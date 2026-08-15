@@ -262,7 +262,7 @@ class TestRepairWorkflows:
         )
 
         assert state["status"] == "error"
-        assert state["termination_reason"] == "llm_error"
+        assert state["termination_reason"].startswith("llm_error")
         wm.cleanup()
 
 

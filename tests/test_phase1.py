@@ -72,7 +72,7 @@ class TestConfig:
         assert settings.max_iterations == 5
 
     def test_llm_provider_default(self):
-        assert settings.llm_provider == "ollama"
+        assert settings.llm_provider == "openai_compatible"
 
     def test_workspace_path_is_absolute(self):
         assert settings.workspace_path.is_absolute()

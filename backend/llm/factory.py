@@ -56,10 +56,10 @@ def get_llm_provider(
         )
         return OpenAICompatibleLLMProvider()
     else:
-        logger.warning(
-            "Unknown provider %r requested; falling back to MockLLMProvider", name
+        raise ValueError(
+            f"Unsupported LLM provider {name!r}. Production AegisCode requires "
+            f"'openai_compatible' with Groq model 'openai/gpt-oss-120b'."
         )
-        return MockLLMProvider()
 
 
 def check_llm_health(provider_name: str | None = None) -> dict[str, str | bool]:

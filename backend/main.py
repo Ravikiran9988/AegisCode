@@ -8,6 +8,7 @@ Later phases will add /projects, /runs, etc.
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -32,6 +33,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup / shutdown hooks."""
     setup_logging()
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
+    if (
+        os.environ.get("ENV") == "production"
+        or os.environ.get("STRICT_LLM_VALIDATION") == "true"
+        or (not settings.debug and settings.openai_api_key != "your_openai_api_key_here")
+    ):
+        settings.validate_production_llm_config()
+        logger.info(
+            "Production Groq LLM config validated successfully (model=%s)",
+            settings.openai_model,
+        )
     init_db()
     logger.info("Application ready")
     yield

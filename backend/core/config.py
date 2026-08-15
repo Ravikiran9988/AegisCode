@@ -49,12 +49,12 @@ class Settings(BaseSettings):
     # LLM provider
     # ------------------------------------------------------------------ #
     llm_provider: str = Field(
-        default="ollama",
-        description="LLM provider: 'ollama', 'openai_compatible', or 'mock'",
+        default="openai_compatible",
+        description="LLM provider: 'openai_compatible', 'ollama', or 'mock'",
     )
     ollama_base_url: str = Field(
         default="http://localhost:11434",
-        description="Base URL for local Ollama instance",
+        description="Base URL for local Ollama instance (development only)",
     )
     ollama_model: str = Field(
         default="qwen2.5-coder:7b",
@@ -65,12 +65,12 @@ class Settings(BaseSettings):
         description="API key for OpenAI-compatible hosted provider",
     )
     openai_base_url: str = Field(
-        default="https://api.openai.com/v1",
-        description="Base URL for OpenAI-compatible REST endpoint",
+        default="https://api.groq.com/openai/v1",
+        description="Base URL for OpenAI-compatible REST endpoint (Groq)",
     )
     openai_model: str = Field(
-        default="llama-3.3-70b-versatile",
-        description="Model name for OpenAI-compatible provider",
+        default="openai/gpt-oss-120b",
+        description="Model name for OpenAI-compatible provider (Groq)",
     )
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-3-5-sonnet-20241022"
@@ -120,6 +120,50 @@ class Settings(BaseSettings):
     def is_debug(self) -> bool:
         return self.debug
 
+    def validate_production_llm_config(self) -> None:
+        """
+        Enforces strict production configuration rules for AegisCode:
+        - LLM_PROVIDER must be 'openai_compatible'.
+        - OPENAI_BASE_URL must be exactly 'https://api.groq.com/openai/v1'.
+        - OPENAI_MODEL must be exactly 'openai/gpt-oss-120b'.
+        - OPENAI_API_KEY must be configured and non-placeholder.
+
+        Raises ValueError if any configuration rule is violated.
+        """
+        errors = []
+        provider_clean = self.llm_provider.lower()
+        if provider_clean not in ("openai_compatible", "openai", "hosted"):
+            errors.append(
+                f"LLM_PROVIDER must be 'openai_compatible', got {self.llm_provider!r}"
+            )
+
+        base_clean = self.openai_base_url.rstrip("/")
+        if base_clean != "https://api.groq.com/openai/v1":
+            errors.append(
+                f"OPENAI_BASE_URL must be 'https://api.groq.com/openai/v1', got {base_clean!r}"
+            )
+
+        if self.openai_model != "openai/gpt-oss-120b":
+            errors.append(
+                f"OPENAI_MODEL must be exactly 'openai/gpt-oss-120b', got {self.openai_model!r}"
+            )
+
+        if (
+            not self.openai_api_key
+            or self.openai_api_key == "your_openai_api_key_here"
+            or "placeholder" in self.openai_api_key.lower()
+        ):
+            errors.append(
+                "OPENAI_API_KEY is missing or invalid placeholder. "
+                "A valid Groq API key is required."
+            )
+
+        if errors:
+            err_str = "\n".join(f" - {e}" for e in errors)
+            msg = f"Production LLM Configuration Errors:\n{err_str}"
+            raise ValueError(msg)
+
 
 # Module-level singleton — import this everywhere
 settings = Settings()
+
