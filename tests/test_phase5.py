@@ -39,9 +39,9 @@ class TestOpenAIProvider:
         provider = OpenAICompatibleLLMProvider(
             api_key="sk-test-key",
             base_url="https://api.groq.com/openai/v1",
-            model="openai/gpt-oss-120b",
+            model="llama-3.3-70b-versatile",
         )
-        assert provider.model_name == "openai/gpt-oss-120b"
+        assert provider.model_name == "llama-3.3-70b-versatile"
         assert provider.provider_name == "openai_compatible"
         assert provider.base_url == "https://api.groq.com/openai/v1"
 

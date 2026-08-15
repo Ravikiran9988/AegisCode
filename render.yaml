@@ -11,7 +11,7 @@ services:
       - key: OPENAI_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: OPENAI_MODEL
-        value: openai/gpt-oss-120b
+        value: llama-3.3-70b-versatile
       - key: OPENAI_API_KEY
         sync: false           # set in Render dashboard - do NOT commit the key
       - key: DATABASE_URL
