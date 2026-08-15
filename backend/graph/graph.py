@@ -208,7 +208,7 @@ def run_repair_workflow(
         logger.error("Repair graph execution error: %s", exc)
         final_state = dict(initial_state)
         final_state["status"] = "error"
-        final_state["termination_reason"] = "llm_error"
+        final_state["termination_reason"] = f"llm_error: {exc}"
 
     # Ensure status is finalised if graph ended while status was still "running"
     if final_state.get("status") == "running":
