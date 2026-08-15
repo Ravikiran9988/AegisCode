@@ -44,8 +44,8 @@ cp .env.example .env
 | `DATABASE_URL` | `postgresql+psycopg://user:pass@host:5432/dbname` | PostgreSQL connection string |
 | `LLM_PROVIDER` | `openai_compatible` or `ollama` | Provider selection |
 | `OPENAI_API_KEY` | `sk-...` | Hosted LLM API Key |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Hosted provider endpoint |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Target model for reasoning & coding |
+| `OPENAI_BASE_URL` | `https://api.groq.com/openai/v1` | Hosted provider endpoint (Groq / OpenAI) |
+| `OPENAI_MODEL` | `openai/gpt-oss-120b` | Target model for reasoning & coding |
 | `CORS_ORIGINS` | `https://your-frontend.onrender.com` | Allowed CORS origins |
 | `BACKEND_URL` | `https://your-backend.onrender.com/api` | Streamlit backend endpoint |
 | `EXECUTION_BACKEND` | `docker` or `local` | Sandbox backend choice |

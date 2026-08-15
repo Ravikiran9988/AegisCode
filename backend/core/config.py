@@ -69,7 +69,7 @@ class Settings(BaseSettings):
         description="Base URL for OpenAI-compatible REST endpoint",
     )
     openai_model: str = Field(
-        default="gpt-4o-mini",
+        default="openai/gpt-oss-120b",
         description="Model name for OpenAI-compatible provider",
     )
     anthropic_api_key: str = ""

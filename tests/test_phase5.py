@@ -35,6 +35,16 @@ class TestOpenAIProvider:
         provider = get_llm_provider(provider_type="openai_compatible")
         assert isinstance(provider, OpenAICompatibleLLMProvider)
 
+    def test_openai_provider_model_configuration(self):
+        provider = OpenAICompatibleLLMProvider(
+            api_key="sk-test-key",
+            base_url="https://api.groq.com/openai/v1",
+            model="openai/gpt-oss-120b",
+        )
+        assert provider.model_name == "openai/gpt-oss-120b"
+        assert provider.provider_name == "openai_compatible"
+        assert provider.base_url == "https://api.groq.com/openai/v1"
+
     @patch("requests.post")
     def test_openai_generate(self, mock_post):
         mock_response = MagicMock()
