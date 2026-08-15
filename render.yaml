@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: aegiscode-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: LLM_PROVIDER
+        value: openai_compatible
+      - key: OPENAI_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: OPENAI_MODEL
+        value: llama-3.3-70b-versatile
+      - key: OPENAI_API_KEY
+        sync: false           # set in Render dashboard - do NOT commit the key
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aegiscode-db
+          property: connectionString
+      - key: CORS_ORIGINS
+        value: https://aegiscode-frontend.onrender.com
+      - key: EXECUTION_BACKEND
+        value: local           # Render does not support Docker-in-Docker
+      - key: WORKSPACE_BASE_DIR
+        value: /tmp/aegiscode_workspaces
+      - key: MAX_ITERATIONS
+        value: "5"
+      - key: LLM_TIMEOUT_SECONDS
+        value: "90"
+
+  - type: web
+    name: aegiscode-frontend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: BACKEND_URL
+        value: https://aegiscode-backend.onrender.com
+
+databases:
+  - name: aegiscode-db
+    plan: free
+    databaseName: aegiscode_db
+    user: aegis_user

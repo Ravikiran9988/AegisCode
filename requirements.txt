@@ -1,0 +1,43 @@
+# =============================================================================
+# AegisCode – Runtime Dependencies
+# =============================================================================
+# Uses >= pins so pip can resolve the current compatible set.
+# Install:  pip install -r requirements.txt
+
+# ── Web / API ─────────────────────────────────────────────────────────────────
+fastapi>=0.130.0               # >=0.130 required for starlette 1.x compatibility
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.18       # file uploads
+httpx>=0.27.0                  # async HTTP (Streamlit → FastAPI health check)
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.0
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.30
+psycopg2-binary>=2.9.9         # PostgreSQL driver for Render production
+
+# ── LangGraph / LangChain (1.x series) ───────────────────────────────────────
+langgraph>=1.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-ollama>=0.2.0
+langchain-openai>=0.2.0        # optional; not imported unless provider=openai
+
+# ── LLM providers ─────────────────────────────────────────────────────────────
+ollama>=0.4.0                  # Python SDK for Ollama REST API
+
+# ── Agent tools / execution ───────────────────────────────────────────────────
+pytest>=8.3.0                  # executed as subprocess inside sandbox
+gitpython>=3.1.40              # git diff support for reviewer
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+streamlit>=1.40.0
+requests>=2.32.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+tenacity>=9.0.0                # retry logic
+rich>=13.9.0                   # pretty console output / evaluation reports

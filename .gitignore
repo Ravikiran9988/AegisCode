@@ -1,0 +1,58 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# ── AegisCode runtime artefacts ──────────────────────────────────────────────
+aegiscode.db
+aegiscode.db-shm
+aegiscode.db-wal
+workspaces/
+*.log
+
+# ── Evaluation results (contain local paths, regenerate on each run) ───────────
+evaluation/results.json
+evaluation/results.csv
+
+# ── IDE / editors ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.pytest_cache/
+
+# ── Type checking ─────────────────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.docker/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Streamlit ─────────────────────────────────────────────────────────────────
+.streamlit/secrets.toml
