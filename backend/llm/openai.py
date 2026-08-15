@@ -77,6 +77,14 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"]
+        except requests.exceptions.HTTPError as exc:
+            body_err = ""
+            try:
+                body_err = f" | Details: {resp.text[:300]}"
+            except Exception:
+                pass
+            logger.error("OpenAI API HTTP error: %s%s", exc, body_err)
+            raise LLMProviderError(f"OpenAI API request failed: {exc}{body_err}") from exc
         except Exception as exc:
             logger.error("OpenAI API call failed: %s", exc)
             raise LLMProviderError(f"OpenAI API request failed: {exc}") from exc
