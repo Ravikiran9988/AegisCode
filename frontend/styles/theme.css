@@ -179,7 +179,7 @@ code, pre, .stCodeBlock, [class*="stCode"], kbd {
 }
 
 /* Hide default streamlit chrome & duplicate navigation */
-#MainMenu, header, footer, [data-testid="stSidebarNav"], .stDeployButton {
+#MainMenu, footer, [data-testid="stSidebarNav"], .stDeployButton {
   display: none !important;
   visibility: hidden !important;
 }
