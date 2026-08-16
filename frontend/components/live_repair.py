@@ -171,7 +171,7 @@ def render_live_repair(api_url: str) -> None:
         status_label = "RUNNING"
 
     # ── A. RUN HEADER ─────────────────────────────────────────────────────────
-    st.markdown(
+    st.html(
         f"""
         <div style="display: flex; justify-content: space-between; align-items: center;
         margin-bottom: 18px; flex-wrap: wrap; gap: 10px; background: var(--bg-panel);
@@ -198,11 +198,10 @@ def render_live_repair(api_url: str) -> None:
           </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
     # ── B. REAL-TIME PROGRESS BAR ─────────────────────────────────────────────
-    st.markdown(
+    st.html(
         f"""
         <div style="background: var(--bg-panel); padding: 14px 18px;
         border-radius: var(--radius-md); border: 1px solid var(--border-subtle);
@@ -218,7 +217,6 @@ def render_live_repair(api_url: str) -> None:
           </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
     st.progress(min(progress_pct / 100.0, 1.0))
 
@@ -226,17 +224,15 @@ def render_live_repair(api_url: str) -> None:
     col_pipe, col_action = st.columns([3, 2])
 
     with col_pipe:
-        st.markdown(
+        st.html(
             """
             <div style="font-weight: 700; font-size: 0.85rem; color: #94a3b8;
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
               LangGraph State Machine Pipeline
             </div>
             """,
-            unsafe_allow_html=True,
         )
 
-        # Default fallback pipeline nodes if not populated
         nodes_to_show = pipeline_nodes or [
             {
                 "node": "initial_test",
@@ -323,17 +319,16 @@ def render_live_repair(api_url: str) -> None:
             </div>
             """
         pipe_html += "</div>"
-        st.markdown(pipe_html, unsafe_allow_html=True)
+        st.html(pipe_html)
 
     with col_action:
-        st.markdown(
+        st.html(
             """
             <div style="font-weight: 700; font-size: 0.85rem; color: #94a3b8;
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
               Current Autonomous Action
             </div>
             """,
-            unsafe_allow_html=True,
         )
 
         agent_name = current_action.get("agent", sdata.get("current_agent", "Autonomous Agent"))
@@ -346,7 +341,7 @@ def render_live_repair(api_url: str) -> None:
             if action_file else ""
         )
 
-        st.markdown(
+        st.html(
             f"""
             <div class="aegis-agent-card" style="height: calc(100% - 28px); display: flex;
             flex-direction: column; justify-content: space-between;">
@@ -367,11 +362,10 @@ def render_live_repair(api_url: str) -> None:
               </div>
             </div>
             """,
-            unsafe_allow_html=True,
         )
 
     # ── D & E. ITERATION TRACKER & LIVE TEST METRICS ──────────────────────────
-    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+    st.html("<div style='height: 14px;'></div>")
 
     t_pass = tests_info.get("passed", 0)
     t_fail = tests_info.get("failed", 0)
@@ -380,7 +374,7 @@ def render_live_repair(api_url: str) -> None:
     t_cov = tests_info.get("coverage_percent", 0.0)
     f_changed = files_info.get("changed", 0)
 
-    st.markdown(
+    st.html(
         f"""
         <div class="aegis-metric-grid">
           <div class="aegis-metric-card">
@@ -414,7 +408,6 @@ def render_live_repair(api_url: str) -> None:
           </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
     # ── G. LIVE EXECUTION TIMELINE STREAM ──────────────────────────────────────
@@ -426,7 +419,7 @@ def render_live_repair(api_url: str) -> None:
                 msg = ev.get("message", "")
                 it_tag = f"[Iter {ev.get('iteration')}]" if ev.get("iteration") else ""
 
-                st.markdown(
+                st.html(
                     f"""
                     <div style="display: flex; gap: 12px; font-size: 0.84rem; padding: 6px 0;
                     border-bottom: 1px solid rgba(255,255,255,0.04); align-items: baseline;">
@@ -438,14 +431,13 @@ def render_live_repair(api_url: str) -> None:
                       <span style="color: #f8fafc; flex: 1;">{msg}</span>
                     </div>
                     """,
-                    unsafe_allow_html=True,
                 )
 
     # ── H. STATUS HERO / COMPLETION & FAILURE BANNERS ─────────────────────────
     if is_rate_limit_err:
         render_rate_limit_alert()
     elif run_status in ("passed", "already_passing"):
-        st.markdown(
+        st.html(
             f"""
             <div class="aegis-status-banner passed">
               <div>
@@ -466,10 +458,8 @@ def render_live_repair(api_url: str) -> None:
               <div style="font-size: 2.2rem;">🛡️</div>
             </div>
             """,
-            unsafe_allow_html=True,
         )
 
-        # Action bar
         col_act1, col_act2, col_act3, col_act4 = st.columns(4)
         with col_act1:
             if st.button("🔀 View Code Changes", key="btn_view_diffs", use_container_width=True):
@@ -506,7 +496,7 @@ def render_live_repair(api_url: str) -> None:
             final_summary
             or f"Autonomous repair reached iteration {current_iter}/{max_iter} without passing."
         )
-        st.markdown(
+        st.html(
             f"""
             <div class="aegis-status-banner failed">
               <div>
@@ -519,7 +509,6 @@ def render_live_repair(api_url: str) -> None:
               <div style="font-size: 2.2rem;">🛑</div>
             </div>
             """,
-            unsafe_allow_html=True,
         )
 
         col_f1, col_f2 = st.columns(2)
@@ -556,12 +545,10 @@ def render_live_repair(api_url: str) -> None:
 
     is_already_passing = (run_status == "already_passing")
 
-    # Tab 1: Stepper Timeline
     with console_tabs[0]:
         st.markdown("### 📅 Execution Lifecycle Stepper")
         render_timeline(run_status, iterations, final_summary)
 
-    # Tab 2: Architect
     with console_tabs[1]:
         st.markdown("### 🏛️ Architect Agent Analysis")
         if iterations:
@@ -573,7 +560,6 @@ def render_live_repair(api_url: str) -> None:
         else:
             st.caption("No architect trace recorded for this run.")
 
-    # Tab 3: Coder
     with console_tabs[2]:
         st.markdown("### 💻 Coder Agent Synthesis")
         if iterations:
@@ -585,7 +571,6 @@ def render_live_repair(api_url: str) -> None:
         else:
             st.caption("No code modifications recorded for this run.")
 
-    # Tab 4: Pytest
     with console_tabs[3]:
         st.markdown("### 🧪 Authoritative Pytest Execution")
         if iterations:
@@ -597,7 +582,6 @@ def render_live_repair(api_url: str) -> None:
         else:
             st.caption("No test execution logs recorded for this run.")
 
-    # Tab 5: Reviewer
     with console_tabs[4]:
         st.markdown("### 🔍 Independent Reviewer Audit")
         if iterations:
@@ -609,7 +593,6 @@ def render_live_repair(api_url: str) -> None:
         else:
             st.caption("No reviewer audit recorded for this run.")
 
-    # Tab 6: Code Changes
     with console_tabs[5]:
         render_code_diff_viewer(iterations, is_already_passing)
 
