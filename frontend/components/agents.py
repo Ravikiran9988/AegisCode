@@ -1,11 +1,13 @@
 """
 Agent Observability & Traces Component for AegisCode.
-Renders dedicated telemetry panels for Architect, Coder, Test, and Reviewer agents.
+Provides dedicated telemetry cards and standalone multi-agent engineering dashboard.
 """
 
 from __future__ import annotations
 
 import streamlit as st
+
+from frontend.utils.api_client import fetch_recent_runs, fetch_run_results
 
 
 def render_architect_panel(arch_plan: dict, is_already_passing: bool = False) -> None:
@@ -191,3 +193,131 @@ def render_reviewer_panel(review_res: dict, is_already_passing: bool = False) ->
         else:
             st.caption("No reviewer audit result recorded for this iteration.")
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_agents_view(api_url: str) -> None:
+    """Render standalone Agent Observability dashboard."""
+    st.markdown(
+        """
+        <div class="aegis-page-header">
+          <h1 class="aegis-page-title">Multi-Agent Observability & Telemetry</h1>
+          <p class="aegis-page-desc">
+            Deep inspection into the specialized roles, telemetry, and runtime behavior
+            of the 4 core AegisCode autonomous engineering agents.
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 4 Agent Architecture Grid
+    col_ag1, col_ag2 = st.columns(2)
+    with col_ag1:
+        st.markdown(
+            """
+            <div class="aegis-agent-card">
+              <div class="aegis-agent-header">
+                <span class="aegis-agent-title">🏛️ Architect Agent</span>
+                <span class="aegis-badge passed">Root Cause Diagnosis</span>
+              </div>
+              <p style="font-size: 0.86rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 10px 0;">
+                Ingests pytest tracebacks, syntax error positions, and project context.
+                Formulates root cause hypotheses and establishes a targeted repair blueprint.
+              </p>
+              <div style="font-size: 0.78rem; color: #94a3b8;">
+                <div>• Read-only access to repository context</div>
+                <div>• Generates structured JSON architecture plans</div>
+                <div>• Identifies relevant source files and verification strategies</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+            <div class="aegis-agent-card">
+              <div class="aegis-agent-header">
+                <span class="aegis-agent-title">🧪 Test Execution Node</span>
+                <span class="aegis-badge passed">Authoritative Gate</span>
+              </div>
+              <p style="font-size: 0.86rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 10px 0;">
+                Spawns authoritative pytest processes inside the isolated execution sandbox.
+                Test exit code 0 is an invariant requirement for resolution.
+              </p>
+              <div style="font-size: 0.78rem; color: #94a3b8;">
+                <div>• Captures raw stdout and stderr streams</div>
+                <div>• Measures sub-second assertion execution times</div>
+                <div>• Read-only test files guard prevents agent tampering</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_ag2:
+        st.markdown(
+            """
+            <div class="aegis-agent-card">
+              <div class="aegis-agent-header">
+                <span class="aegis-agent-title">💻 Coder Agent</span>
+                <span class="aegis-badge running">Code Synthesis</span>
+              </div>
+              <p style="font-size: 0.86rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 10px 0;">
+                Translates Architect plans into AST-verified file replacements or unified diffs.
+                Executes surgical source code repairs.
+              </p>
+              <div style="font-size: 0.78rem; color: #94a3b8;">
+                <div>• AST validation prevents syntax regressions</div>
+                <div>• Enforces strict file-modification policies</div>
+                <div>• Path traversal protection blocks outside writes</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+            <div class="aegis-agent-card">
+              <div class="aegis-agent-header">
+                <span class="aegis-agent-title">🔍 Reviewer Agent</span>
+                <span class="aegis-badge risk-low">Independent Verification</span>
+              </div>
+              <p style="font-size: 0.86rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 10px 0;">
+                Audits all synthesized code modifications against the original workspace.
+                Evaluates regression risk and must explicitly approve the fix.
+              </p>
+              <div style="font-size: 0.78rem; color: #94a3b8;">
+                <div>• Rates regression risk: LOW, MEDIUM, HIGH</div>
+                <div>• Verifies root cause defect was genuinely resolved</div>
+                <div>• Second gate of double-gated resolution model</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # Active or Recent Run Agent Traces
+    active_run_id = st.session_state.get("active_run_id")
+    if not active_run_id:
+        recent_runs = fetch_recent_runs(api_url, limit=1)
+        if recent_runs:
+            active_run_id = recent_runs[0].get("run_id")
+
+    if active_run_id:
+        st.markdown("---")
+        st.markdown(f"### 📋 Live Agent Traces for Active Run (`RUN-{active_run_id[:8].upper()}`)")
+        rdata = fetch_run_results(api_url, active_run_id)
+        if rdata:
+            iterations = rdata.get("iterations", rdata.get("iteration_details", []))
+            for idx, it in enumerate(iterations):
+                it_num = it.get("iteration_number", it.get("iteration", idx + 1))
+                st.markdown(f"#### Iteration {it_num}")
+                col_t1, col_t2 = st.columns(2)
+                with col_t1:
+                    render_architect_panel(it.get("architecture_plan") or it.get("architect") or {})
+                    render_coder_panel(it.get("code_changes") or it.get("coder") or [])
+                with col_t2:
+                    render_test_panel(it.get("test_results") or it.get("tests") or {})
+                    render_reviewer_panel(it.get("review_result") or it.get("reviewer") or {})

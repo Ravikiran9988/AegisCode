@@ -18,12 +18,12 @@ def render_topbar(
         if idx == len(breadcrumbs) - 1:
             crumb_html_parts.append(f"<span class='crumb-current'>{c}</span>")
         else:
-            crumb_html_parts.append(f"<span>{c}</span> / ")
+            crumb_html_parts.append(f"<span class='crumb-parent'>{c}</span> / ")
 
     crumbs_str = "".join(crumb_html_parts)
 
     if backend_online:
-        status_pill = "<span class='topbar-pill online'>● Backend Online</span>"
+        status_pill = "<span class='topbar-pill online'>● Operational</span>"
     else:
         status_pill = (
             "<span class='topbar-pill' style='border-color: #ef4444; color: #f87171;'>"

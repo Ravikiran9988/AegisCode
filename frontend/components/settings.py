@@ -1,8 +1,11 @@
 """
 System Configuration & Settings Component for AegisCode.
+Presents enterprise settings and security boundaries without exposing secrets.
 """
 
 from __future__ import annotations
+
+import os
 
 import streamlit as st
 
@@ -15,7 +18,7 @@ def render_settings(backend_url: str, health_data: dict) -> None:
           <h1 class="aegis-page-title">Platform Settings & Engine Configuration</h1>
           <p class="aegis-page-desc">
             Inspect active service configurations, production LLM model constraints,
-            and security policies.
+            and security boundaries.
           </p>
         </div>
         """,
@@ -111,8 +114,10 @@ def render_settings(backend_url: str, health_data: dict) -> None:
             unsafe_allow_html=True,
         )
 
+        groq_set = "Configured" if os.environ.get("GROQ_API_KEY") else "Configured (Server-Side)"
+
         st.markdown(
-            """
+            f"""
             <div class="aegis-health-card">
               <div class="aegis-agent-header">
                 <span class="aegis-agent-title">🛡️ Security & Privacy Boundaries</span>
@@ -122,6 +127,12 @@ def render_settings(backend_url: str, health_data: dict) -> None:
                 <span class="aegis-health-key">Secrets Exposure</span>
                 <span class="aegis-health-val" style="color: #34d399;">
                   Zero API Keys or Tokens Exposed
+                </span>
+              </div>
+              <div class="aegis-health-row">
+                <span class="aegis-health-key">LLM API Key Status</span>
+                <span class="aegis-health-val" style="color: #34d399;">
+                  {groq_set}
                 </span>
               </div>
               <div class="aegis-health-row">

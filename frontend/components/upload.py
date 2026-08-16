@@ -1,6 +1,6 @@
 """
 New Repair & Project Upload Component for AegisCode.
-Handles project ZIP upload, workspace initialization, and graph execution launch.
+Centered workspace with project inspection and 2-step repair launch workflow.
 """
 
 from __future__ import annotations
@@ -15,79 +15,79 @@ from frontend.utils.helpers import _parse_api_error, format_file_size
 
 
 def render_upload(api_url: str) -> None:
-    """Render the project upload and repair initialization experience."""
+    """Render the centered project upload and repair initialization experience."""
     st.markdown(
         """
-        <div class="aegis-page-header">
-          <h1 class="aegis-page-title">Start a New Autonomous Repair</h1>
+        <div class="aegis-page-header"
+        style="text-align: center; max-width: 680px; margin: 0 auto 28px auto;">
+          <h1 class="aegis-page-title">Start Autonomous Repair</h1>
           <p class="aegis-page-desc">
-            Upload a Python repository and let AegisCode diagnose failures,
-            synthesize verified patches, and audit regressions.
+            Upload a Python project archive and let AegisCode diagnose defects,
+            synthesize verified patches, and independently audit regressions.
           </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # Drag and Drop Upload Card
-    uploaded_file = st.file_uploader(
-        "Upload Python Project ZIP",
-        type=["zip"],
-        help="Upload a .zip file containing your Python source files and pytest test files.",
-        key="project_zip_uploader",
-    )
-
-    if uploaded_file is not None:
-        file_bytes = uploaded_file.getvalue()
-        file_size_str = format_file_size(len(file_bytes))
-
-        st.markdown(
-            f"""
-            <div class="aegis-agent-card" style="margin-top: 16px;">
-              <div class="aegis-agent-header">
-                <span class="aegis-agent-title">📦 Project Archive Details</span>
-                <span class="aegis-badge running">Ready for Inspection</span>
-              </div>
-              <div style="display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-              gap: 12px; font-size: 0.88rem;">
-                <div>
-                  <span style="color: #94a3b8;">Archive Name:</span><br>
-                  <strong style="color: #f8fafc;">{uploaded_file.name}</strong>
-                </div>
-                <div>
-                  <span style="color: #94a3b8;">Archive Size:</span><br>
-                  <strong style="color: #f8fafc;">{file_size_str}</strong>
-                </div>
-                <div>
-                  <span style="color: #94a3b8;">Target Runtime:</span><br>
-                  <strong style="color: #38bdf8;">Python 3.10+</strong>
-                </div>
-                <div>
-                  <span style="color: #94a3b8;">Test Framework:</span><br>
-                  <strong style="color: #34d399;">Pytest (Auto-detected)</strong>
-                </div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    # Centered Drag and Drop Upload Card
+    col_u1, col_u2, col_u3 = st.columns([1, 6, 1])
+    with col_u2:
+        uploaded_file = st.file_uploader(
+            "Upload Project ZIP Archive",
+            type=["zip"],
+            help="Upload a .zip file containing your Python source files and pytest test files.",
+            key="project_zip_uploader",
         )
 
-        col_act1, col_act2 = st.columns([1, 1])
+        if uploaded_file is not None:
+            file_bytes = uploaded_file.getvalue()
+            file_size_str = format_file_size(len(file_bytes))
 
-        # Step 1: Initialize Workspace
-        with col_act1:
+            st.markdown(
+                f"""
+                <div class="aegis-agent-card" style="margin-top: 20px;">
+                  <div class="aegis-agent-header">
+                    <span class="aegis-agent-title">📦 Project Inspection Metadata</span>
+                    <span class="aegis-badge running">Ready for Inspection</span>
+                  </div>
+                  <div style="display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                  gap: 12px; font-size: 0.88rem;">
+                    <div>
+                      <span style="color: #94a3b8;">Archive Name:</span><br>
+                      <strong style="color: #f8fafc;">{uploaded_file.name}</strong>
+                    </div>
+                    <div>
+                      <span style="color: #94a3b8;">Archive Size:</span><br>
+                      <strong style="color: #f8fafc;">{file_size_str}</strong>
+                    </div>
+                    <div>
+                      <span style="color: #94a3b8;">Python Runtime:</span><br>
+                      <strong style="color: #38bdf8;">Python 3.10+</strong>
+                    </div>
+                    <div>
+                      <span style="color: #94a3b8;">Test Framework:</span><br>
+                      <strong style="color: #34d399;">Pytest (Auto-detected)</strong>
+                    </div>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # Step 1: Initialize Workspace
             uploaded_name = uploaded_file.name
             has_project = "project_id" in st.session_state
             is_same_file = st.session_state.get("uploaded_filename") == uploaded_name
             if not has_project or not is_same_file:
                 if st.button(
-                    "🚀 Initialize Project Workspace",
+                    "🚀 Initialize Workspace",
                     type="primary",
                     use_container_width=True,
                     key="btn_init_ws",
                 ):
-                    with st.spinner("Extracting workspace and initializing git snapshot..."):
+                    with st.spinner("Extracting workspace and initializing git baseline..."):
                         try:
                             file_tuple = (
                                 uploaded_file.name,
@@ -133,17 +133,15 @@ def render_upload(api_url: str) -> None:
                         except Exception as exc:
                             render_error_alert("Upload Exception", str(exc))
 
-    # Step 2: Configure and Launch Graph
-    if "project_id" in st.session_state:
-        pid = st.session_state["project_id"]
-        pname = st.session_state.get("project_name", "project")
-        fcnt = st.session_state.get("file_count", 0)
+        # Step 2: Configure and Launch Graph
+        if "project_id" in st.session_state:
+            pid = st.session_state["project_id"]
+            pname = st.session_state.get("project_name", "project")
+            fcnt = st.session_state.get("file_count", 0)
 
-        st.markdown("---")
-        st.markdown("### 2. Configure Autonomous Repair Parameters")
+            st.markdown("---")
+            st.markdown("### 2. Configure Repair Execution")
 
-        col_cfg1, col_cfg2 = st.columns([1, 1])
-        with col_cfg1:
             max_iters = st.slider(
                 "Maximum Repair Iterations",
                 min_value=1,
@@ -152,56 +150,38 @@ def render_upload(api_url: str) -> None:
                 help="Max cycles of Architect → Coder → Test → Reviewer before halting.",
                 key="upload_max_iters_slider",
             )
-            st.caption(f"Active Workspace: `{pid}` ({pname} • {fcnt} files)")
+            st.caption(f"Active Workspace: `{pid}` ({pname} • {fcnt} source files)")
 
-        with col_cfg2:
-            st.markdown(
-                """
-                <div class="aegis-health-card">
-                  <strong style="color: #e2e8f0; font-size: 0.88rem;">
-                    🛡️ Engine Safety & Isolation Guarantees:
-                  </strong>
-                  <ul style="margin: 6px 0 0 0; padding-left: 18px; color: #94a3b8;
-                  font-size: 0.82rem; line-height: 1.5;">
-                    <li>Isolated sandbox prevents modification outside project root.</li>
-                    <li>Test files are strictly read-only — agents cannot tamper with tests.</li>
-                    <li>Double-gated resolution: 100% Pytest pass + Reviewer LLM audit.</li>
-                  </ul>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            if st.button(
+                "🛡️ Start Autonomous Repair",
+                type="primary",
+                use_container_width=True,
+                key="btn_start_repair",
+            ):
+                with st.spinner("Spawning autonomous LangGraph repair engine..."):
+                    try:
+                        payload = {
+                            "project_id": pid,
+                            "max_iterations": max_iters,
+                        }
+                        create_res = _safe_post(f"{api_url}/runs", json=payload, timeout=30)
+                        if create_res is None:
+                            render_error_alert(
+                                "Connection Error",
+                                "Could not reach backend to spawn repair run.",
+                            )
+                        elif create_res.status_code == 201:
+                            run_id = create_res.json()["run_id"]
+                            st.session_state["active_run_id"] = run_id
 
-        if st.button(
-            "🛡️ Start Autonomous Self-Healing Graph",
-            type="primary",
-            use_container_width=True,
-            key="btn_start_repair",
-        ):
-            with st.spinner("Spawning autonomous LangGraph repair engine..."):
-                try:
-                    payload = {
-                        "project_id": pid,
-                        "max_iterations": max_iters,
-                    }
-                    create_res = _safe_post(f"{api_url}/runs", json=payload, timeout=30)
-                    if create_res is None:
-                        render_error_alert(
-                            "Connection Error",
-                            "Could not reach backend to spawn repair run.",
-                        )
-                    elif create_res.status_code == 201:
-                        run_id = create_res.json()["run_id"]
-                        st.session_state["active_run_id"] = run_id
+                            # Trigger background repair graph
+                            _safe_post(f"{api_url}/runs/{run_id}/repair", timeout=10)
 
-                        # Trigger background repair graph
-                        _safe_post(f"{api_url}/runs/{run_id}/repair", timeout=10)
-
-                        st.success(f"🚀 Repair Graph Launched! Run ID: `{run_id}`")
-                        time.sleep(0.5)
-                        st.session_state["nav_view"] = "🤖 Live Repair Console"
-                        st.rerun()
-                    else:
-                        render_error_alert("Run Creation Failed", _parse_api_error(create_res))
-                except Exception as exc:
-                    render_error_alert("Execution Error", str(exc))
+                            st.success(f"🚀 Repair Graph Launched! Run ID: `{run_id}`")
+                            time.sleep(0.5)
+                            st.session_state["nav_view"] = "🤖 Active Repairs"
+                            st.rerun()
+                        else:
+                            render_error_alert("Run Creation Failed", _parse_api_error(create_res))
+                    except Exception as exc:
+                        render_error_alert("Execution Error", str(exc))

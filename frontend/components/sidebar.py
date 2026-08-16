@@ -1,5 +1,6 @@
 """
-Sidebar Navigation and Brand Shell Component for AegisCode.
+Left Sidebar Shell & Navigation for AegisCode.
+Structured into Control Center, Engineering, and System navigation groups.
 """
 
 from __future__ import annotations
@@ -9,116 +10,100 @@ import streamlit as st
 
 def render_sidebar(
     default_backend: str,
-    backend_online: bool,
-    health_data: dict,
-    backend_error: str,
+    backend_online: bool = True,
+    health_data: dict | None = None,
+    backend_error: str = "",
 ) -> tuple[str, str]:
-    """
-    Render professional dark developer-tool sidebar.
-    Returns (selected_view, normalized_backend_url).
-    """
-    # Brand Header
-    st.sidebar.markdown(
-        """
-        <div style="padding: 4px 0 16px 0;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 1.7rem;">🛡️</span>
-            <div>
-              <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800;
-              letter-spacing: -0.02em; color: #f8fafc; line-height: 1.1;">
-                AegisCode
-              </h2>
-              <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 500;
-              letter-spacing: 0.04em; text-transform: uppercase; margin-top: 3px;">
-                Autonomous Engineering
+    """Render the left navigation sidebar and return the selected view and backend URL."""
+    health_data = health_data or {}
+
+    with st.sidebar:
+        # Brand Header
+        st.markdown(
+            """
+            <div class="aegis-sidebar-brand">
+              <div class="aegis-brand-title">
+                <span>🛡️</span> AegisCode
               </div>
-            </div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Backend Host Input
-    raw_backend = st.sidebar.text_input(
-        "Backend Host",
-        value=default_backend,
-        help="FastAPI backend host URL",
-        key="sidebar_backend_url_input",
-    )
-
-    st.sidebar.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-
-    # Navigation Menu
-    nav_options = [
-        "◉ Dashboard",
-        "🚀 New Repair",
-        "📊 Repair History",
-        "🤖 Live Repair Console",
-        "❤️ System Health",
-        "⚙ Settings",
-        "📖 Documentation",
-    ]
-
-    current_idx = 0
-    if "nav_view" in st.session_state and st.session_state["nav_view"] in nav_options:
-        current_idx = nav_options.index(st.session_state["nav_view"])
-
-    selected_nav = st.sidebar.radio(
-        "Navigation",
-        nav_options,
-        index=current_idx,
-        key="main_sidebar_nav_radio",
-        label_visibility="collapsed",
-    )
-    st.session_state["nav_view"] = selected_nav
-
-    st.sidebar.markdown("---")
-
-    # Real-time Engine Status Footer
-    if backend_online:
-        db_stat = health_data.get("database", "connected")
-        st.sidebar.markdown(
-            f"""
-            <div class="aegis-health-card" style="padding: 12px 14px; margin-bottom: 0;">
-              <div class="aegis-health-row">
-                <span class="aegis-health-key" style="font-size: 0.78rem;">Backend API</span>
-                <span style="color: #34d399; font-weight: 600; font-size: 0.78rem;">
-                  ● Online
-                </span>
-              </div>
-              <div class="aegis-health-row">
-                <span class="aegis-health-key" style="font-size: 0.78rem;">LLM Engine</span>
-                <span style="color: #c084fc; font-weight: 600; font-size: 0.78rem;">
-                  openai/gpt-oss-120b
-                </span>
-              </div>
-              <div class="aegis-health-row">
-                <span class="aegis-health-key" style="font-size: 0.78rem;">Database</span>
-                <span style="color: #6ee7b7; font-weight: 600; font-size: 0.78rem;">
-                  {db_stat}
-                </span>
+              <div class="aegis-brand-subtitle">
+                Autonomous Software Engineering
               </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-    else:
-        st.sidebar.markdown(
+
+        nav_options = [
+            # Control Center
+            "◉ Overview",
+            "🚀 New Repair",
+            "🤖 Active Repairs",
+            "📊 Repair History",
+            # Engineering
+            "🏛️ Agents",
+            "🔀 Code Changes",
+            "🧪 Test Runs",
+            "❤️ System Health",
+            # System
+            "📖 Documentation",
+            "⚙ Settings",
+        ]
+
+        current_nav = st.session_state.get("nav_view", "◉ Overview")
+        if current_nav not in nav_options:
+            current_nav = "◉ Overview"
+
+        st.markdown(
+            "<div class='aegis-nav-group-header'>CONTROL CENTER</div>",
+            unsafe_allow_html=True,
+        )
+        selected_nav = st.radio(
+            "Navigation",
+            options=nav_options,
+            index=nav_options.index(current_nav),
+            key="app_navigation_radio",
+            label_visibility="collapsed",
+        )
+        st.session_state["nav_view"] = selected_nav
+
+        # Backend URL configuration drawer
+        with st.expander("🔌 Backend Connection", expanded=False):
+            raw_backend = st.text_input(
+                "Backend URL",
+                value=default_backend,
+                key="input_backend_url",
+                help="Enter base URL of the AegisCode FastAPI backend.",
+            )
+        backend_to_use = raw_backend if "raw_backend" in locals() else default_backend
+
+        # Sidebar Footer: Live Engine & Infrastructure Status
+        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+        db_stat = health_data.get("database", "connected").capitalize()
+        status_dot = "●"
+        status_color = "#34d399" if backend_online else "#f87171"
+        status_text = "Engine Operational" if backend_online else "Engine Offline"
+
+        st.markdown(
             f"""
-            <div class="aegis-alert error" style="margin: 0; padding: 10px 12px;">
-              <strong style="font-size: 0.8rem;">❌ Backend Offline</strong><br>
-              <small style="color: #fca5a5; font-size: 0.72rem;">{backend_error[:90]}</small>
+            <div class="aegis-health-card" style="padding: 10px 12px; margin-top: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;
+              margin-bottom: 6px;">
+                <span style="font-weight: 700; font-size: 0.78rem; color: #e2e8f0;">
+                  <span style="color: {status_color}; margin-right: 4px;">{status_dot}</span>
+                  {status_text}
+                </span>
+              </div>
+              <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.5;">
+                <div>LLM: <strong style="color: #c084fc;">openai/gpt-oss-120b</strong></div>
+                <div>Database: <strong style="color: #38bdf8;">{db_stat}</strong></div>
+                <div>Backend: <strong style="color: #e2e8f0;">FastAPI REST</strong></div>
+              </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        if st.sidebar.button(
-            "🔄 Retry Connection",
-            key="btn_sidebar_retry",
-            use_container_width=True,
-        ):
-            st.session_state["backend_online"] = False
-            st.rerun()
 
-    return selected_nav, raw_backend
+        if not backend_online and backend_error:
+            st.caption(f"⚠️ {backend_error[:60]}")
+
+    return selected_nav, backend_to_use

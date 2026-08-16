@@ -19,8 +19,8 @@ def render_system_health(backend_url: str, initial_health_data: dict) -> None:
         <div class="aegis-page-header">
           <h1 class="aegis-page-title">System Health & Telemetry</h1>
           <p class="aegis-page-desc">
-            Real-time operational status, backend connectivity, database integrity,
-            and execution environment.
+            Real-time operational metrics, round-trip latency, database integrity,
+            and execution environment sandboxing.
           </p>
         </div>
         """,

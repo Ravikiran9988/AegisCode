@@ -1,5 +1,6 @@
 """
 Live Repair Console & Interactive Execution Workspace for AegisCode.
+Features real-time polling, progress timeline stepper, agent tabs, and hero completion screens.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def render_live_repair(api_url: str) -> None:
     """Render the live execution console for active or past repair runs."""
     active_run_id = st.session_state.get("active_run_id", "")
 
-    # Top search / switch bar
+    # Search / Switch bar
     col_s1, col_s2 = st.columns([3, 1])
     with col_s1:
         manual_id = st.text_input(
@@ -66,7 +67,7 @@ def render_live_repair(api_url: str) -> None:
         return
 
     # Fetch status & results
-    with st.spinner("Fetching execution metrics from backend..."):
+    with st.spinner("Fetching execution telemetry from backend..."):
         sdata = fetch_run_status(api_url, active_run_id)
         rdata = fetch_run_results(api_url, active_run_id)
 
@@ -95,30 +96,50 @@ def render_live_repair(api_url: str) -> None:
         st.rerun()
 
     # ── Header Console Bar ────────────────────────────────────────────────────
-    short_id = active_run_id[:8]
+    short_id = active_run_id[:8].upper()
     p_name = st.session_state.get("project_name", "Python Project")
+    status_label = run_status.upper()
+    if run_status in ("passed", "already_passing"):
+        badge_class = "passed"
+    elif run_status in ("failed", "error"):
+        badge_class = "failed"
+    else:
+        badge_class = "running"
+
     st.markdown(
         f"""
         <div style="display: flex; justify-content: space-between; align-items: center;
-        margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        margin-bottom: 18px; flex-wrap: wrap; gap: 10px; background: var(--bg-panel);
+        padding: 14px 18px; border-radius: var(--radius-md);
+        border: 1px solid var(--border-subtle);">
           <div>
-            <h2 style="margin: 0; font-size: 1.4rem; font-weight: 800; color: #f8fafc;">
-              Repair Console <code>#{short_id}</code>
+            <div style="font-size: 0.74rem; color: #94a3b8; text-transform: uppercase;
+            letter-spacing: 0.06em; font-weight: 700;">
+              Autonomous Engineering Console
+            </div>
+            <h2 style="margin: 2px 0 0 0; font-size: 1.35rem; font-weight: 800; color: #f8fafc;">
+              Repair Run <code>RUN-{short_id}</code>
             </h2>
             <div style="font-size: 0.84rem; color: #94a3b8; margin-top: 3px;">
-              Project: <strong>{p_name}</strong> • Duration: <strong>{duration_str}</strong>
-              • Iteration: <strong>{current_iter}/{max_iter}</strong>
+              Project: <strong style="color: #f8fafc;">{p_name}</strong> &nbsp;•&nbsp;
+              Elapsed: <strong style="color: #38bdf8;">{duration_str}</strong> &nbsp;•&nbsp;
+              Iteration: <strong style="color: #c084fc;">{current_iter}/{max_iter}</strong>
             </div>
           </div>
           <div>
-            <span class="aegis-badge {run_status}">{run_status.upper()}</span>
+            <span class="aegis-badge {badge_class}" style="font-size: 0.85rem; padding: 6px 14px;">
+              ● {status_label}
+            </span>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # ── Top Metric Cards ──────────────────────────────────────────────────────
+    # ── Top Progress Lifecycle Stepper ────────────────────────────────────────
+    render_timeline(run_status, iterations, final_summary)
+
+    # ── Metric KPI Summary Grid ───────────────────────────────────────────────
     latest_it = iterations[-1] if iterations else {}
     tres_last = latest_it.get("test_results") or latest_it.get("tests") or {}
     rev_last = latest_it.get("review_result") or latest_it.get("reviewer") or {}
@@ -148,37 +169,37 @@ def render_live_repair(api_url: str) -> None:
         f"""
         <div class="aegis-metric-grid">
           <div class="aegis-metric-card">
-            <div class="aegis-metric-label"><span>🛡️</span> Execution Status</div>
+            <div class="aegis-metric-label"><span>🛡️</span> Execution State</div>
             <div class="aegis-metric-val">{run_status.upper()}</div>
-            <div class="aegis-metric-sub">Run ID: {short_id}...</div>
+            <div class="aegis-metric-sub">Run: RUN-{short_id}</div>
           </div>
           <div class="aegis-metric-card">
             <div class="aegis-metric-label"><span>🧪</span> Pytest Assertion State</div>
             <div class="aegis-metric-val">
-              {passed_count} <small style='font-size: 0.9rem; color: #94a3b8;'>passed</small>
-              / {failed_count} <small style='font-size: 0.9rem; color: #94a3b8;'>failed</small>
+              {passed_count} <small style='font-size: 0.85rem; color: #94a3b8;'>passed</small>
+              / {failed_count} <small style='font-size: 0.85rem; color: #94a3b8;'>failed</small>
             </div>
             <div class="aegis-metric-sub">Exit Code: {exit_c}</div>
           </div>
           <div class="aegis-metric-card">
             <div class="aegis-metric-label"><span>🔍</span> Reviewer Gate</div>
             <div class="aegis-metric-val">{rev_str}</div>
-            <div class="aegis-metric-sub">Regression Risk: <strong>{risk_level}</strong></div>
+            <div class="aegis-metric-sub">Risk Rating: <strong>{risk_level}</strong></div>
           </div>
           <div class="aegis-metric-card">
             <div class="aegis-metric-label"><span>⚡</span> Lifecycle Stats</div>
             <div class="aegis-metric-val">
               {current_iter} / {max_iter}
-              <small style='font-size: 0.9rem; color: #94a3b8;'>iters</small>
+              <small style='font-size: 0.85rem; color: #94a3b8;'>iters</small>
             </div>
-            <div class="aegis-metric-sub">Elapsed: {duration_str}</div>
+            <div class="aegis-metric-sub">Duration: {duration_str}</div>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # ── Status Notification / Completion Banner ───────────────────────────────
+    # ── Status Hero / Completion Banners ──────────────────────────────────────
     if is_rate_limit_err:
         render_rate_limit_alert()
     elif run_status in ("passed", "already_passing"):
@@ -186,13 +207,20 @@ def render_live_repair(api_url: str) -> None:
             """
             <div class="aegis-status-banner passed">
               <div>
-                <h3 class="aegis-banner-title">🛡️ REPAIR SUCCESSFUL</h3>
+                <h3 class="aegis-banner-title">✓ REPAIR SUCCESSFUL</h3>
                 <p class="aegis-banner-desc">
-                  Your project has been repaired successfully. All authoritative tests passed
-                  and the independent Reviewer approved the changes without regression risk.
+                  Your project has been repaired and independently verified. All authoritative
+                  pytest tests passed and the Reviewer approved the patch without regressions.
                 </p>
+                <div style="margin-top: 10px; font-size: 0.82rem; color: #a7f3d0;
+                display: flex; gap: 16px; flex-wrap: wrap;">
+                  <span>✓ Root cause identified</span>
+                  <span>✓ Patch applied</span>
+                  <span>✓ Tests passed</span>
+                  <span>✓ Reviewer approved</span>
+                </div>
               </div>
-              <div style="font-size: 2rem;">🎉</div>
+              <div style="font-size: 2.2rem;">🛡️</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -214,7 +242,7 @@ def render_live_repair(api_url: str) -> None:
                         <div class="aegis-download-hero">
                           <div class="aegis-download-hero-text">
                             <h3>📦 Download Repaired Project Workspace</h3>
-                            <p>Get the fully repaired and verified repository archive.</p>
+                            <p>Get the fully repaired and verified repository archive (.zip).</p>
                           </div>
                         </div>
                         """,
@@ -224,7 +252,7 @@ def render_live_repair(api_url: str) -> None:
                     st.write("")
                     st.write("")
                     st.download_button(
-                        label="⬇️ Download Repaired Project (.zip)",
+                        label="⬇️ Download Repaired Project",
                         data=zip_bytes,
                         file_name=filename,
                         mime="application/zip",
@@ -250,18 +278,21 @@ def render_live_repair(api_url: str) -> None:
             f"""
             <div class="aegis-status-banner failed">
               <div>
-                <h3 class="aegis-banner-title">🔴 REPAIR TERMINATED</h3>
+                <h3 class="aegis-banner-title">🔴 REPAIR COULD NOT BE COMPLETED</h3>
                 <p class="aegis-banner-desc">
-                  {final_summary or 'Could not safely complete repair within iteration limits.'}
+                  {final_summary or 'Maximum iterations reached or unrecoverable defect.'}
                 </p>
+                <div style="margin-top: 8px; font-size: 0.82rem; color: #fca5a5;">
+                  Prior agent telemetry and diagnostics have been preserved below.
+                </div>
               </div>
-              <div style="font-size: 2rem;">🛑</div>
+              <div style="font-size: 2.2rem;">🛑</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    # ── Multi-Tab Execution Details ───────────────────────────────────────────
+    # ── Multi-Tab Execution Workspace ─────────────────────────────────────────
     st.markdown("---")
     console_tabs = st.tabs([
         "📅 Overview & Timeline",
@@ -276,6 +307,7 @@ def render_live_repair(api_url: str) -> None:
 
     # Tab 1: Timeline
     with console_tabs[0]:
+        st.markdown("### 📅 Execution Timeline & State History")
         render_timeline(run_status, iterations, final_summary)
 
     # Tab 2: Architect
@@ -288,7 +320,7 @@ def render_live_repair(api_url: str) -> None:
                 arch = it.get("architecture_plan") or it.get("architect") or {}
                 render_architect_panel(arch, is_already_passing)
         else:
-            st.caption("No iteration data recorded.")
+            st.caption("No architect trace recorded for this run.")
 
     # Tab 3: Coder
     with console_tabs[2]:
@@ -300,11 +332,11 @@ def render_live_repair(api_url: str) -> None:
                 coder_d = it.get("code_changes") or it.get("coder") or []
                 render_coder_panel(coder_d, is_already_passing)
         else:
-            st.caption("No iteration data recorded.")
+            st.caption("No code modifications recorded for this run.")
 
     # Tab 4: Pytest
     with console_tabs[3]:
-        st.markdown("### 🧪 Authoritative Pytest Output")
+        st.markdown("### 🧪 Authoritative Pytest Execution")
         if iterations:
             for idx, it in enumerate(iterations):
                 it_num = it.get("iteration_number", it.get("iteration", idx + 1))
@@ -312,7 +344,7 @@ def render_live_repair(api_url: str) -> None:
                 tres = it.get("test_results") or it.get("tests") or {}
                 render_test_panel(tres)
         else:
-            st.caption("No test execution output recorded.")
+            st.caption("No test execution logs recorded for this run.")
 
     # Tab 5: Reviewer
     with console_tabs[4]:
@@ -324,7 +356,7 @@ def render_live_repair(api_url: str) -> None:
                 rev = it.get("review_result") or it.get("reviewer") or {}
                 render_reviewer_panel(rev, is_already_passing)
         else:
-            st.caption("No reviewer audit recorded.")
+            st.caption("No reviewer audit recorded for this run.")
 
     # Tab 6: Code Changes
     with console_tabs[5]:
