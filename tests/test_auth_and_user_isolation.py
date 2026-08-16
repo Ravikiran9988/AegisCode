@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -19,7 +20,7 @@ from backend.core.security import (
     get_password_hash,
     verify_password,
 )
-from backend.database.models import Base, Project, Run, User
+from backend.database.models import Base, Project, Run
 from backend.database.session import get_db
 from backend.main import app
 
@@ -132,7 +133,6 @@ class TestAuthAPI:
         assert "already exists" in res2.json()["detail"]
 
     def test_login_user_success(self, client: TestClient):
-        # Register first
         client.post(
             "/api/auth/register",
             json={
@@ -142,7 +142,6 @@ class TestAuthAPI:
                 "confirm_password": "Password123!",
             },
         )
-        # Login
         login_res = client.post(
             "/api/auth/login",
             json={"email": "alan@kiranverse.tech", "password": "Password123!"},
@@ -204,7 +203,6 @@ class TestUserDataIsolation:
         return buf
 
     def test_user_runs_isolated_between_accounts(self, client: TestClient):
-        # 1. Register User A
         reg_a = client.post(
             "/api/auth/register",
             json={
@@ -217,7 +215,6 @@ class TestUserDataIsolation:
         token_a = reg_a["access_token"]
         user_a_id = reg_a["user"]["id"]
 
-        # 2. Register User B
         reg_b = client.post(
             "/api/auth/register",
             json={
@@ -229,7 +226,6 @@ class TestUserDataIsolation:
         ).json()
         token_b = reg_b["access_token"]
 
-        # 3. Create Project and Run directly in database for User A
         db = TestingSessionLocal()
         proj_a = Project(
             user_id=user_a_id,
@@ -254,20 +250,17 @@ class TestUserDataIsolation:
         run_a_id = run_a.id
         db.close()
 
-        # 4. User A lists runs -> sees run_a
         res_a = client.get("/api/runs", headers={"Authorization": f"Bearer {token_a}"})
         assert res_a.status_code == 200
         runs_a = res_a.json()
         assert len(runs_a) == 1
         assert runs_a[0]["run_id"] == run_a_id
 
-        # 5. User B lists runs -> does NOT see run_a
         res_b = client.get("/api/runs", headers={"Authorization": f"Bearer {token_b}"})
         assert res_b.status_code == 200
         runs_b = res_b.json()
         assert len(runs_b) == 0
 
-        # 6. User B attempts direct access to User A's run -> 403 Forbidden
         res_b_direct = client.get(
             f"/api/runs/{run_a_id}",
             headers={"Authorization": f"Bearer {token_b}"},
