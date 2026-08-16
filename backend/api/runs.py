@@ -1,9 +1,10 @@
 """
-Runs API — Phase 2.
+Runs API — Phase 2 / Phase 6.
 
-POST /api/runs            — create a run and execute initial pytest
-GET  /api/runs/{run_id}   — get run status and metadata
-GET  /api/runs/{run_id}/results — get detailed test results
+POST /api/runs                    — create a run and execute initial pytest
+GET  /api/runs/{run_id}           — get run status and metadata
+GET  /api/runs/{run_id}/results   — get detailed test results
+GET  /api/runs/{run_id}/download  — download repaired project as ZIP
 
 Phase 2: runs execute the test suite only — no LLM agents yet.
 LangGraph agents are wired in Phase 4.
@@ -11,11 +12,16 @@ LangGraph agents are wired in Phase 4.
 
 from __future__ import annotations
 
+import fnmatch
+import io
+import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.responses import StreamingResponse
 
 from backend.core.config import settings
 from backend.core.logging import get_logger
@@ -28,6 +34,65 @@ from backend.llm.factory import get_llm_provider
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
+
+# ── Security exclusion rules for the download ZIP ─────────────────────────────
+
+# Directory/component names that are always excluded from the download ZIP
+_EXCLUDED_DIR_COMPONENTS: frozenset[str] = frozenset({
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "venv",
+    "node_modules",
+})
+
+# Glob patterns matched against the *filename* (not full path)
+_EXCLUDED_FILENAME_PATTERNS: tuple[str, ...] = (
+    ".env",
+    ".env.*",
+    "*.db",
+    "*.db-shm",
+    "*.db-wal",
+    "*.pyc",
+    "*.pyo",
+    "secrets",
+    "credentials",
+    ".DS_Store",
+    "Thumbs.db",
+)
+
+
+def _is_excluded(file_path: Path, project_root: Path) -> bool:
+    """
+    Return True if *file_path* should be excluded from the download ZIP.
+
+    Checks
+    ------
+    1. Any path component matches an excluded directory name.
+    2. The filename matches an excluded glob pattern.
+    """
+    try:
+        rel = file_path.relative_to(project_root)
+    except ValueError:
+        # Path is outside the project root — always exclude
+        return True
+
+    # Check every component of the relative path
+    for part in rel.parts:
+        if part in _EXCLUDED_DIR_COMPONENTS:
+            return True
+
+    # Check filename against glob patterns
+    fname = file_path.name
+    for pattern in _EXCLUDED_FILENAME_PATTERNS:
+        if fnmatch.fnmatch(fname, pattern):
+            return True
+
+    return False
 
 router = APIRouter(prefix=f"{settings.api_prefix}/runs", tags=["runs"])
 
@@ -368,11 +433,144 @@ def get_run_results(run_id: str, db: Session = Depends(get_db)) -> RunResultsRes
     )
 
 
+@router.get(
+    "/{run_id}/download",
+    summary="Download the repaired project as a ZIP archive",
+    response_class=StreamingResponse,
+)
+def download_repaired_project(
+    run_id: str,
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Stream the repaired project workspace as a ZIP archive.
+
+    Security
+    --------
+    * Only ``status in ('passed', 'already_passing')`` runs may be downloaded.
+    * All files are verified to reside inside the run's workspace before
+      inclusion (path-traversal guard).
+    * Sensitive files and directories (.env, *.db, __pycache__, .git, etc.)
+      are explicitly excluded.
+    * The archive is built entirely in memory — no temporary files on disk.
+    """
+    # ── Verify run exists ─────────────────────────────────────────────────────
+    run = db.get(Run, run_id)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run {run_id!r} not found.",
+        )
+
+    # ── Guard: only completed-successfully runs can be downloaded ─────────────
+    _DOWNLOADABLE_STATUSES = {"passed", "already_passing"}
+    if run.status == "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Repair is still in progress. "
+                "Please wait for the run to complete before downloading."
+            ),
+        )
+    if run.status not in _DOWNLOADABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Repaired project is not available because the run did not "
+                f"complete successfully (status={run.status!r}). "
+                "Only runs with status 'passed' or 'already_passing' can be downloaded."
+            ),
+        )
+
+    # ── Locate the repaired workspace ─────────────────────────────────────────
+    project = db.get(Project, run.project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Project record for run {run_id!r} not found.",
+        )
+
+    try:
+        workspace = WorkspaceManager.from_id(
+            _workspace_id_from_project(project),
+            base_dir=settings.workspace_path,
+        )
+        project_path: Path = workspace.get_project_path()
+    except WorkspaceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repaired workspace not found: {exc}",
+        ) from exc
+
+    # Resolve once so all comparisons use canonical absolute paths
+    project_root: Path = project_path.resolve()
+    workspace_root: Path = workspace.get_workspace_path().resolve()
+
+    if not project_root.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repaired project directory no longer exists on disk.",
+        )
+
+    # ── Build in-memory ZIP ───────────────────────────────────────────────────
+    buf = io.BytesIO()
+    file_count = 0
+
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for abs_path in sorted(project_root.rglob("*")):
+            if not abs_path.is_file():
+                continue
+
+            # ── Path-traversal guard ──────────────────────────────────────────
+            resolved = abs_path.resolve()
+            # Must be inside the workspace root (not just the project sub-dir)
+            # to defend against any symlink tricks
+            try:
+                resolved.relative_to(workspace_root)
+            except ValueError:
+                logger.warning(
+                    "Download: skipping %s — resolves outside workspace", abs_path
+                )
+                continue
+
+            # ── Security exclusion check ──────────────────────────────────────
+            if _is_excluded(resolved, project_root):
+                logger.debug("Download: excluding %s", resolved.name)
+                continue
+
+            # ── Archive name: relative path from project root ─────────────────
+            try:
+                arcname = str(resolved.relative_to(project_root))
+            except ValueError:
+                # Shouldn't happen after the guard above, but be defensive
+                continue
+
+            zf.write(resolved, arcname)
+            file_count += 1
+
+    logger.info(
+        "Download: created in-memory ZIP for run=%s (%d files, %d bytes)",
+        run_id, file_count, buf.tell(),
+    )
+
+    buf.seek(0)
+    filename = f"aegiscode-repaired-{run_id}.zip"
+
+    return StreamingResponse(
+        content=buf,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-AegisCode-Run-Id": run_id,
+            "X-AegisCode-File-Count": str(file_count),
+        },
+    )
+
+
 # ── Utility ───────────────────────────────────────────────────────────────────
 
 def _workspace_id_from_project(project: Project) -> str:
     """Extract the UUID from the stored workspace path ``run_<uuid>``."""
-    from pathlib import Path
     ws_path = Path(project.workspace_path)
     folder = ws_path.name  # e.g. "run_<uuid>"
     return folder.removeprefix("run_")
