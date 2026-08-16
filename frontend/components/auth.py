@@ -58,7 +58,7 @@ def render_auth(api_url: str) -> None:
             with st.form("form_signin", clear_on_submit=False):
                 signin_email = st.text_input(
                     "Email",
-                    placeholder="engineer@kiranverse.tech",
+                    placeholder="lily@gmail.com",
                     key="signin_email",
                 ).strip()
                 signin_pwd = st.text_input(
