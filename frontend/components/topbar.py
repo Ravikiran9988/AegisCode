@@ -32,8 +32,9 @@ def render_topbar(
 
     user_html = ""
     current_user = st.session_state.get("current_user")
-    if current_user and current_user.get("name"):
-        user_name_short = current_user.get("name").split()[0]
+    if current_user and (current_user.get("full_name") or current_user.get("name")):
+        raw_name = current_user.get("full_name") or current_user.get("name")
+        user_name_short = raw_name.split()[0]
         user_html = (
             f"<div class='topbar-pill' style='background: rgba(99, 102, 241, 0.12); "
             f"color: #818cf8; border-color: rgba(99, 102, 241, 0.3); font-weight: 600;'>"

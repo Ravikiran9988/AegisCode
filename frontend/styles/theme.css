@@ -788,3 +788,76 @@ code, pre, .stCodeBlock, [class*="stCode"], kbd {
 .aegis-footer-copy {
   color: var(--text-muted);
 }
+
+/* ── Auth Portal SaaS Styling ────────────────────────────────────────────── */
+.aegis-auth-wrapper {
+  max-width: 460px;
+  margin: 32px auto 24px auto;
+  padding: 0 16px;
+}
+
+.aegis-auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.aegis-auth-shield {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.12), rgba(99, 102, 241, 0.15));
+  border: 1px solid rgba(225, 29, 72, 0.25);
+  font-size: 1.75rem;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.12);
+}
+
+.aegis-auth-brand-name {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.035em;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.aegis-auth-brand-sub {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #e11d48;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+.aegis-auth-tagline {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 10px;
+  margin-bottom: 2px;
+}
+
+.aegis-auth-subtagline {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.aegis-auth-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 28px 24px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+}
+
+.aegis-auth-trust-footer {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}

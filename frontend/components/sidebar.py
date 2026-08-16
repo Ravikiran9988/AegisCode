@@ -95,7 +95,7 @@ def render_sidebar(
         # User Account & Logout section
         current_user = st.session_state.get("current_user")
         if current_user:
-            u_name = current_user.get("name", "User")
+            u_name = current_user.get("full_name") or current_user.get("name", "User")
             u_email = current_user.get("email", "")
             st.markdown(
                 f"""

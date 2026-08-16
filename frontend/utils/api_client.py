@@ -88,6 +88,35 @@ def _safe_post(url: str, timeout: int = 30, **kwargs) -> requests.Response | Non
         return None
 
 
+def _format_http_error(resp: requests.Response, default_msg: str) -> str:
+    """Format user-friendly error message from HTTP response."""
+    try:
+        data = resp.json()
+        if isinstance(data, dict) and data.get("detail"):
+            detail = data["detail"]
+            if isinstance(detail, list):
+                # Pydantic validation errors list
+                msgs = [d.get("msg", str(d)) for d in detail if isinstance(d, dict)]
+                return ", ".join(msgs) if msgs else default_msg
+            return str(detail)
+    except Exception:
+        pass
+
+    if resp.status_code == 400:
+        return "Invalid input data. Please check the fields and try again."
+    if resp.status_code == 409:
+        return "An account with this email address already exists."
+    if resp.status_code == 401:
+        return "Invalid email or password."
+    if resp.status_code == 403:
+        return "Account is deactivated or access is restricted."
+    if resp.status_code == 404:
+        return "Authentication service endpoint not found."
+    if resp.status_code >= 500:
+        return "A server error occurred. Please try again shortly."
+    return default_msg
+
+
 def api_register(
     api_url: str,
     name: str,
@@ -98,19 +127,23 @@ def api_register(
     """Register a new account on backend API."""
     norm_url = _normalize_backend_url(api_url)
     payload = {
+        "full_name": name,
         "name": name,
         "email": email,
         "password": password,
         "confirm_password": confirm_password,
     }
+    target_url = f"{norm_url}/api/auth/register"
     try:
-        resp = requests.post(f"{norm_url}/auth/register", json=payload, timeout=15)
+        resp = requests.post(target_url, json=payload, timeout=15)
         if resp.status_code == 201:
             return True, resp.json()
-        is_json = resp.headers.get("content-type", "").startswith("application/json")
-        default_err = f"HTTP {resp.status_code}"
-        err = resp.json().get("detail", "Registration failed") if is_json else default_err
+        err = _format_http_error(resp, "Registration failed")
         return False, err
+    except requests.exceptions.ConnectionError:
+        return False, "Cannot connect to AegisCode backend. Please verify your backend service."
+    except requests.exceptions.Timeout:
+        return False, "Request timed out connecting to authentication service."
     except Exception as exc:
         return False, str(exc)
 
@@ -123,14 +156,17 @@ def api_login(
     """Authenticate with backend API."""
     norm_url = _normalize_backend_url(api_url)
     payload = {"email": email, "password": password}
+    target_url = f"{norm_url}/api/auth/login"
     try:
-        resp = requests.post(f"{norm_url}/auth/login", json=payload, timeout=15)
+        resp = requests.post(target_url, json=payload, timeout=15)
         if resp.status_code == 200:
             return True, resp.json()
-        is_json = resp.headers.get("content-type", "").startswith("application/json")
-        default_err = f"HTTP {resp.status_code}"
-        err = resp.json().get("detail", "Invalid email or password") if is_json else default_err
+        err = _format_http_error(resp, "Invalid email or password")
         return False, err
+    except requests.exceptions.ConnectionError:
+        return False, "Cannot connect to AegisCode backend. Please verify your backend service."
+    except requests.exceptions.Timeout:
+        return False, "Request timed out connecting to authentication service."
     except Exception as exc:
         return False, str(exc)
 
@@ -138,9 +174,10 @@ def api_login(
 def api_get_current_user(api_url: str, token: str) -> dict | None:
     """Fetch current user profile using JWT token."""
     norm_url = _normalize_backend_url(api_url)
+    target_url = f"{norm_url}/api/auth/me"
     try:
         resp = requests.get(
-            f"{norm_url}/auth/me",
+            target_url,
             headers={"Authorization": f"Bearer {token}"},
             timeout=10,
         )

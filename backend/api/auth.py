@@ -30,7 +30,12 @@ auth_router = APIRouter()
 # ────────────────────────────────────────────────────────────────────────────
 
 class UserRegisterRequest(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100, description="User full name")
+    full_name: str | None = Field(
+        default=None, min_length=2, max_length=100, description="User full name"
+    )
+    name: str | None = Field(
+        default=None, min_length=2, max_length=100, description="User name (alias)"
+    )
     email: str = Field(..., min_length=5, max_length=255, description="User unique email address")
     password: str = Field(..., min_length=8, max_length=128, description="User password")
     confirm_password: str = Field(
@@ -47,6 +52,7 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    full_name: str
     name: str
     email: str
     is_active: bool
@@ -155,21 +161,29 @@ def register_user(
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """Register a new user, validate input, hash password, and issue JWT access token."""
-    # 1. Validate email format
+    # 1. Validate full name
+    display_name = (req.full_name or req.name or "").strip()
+    if not display_name or len(display_name) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please provide a valid full name (at least 2 characters)",
+        )
+
+    # 2. Validate email format
     if "@" not in req.email or "." not in req.email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Please provide a valid email address",
         )
 
-    # 2. Validate password match
+    # 3. Validate password match
     if req.password != req.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Passwords do not match",
         )
 
-    # 3. Strong password checks
+    # 4. Strong password checks
     if len(req.password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -181,19 +195,20 @@ def register_user(
             detail="Password must contain both letters and numbers",
         )
 
-    # 3. Check duplicate email
+    # 5. Check duplicate email -> 409 Conflict
     email_clean = req.email.strip().lower()
     existing = db.scalars(select(User).where(User.email == email_clean)).first()
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email address already exists",
         )
 
-    # 4. Create and persist user
+    # 6. Create and persist user
     hashed_pwd = get_password_hash(req.password)
     user = User(
-        name=req.name.strip(),
+        full_name=display_name,
+        name=display_name,
         email=email_clean,
         hashed_password=hashed_pwd,
         is_active=True,
@@ -203,7 +218,7 @@ def register_user(
     db.commit()
     db.refresh(user)
 
-    # 5. Issue JWT access token
+    # 7. Issue JWT access token
     token = create_access_token(data={"sub": user.id, "email": user.email})
     return TokenResponse(
         access_token=token,

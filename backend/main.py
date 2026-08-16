@@ -81,6 +81,7 @@ def create_app() -> FastAPI:
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(health_router)
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+    app.include_router(auth_router, prefix="/auth", tags=["auth-alias"], include_in_schema=False)
     app.include_router(projects_router)
     app.include_router(runs_router)
 
