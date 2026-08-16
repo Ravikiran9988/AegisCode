@@ -102,10 +102,47 @@ st.set_page_config(
 
 # ── Load Design System CSS ────────────────────────────────────────────────────
 
+if "theme_mode" not in st.session_state:
+    st.session_state["theme_mode"] = "dark"
+if "theme_toggle" not in st.session_state:
+    st.session_state["theme_toggle"] = st.session_state["theme_mode"] == "dark"
+
 _CSS_PATH = Path(__file__).parent / "styles" / "theme.css"
 if _CSS_PATH.exists():
     with open(_CSS_PATH, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+if st.session_state["theme_mode"] == "light":
+    st.markdown(
+        """
+        <style>
+        :root {
+          --bg-app: #f5f7fb;
+          --bg-panel: #ffffff;
+          --bg-panel-elevated: #f8fafc;
+          --bg-panel-hover: #eef2ff;
+          --bg-sidebar: #ffffff;
+          --bg-glass: rgba(255, 255, 255, 0.88);
+          --border-subtle: rgba(15, 23, 42, 0.10);
+          --border-muted: rgba(15, 23, 42, 0.16);
+          --border-hover: rgba(79, 70, 229, 0.42);
+          --text-primary: #172033;
+          --text-secondary: #526179;
+          --text-muted: #71809a;
+          --text-dim: #94a3b8;
+          --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08);
+          --shadow-glow: 0 0 28px rgba(79, 70, 229, 0.12);
+        }
+        [data-testid="stAppViewContainer"], [data-testid="stApp"], .stApp {
+          background:
+            radial-gradient(circle at 84% -12%, rgba(99, 102, 241, 0.13), transparent 30rem),
+            radial-gradient(circle at 12% 115%, rgba(14, 165, 233, 0.08), transparent 32rem),
+            var(--bg-app) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ── Configuration & Defaults ──────────────────────────────────────────────────
 

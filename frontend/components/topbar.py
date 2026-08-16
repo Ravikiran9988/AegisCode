@@ -20,9 +20,9 @@ def render_topbar(
 
     with right:
         status = "●  Operational" if backend_online else "●  Backend offline"
-        model = "openai/gpt-oss-120b"
-        run = f"  ·  Run {active_run_id[:8]}" if active_run_id else ""
+        model = "GPT-OSS 120B"
+        run = f"  •  Run {active_run_id[:8]}" if active_run_id else ""
         st.caption("SYSTEM STATUS")
-        st.markdown(f"`{status}`  ·  `{model}`{run}")
+        st.caption(f"{status}  •  {model}{run}")
 
     st.divider()

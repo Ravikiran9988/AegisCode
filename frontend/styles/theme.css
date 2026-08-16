@@ -13,6 +13,7 @@ Visual Identity: Security • Autonomy • Intelligence • Observability
   --bg-panel: #0e1524;
   --bg-panel-elevated: #131b2e;
   --bg-panel-hover: #172138;
+  --bg-sidebar: #0e1524;
   --bg-glass: rgba(14, 21, 36, 0.85);
 
   --border-subtle: rgba(255, 255, 255, 0.08);
@@ -83,7 +84,7 @@ html, body, [class*="css"], .stMarkdown, .stText {
 }
 
 [data-testid="stSidebar"] {
-  background: rgba(14, 21, 36, 0.94) !important;
+  background: var(--bg-sidebar) !important;
   border-right: 1px solid var(--border-subtle);
 }
 
@@ -93,9 +94,8 @@ html, body, [class*="css"], .stMarkdown, .stText {
 
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
 [data-testid="stSidebar"] label,
-.stApp p,
-.stApp span,
-.stApp li {
+.stApp [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stMarkdownContainer"] li {
   color: var(--text-secondary);
 }
 
@@ -134,7 +134,12 @@ html, body, [class*="css"], .stMarkdown, .stText {
 .stButton > button[kind="primary"] {
   border-color: transparent;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff !important;
   box-shadow: 0 8px 20px rgba(99, 102, 241, 0.28);
+}
+
+.stButton > button[kind="primary"] * {
+  color: #ffffff !important;
 }
 
 .stButton > button[kind="primary"]:hover {

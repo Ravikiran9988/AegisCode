@@ -33,6 +33,12 @@ def render_sidebar(
             unsafe_allow_html=True,
         )
 
+        dark_mode = st.toggle("Dark mode", key="theme_toggle")
+        selected_theme = "dark" if dark_mode else "light"
+        if selected_theme != st.session_state.get("theme_mode"):
+            st.session_state["theme_mode"] = selected_theme
+            st.rerun()
+
         nav_options = [
             # Control Center
             "◉ Overview",
@@ -88,15 +94,15 @@ def render_sidebar(
             <div class="aegis-health-card" style="padding: 10px 12px; margin-top: 10px;">
               <div style="display: flex; align-items: center; justify-content: space-between;
               margin-bottom: 6px;">
-                <span style="font-weight: 700; font-size: 0.78rem; color: #e2e8f0;">
+                <span style="font-weight: 700; font-size: 0.78rem; color: var(--text-primary);">
                   <span style="color: {status_color}; margin-right: 4px;">{status_dot}</span>
                   {status_text}
                 </span>
               </div>
-              <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.5;">
+              <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
                 <div>LLM: <strong style="color: #c084fc;">openai/gpt-oss-120b</strong></div>
                 <div>Database: <strong style="color: #38bdf8;">{db_stat}</strong></div>
-                <div>Backend: <strong style="color: #e2e8f0;">FastAPI REST</strong></div>
+                <div>Backend: <strong style="color: var(--text-primary);">FastAPI REST</strong></div>
               </div>
             </div>
             """,
