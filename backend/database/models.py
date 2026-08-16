@@ -36,6 +36,31 @@ class Base(DeclarativeBase):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# User
+# ────────────────────────────────────────────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    projects: Mapped[list[Project]] = relationship("Project", back_populates="user")
+    runs: Mapped[list[Run]] = relationship("Run", back_populates="user")
+
+    def __repr__(self) -> str:
+        return f"<User id={self.id} email={self.email!r}>"
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # Project
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -43,6 +68,9 @@ class Project(Base):
     __tablename__ = "projects"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     workspace_path: Mapped[str] = mapped_column(String(1024), nullable=False)
@@ -53,6 +81,7 @@ class Project(Base):
     )
 
     # Relationships
+    user: Mapped[User | None] = relationship("User", back_populates="projects")
     runs: Mapped[list[Run]] = relationship("Run", back_populates="project")
 
     def __repr__(self) -> str:
@@ -67,6 +96,9 @@ class Run(Base):
     __tablename__ = "runs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         String(50), default="pending"
@@ -83,6 +115,7 @@ class Run(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Relationships
+    user: Mapped[User | None] = relationship("User", back_populates="runs")
     project: Mapped[Project] = relationship("Project", back_populates="runs")
     iterations: Mapped[list[Iteration]] = relationship("Iteration", back_populates="run")
     events: Mapped[list[Event]] = relationship("Event", back_populates="run")

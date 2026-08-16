@@ -92,8 +92,33 @@ def render_sidebar(
             )
         backend_to_use = raw_backend if "raw_backend" in locals() else default_backend
 
+        # User Account & Logout section
+        current_user = st.session_state.get("current_user")
+        if current_user:
+            u_name = current_user.get("name", "User")
+            u_email = current_user.get("email", "")
+            st.markdown(
+                f"""
+                <div style="background: rgba(99, 102, 241, 0.08);
+                border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+                padding: 10px 12px; margin-top: 14px; margin-bottom: 8px;">
+                  <div style="font-weight: 700; font-size: 0.84rem; color: var(--text-primary);">
+                    👤 {u_name}
+                  </div>
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">
+                    {u_email}
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if st.button("Sign Out", key="btn_sidebar_logout", use_container_width=True):
+                st.session_state.pop("auth_token", None)
+                st.session_state.pop("current_user", None)
+                st.rerun()
+
         # Sidebar Footer: Live Engine & Infrastructure Status
-        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         db_stat = health_data.get("database", "connected").capitalize()
         status_dot = "●"
         status_color = "#34d399" if backend_online else "#f87171"

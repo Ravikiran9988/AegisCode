@@ -23,9 +23,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
+from backend.api.auth import get_optional_current_user
 from backend.core.config import settings
 from backend.core.logging import get_logger
-from backend.database.models import Event, Iteration, Project, Run
+from backend.database.models import Event, Iteration, Project, Run, User
 from backend.database.persistence import upsert_iteration
 from backend.database.session import get_db
 from backend.execution.local import LocalExecutionBackend
@@ -176,6 +177,16 @@ def _get_run_or_404(run_id: str, db: Session) -> Run:
     return run
 
 
+def _check_run_access(run: Run, current_user: User | None) -> None:
+    """Ensure that the authenticated user owns this run, or is superuser."""
+    if current_user is not None and not current_user.is_superuser:
+        if run.user_id is not None and run.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this repair run",
+            )
+
+
 def _emit_event(
     db: Session,
     run_id: str,
@@ -206,6 +217,7 @@ def _emit_event(
 def create_run(
     body: RunCreateRequest,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> RunResponse:
     """
     Create a repair run and execute the initial pytest pass.
@@ -224,6 +236,7 @@ def create_run(
     # ── Create Run record ─────────────────────────────────────────────────────
     now = datetime.now(timezone.utc)
     run = Run(
+        user_id=current_user.id if current_user else None,
         project_id=body.project_id,
         status="running",
         max_iterations=body.max_iterations,
@@ -310,6 +323,7 @@ def start_repair_loop(
     run_id: str,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> dict[str, str]:
     """
     Launch the LangGraph repair graph in the background for run `run_id`.
@@ -317,6 +331,8 @@ def start_repair_loop(
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found.")
+
+    _check_run_access(run, current_user)
 
     project = db.get(Project, run.project_id)
     if not project:
@@ -366,6 +382,7 @@ def start_repair_loop(
 def get_run_status(
     run_id: str,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> dict:
     """
     Return detailed status, iteration progress, test metrics, real-time node state, and timeline.
@@ -373,6 +390,8 @@ def get_run_status(
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found.")
+
+    _check_run_access(run, current_user)
 
     # Get iterations
     iterations = (
@@ -687,12 +706,16 @@ def list_runs(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> list[dict]:
     """
     List historical repair runs with status, project metadata, and summary metrics.
     """
+    query = db.query(Run)
+    if current_user is not None and not current_user.is_superuser:
+        query = query.filter(Run.user_id == current_user.id)
     runs = (
-        db.query(Run)
+        query
         .order_by(Run.created_at.desc())
         .offset(offset)
         .limit(min(limit, 100))
@@ -708,13 +731,16 @@ def list_runs(
 def list_active_runs(
     limit: int = 50,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> list[dict]:
     """
     List currently active (running or pending) repair runs.
     """
+    query = db.query(Run).filter(Run.status.in_(("running", "pending")))
+    if current_user is not None and not current_user.is_superuser:
+        query = query.filter(Run.user_id == current_user.id)
     runs = (
-        db.query(Run)
-        .filter(Run.status.in_(("running", "pending")))
+        query
         .order_by(Run.created_at.desc())
         .limit(min(limit, 100))
         .all()
@@ -731,11 +757,14 @@ def list_history_runs(
     offset: int = 0,
     status: str | None = None,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> list[dict]:
     """
     List historical repair runs with optional status filtering.
     """
     query = db.query(Run)
+    if current_user is not None and not current_user.is_superuser:
+        query = query.filter(Run.user_id == current_user.id)
     if status:
         query = query.filter(Run.status == status)
     runs = (
@@ -752,9 +781,14 @@ def list_history_runs(
     response_model=RunResponse,
     summary="Get run status",
 )
-def get_run(run_id: str, db: Session = Depends(get_db)) -> RunResponse:
+def get_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+) -> RunResponse:
     """Return metadata and status for a run."""
     run = _get_run_or_404(run_id, db)
+    _check_run_access(run, current_user)
     return RunResponse(
         run_id=run.id,
         project_id=run.project_id,
@@ -773,9 +807,14 @@ def get_run(run_id: str, db: Session = Depends(get_db)) -> RunResponse:
     response_model=RunResultsResponse,
     summary="Get detailed run results",
 )
-def get_run_results(run_id: str, db: Session = Depends(get_db)) -> RunResultsResponse:
+def get_run_results(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+) -> RunResultsResponse:
     """Return all iteration results for a run."""
     run = _get_run_or_404(run_id, db)
+    _check_run_access(run, current_user)
 
     # Deduplicate iterations by iteration_number (latest/most populated wins)
     iter_map: dict[int, Iteration] = {}
@@ -872,6 +911,7 @@ def get_run_results(run_id: str, db: Session = Depends(get_db)) -> RunResultsRes
 def download_repaired_project(
     run_id: str,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> StreamingResponse:
     """
     Stream the repaired project workspace as a ZIP archive.
@@ -892,6 +932,8 @@ def download_repaired_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Run {run_id!r} not found.",
         )
+
+    _check_run_access(run, current_user)
 
     # ── Guard: only completed-successfully runs can be downloaded ─────────────
     _DOWNLOADABLE_STATUSES = {"passed", "already_passing"}

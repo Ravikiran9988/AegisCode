@@ -29,9 +29,11 @@ import streamlit as st  # noqa: E402
 
 try:
     from frontend.components.agents import render_agents_view
+    from frontend.components.auth import render_auth
     from frontend.components.code_diff import render_code_changes_view
     from frontend.components.dashboard import render_dashboard
     from frontend.components.docs import render_docs
+    from frontend.components.footer import render_footer
     from frontend.components.health import render_system_health
     from frontend.components.history import render_history
     from frontend.components.live_repair import render_live_repair
@@ -55,9 +57,11 @@ try:
     )
 except ImportError:
     from components.agents import render_agents_view
+    from components.auth import render_auth
     from components.code_diff import render_code_changes_view
     from components.dashboard import render_dashboard
     from components.docs import render_docs
+    from components.footer import render_footer
     from components.health import render_system_health
     from components.history import render_history
     from components.live_repair import render_live_repair
@@ -171,6 +175,13 @@ if not st.session_state["backend_online"]:
     st.session_state["health_data"] = h_data
     st.session_state["backend_error"] = err_msg
 
+# ── Authentication Gate ───────────────────────────────────────────────────────
+
+if not st.session_state.get("auth_token"):
+    render_auth(api_url=f"{base_backend_url}/api")
+    render_footer()
+    st.stop()
+
 # ── Render Application Shell (Sidebar + Topbar) ───────────────────────────────
 
 selected_nav, raw_backend = render_sidebar(
@@ -244,3 +255,7 @@ elif selected_nav == "⚙ Settings":
 
 elif selected_nav == "📖 Documentation":
     render_docs()
+
+# ── Global Footer ─────────────────────────────────────────────────────────────
+
+render_footer()

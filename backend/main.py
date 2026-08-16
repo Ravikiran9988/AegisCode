@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
+from backend.api.auth import auth_router
 from backend.api.health import router as health_router
 from backend.api.projects import router as projects_router
 from backend.api.runs import router as runs_router
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(health_router)
+    app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
     app.include_router(projects_router)
     app.include_router(runs_router)
 

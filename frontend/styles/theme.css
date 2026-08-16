@@ -178,14 +178,15 @@ code, pre, .stCodeBlock, [class*="stCode"], kbd {
   font-size: 0.86rem !important;
 }
 
-/* Hide default streamlit chrome */
-#MainMenu, header, footer {
-  visibility: hidden;
+/* Hide default streamlit chrome & duplicate navigation */
+#MainMenu, header, footer, [data-testid="stSidebarNav"], .stDeployButton {
+  display: none !important;
+  visibility: hidden !important;
 }
 
 .main .block-container {
-  padding-top: 1.25rem;
-  padding-bottom: 3rem;
+  padding-top: 0.85rem;
+  padding-bottom: 2.5rem;
   max-width: 1440px;
 }
 
@@ -230,32 +231,63 @@ code, pre, .stCodeBlock, [class*="stCode"], kbd {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0 14px 0;
+  padding: 8px 12px 14px 12px;
   margin-bottom: 22px;
   border-bottom: 1px solid var(--border-subtle);
   flex-wrap: wrap;
   gap: 12px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius-md);
+}
+
+.aegis-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aegis-topbar-brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.aegis-topbar-logo {
+  font-size: 1.1rem;
+}
+
+.aegis-topbar-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .aegis-breadcrumbs {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
+  gap: 6px;
+  font-size: 0.84rem;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-.aegis-breadcrumbs .crumb-parent {
+.crumb-separator {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.crumb-parent {
   color: var(--text-muted);
 }
 
-.aegis-breadcrumbs .crumb-current {
+.crumb-current {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 650;
 }
 
-.aegis-topbar-badges {
+.aegis-topbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -267,16 +299,34 @@ code, pre, .stCodeBlock, [class*="stCode"], kbd {
   gap: 6px;
   background: var(--bg-panel-elevated);
   border: 1px solid var(--border-subtle);
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
+.topbar-pill.run-pill {
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+}
+
 .topbar-pill.online {
   border-color: var(--color-success-border);
-  color: #a7f3d0;
+  color: #34d399;
+}
+
+.topbar-pill.online .status-dot {
+  color: #10b981;
+}
+
+.topbar-pill.offline {
+  border-color: var(--color-danger-border);
+  color: #f87171;
+}
+
+.topbar-pill.offline .status-dot {
+  color: #ef4444;
 }
 
 .topbar-pill.model {
@@ -674,4 +724,67 @@ code, pre, .stCodeBlock, [class*="stCode"], kbd {
   max-width: 440px;
   margin: 0 auto 16px auto;
   line-height: 1.45;
+}
+
+/* Global Footer */
+.aegis-global-footer {
+  margin-top: 48px;
+  padding: 24px 0 16px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.aegis-footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.aegis-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aegis-footer-logo {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.aegis-footer-tagline {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.aegis-footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.aegis-footer-support {
+  color: var(--text-secondary);
+}
+
+.aegis-footer-link {
+  color: var(--brand-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.aegis-footer-link:hover {
+  color: var(--brand-accent);
+  text-decoration: underline;
+}
+
+.aegis-footer-divider {
+  color: var(--text-dim);
+}
+
+.aegis-footer-copy {
+  color: var(--text-muted);
 }

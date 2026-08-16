@@ -13,9 +13,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.api.auth import get_optional_current_user
 from backend.core.config import settings
 from backend.core.logging import get_logger
-from backend.database.models import Project
+from backend.database.models import Project, User
 from backend.database.session import get_db
 from backend.execution.workspace import WorkspaceError, WorkspaceManager, ZipValidationError
 from backend.tools.git_tools import init_repo
@@ -44,6 +45,7 @@ class ProjectUploadResponse(BaseModel):
 async def upload_project(
     file: UploadFile = File(..., description="Python project as a .zip archive"),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> ProjectUploadResponse:
     """
     Upload and validate a Python project ZIP.
@@ -103,6 +105,7 @@ async def upload_project(
     # ── Persist to DB ─────────────────────────────────────────────────────────
     project_name = file.filename.removesuffix(".zip")
     project = Project(
+        user_id=current_user.id if current_user else None,
         name=project_name,
         original_filename=file.filename,
         workspace_path=str(workspace.get_workspace_path()),

@@ -8,6 +8,7 @@ from __future__ import annotations
 import time
 
 import requests
+import streamlit as st
 
 try:
     from frontend.utils.helpers import _normalize_backend_url
@@ -15,6 +16,14 @@ except ImportError:
     from utils.helpers import _normalize_backend_url
 
 _COLD_START_RETRY_DELAYS = [0, 2, 4, 8, 12]
+
+
+def _get_auth_headers() -> dict[str, str]:
+    """Get Authorization header if an auth token is stored in Streamlit session state."""
+    token = st.session_state.get("auth_token") if hasattr(st, "session_state") else None
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
 
 
 def _check_backend_once(backend_url: str, timeout: int = 10) -> tuple[bool, dict, str]:
@@ -59,16 +68,85 @@ def check_backend_with_retry(
 
 def _safe_get(url: str, timeout: int = 30, **kwargs) -> requests.Response | None:
     """Safely execute an HTTP GET request catching connection exceptions."""
+    headers = _get_auth_headers()
+    if "headers" in kwargs:
+        headers.update(kwargs.pop("headers"))
     try:
-        return requests.get(url, timeout=timeout, **kwargs)
+        return requests.get(url, timeout=timeout, headers=headers, **kwargs)
     except Exception:
         return None
 
 
 def _safe_post(url: str, timeout: int = 30, **kwargs) -> requests.Response | None:
     """Safely execute an HTTP POST request catching connection exceptions."""
+    headers = _get_auth_headers()
+    if "headers" in kwargs:
+        headers.update(kwargs.pop("headers"))
     try:
-        return requests.post(url, timeout=timeout, **kwargs)
+        return requests.post(url, timeout=timeout, headers=headers, **kwargs)
+    except Exception:
+        return None
+
+
+def api_register(
+    api_url: str,
+    name: str,
+    email: str,
+    password: str,
+    confirm_password: str,
+) -> tuple[bool, dict | str]:
+    """Register a new account on backend API."""
+    norm_url = _normalize_backend_url(api_url)
+    payload = {
+        "name": name,
+        "email": email,
+        "password": password,
+        "confirm_password": confirm_password,
+    }
+    try:
+        resp = requests.post(f"{norm_url}/auth/register", json=payload, timeout=15)
+        if resp.status_code == 201:
+            return True, resp.json()
+        is_json = resp.headers.get("content-type", "").startswith("application/json")
+        default_err = f"HTTP {resp.status_code}"
+        err = resp.json().get("detail", "Registration failed") if is_json else default_err
+        return False, err
+    except Exception as exc:
+        return False, str(exc)
+
+
+def api_login(
+    api_url: str,
+    email: str,
+    password: str,
+) -> tuple[bool, dict | str]:
+    """Authenticate with backend API."""
+    norm_url = _normalize_backend_url(api_url)
+    payload = {"email": email, "password": password}
+    try:
+        resp = requests.post(f"{norm_url}/auth/login", json=payload, timeout=15)
+        if resp.status_code == 200:
+            return True, resp.json()
+        is_json = resp.headers.get("content-type", "").startswith("application/json")
+        default_err = f"HTTP {resp.status_code}"
+        err = resp.json().get("detail", "Invalid email or password") if is_json else default_err
+        return False, err
+    except Exception as exc:
+        return False, str(exc)
+
+
+def api_get_current_user(api_url: str, token: str) -> dict | None:
+    """Fetch current user profile using JWT token."""
+    norm_url = _normalize_backend_url(api_url)
+    try:
+        resp = requests.get(
+            f"{norm_url}/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        return None
     except Exception:
         return None
 

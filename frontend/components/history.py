@@ -47,8 +47,8 @@ def render_history(api_url: str) -> None:
         )
         return
 
-    # Filters and Search
-    col_f1, col_f2 = st.columns([2, 1])
+    # Filters, Search, and Sorting
+    col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
     with col_f1:
         search_query = st.text_input(
             "Search by Project or Run ID",
@@ -61,6 +61,13 @@ def render_history(api_url: str) -> None:
             "Filter by Status",
             ["All Statuses", "Passed / Healthy", "Failed / Error", "Running"],
             key="hist_status_select",
+        )
+
+    with col_f3:
+        sort_order = st.selectbox(
+            "Sort by",
+            ["Newest First", "Oldest First", "Duration (High to Low)", "Duration (Low to High)"],
+            key="hist_sort_select",
         )
 
     # Filter runs
@@ -83,6 +90,14 @@ def render_history(api_url: str) -> None:
             continue
 
         filtered_runs.append(r)
+
+    # Sort runs
+    if sort_order == "Oldest First":
+        filtered_runs.reverse()
+    elif sort_order == "Duration (High to Low)":
+        filtered_runs.sort(key=lambda x: x.get("duration") or 0.0, reverse=True)
+    elif sort_order == "Duration (Low to High)":
+        filtered_runs.sort(key=lambda x: x.get("duration") or 0.0)
 
     st.markdown(
         f"<small style='color: #94a3b8;'>Displaying {len(filtered_runs)} of {len(runs)} "
