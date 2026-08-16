@@ -11,7 +11,9 @@ START -> INITIAL_TEST -> ARCHITECT -> CODER -> TEST -> REVIEWER -> DECISION
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from functools import partial
+from pathlib import Path
 from typing import Literal
 
 from langgraph.graph import END, START, StateGraph
@@ -32,6 +34,7 @@ from backend.graph.nodes import (
 from backend.graph.state import RepairState
 from backend.llm.base import BaseLLMProvider
 from backend.llm.openai import RateLimitError
+from backend.tools.git_tools import init_repo
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
@@ -49,9 +52,17 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
     4. Repeated failure fingerprint 2+ times -> END (status="stalled")
     5. Otherwise -> RETRY (increment iteration, route back to Architect)
     """
+    run_id = state.get("run_id", "")
     status = state.get("status", "running")
+    current_iteration = state.get("iteration", 1)
+
+    logger.info(
+        "[ITERATION COMPLETE] run_id=%s iteration=%d status=%s",
+        run_id, current_iteration, status,
+    )
+
     if status in ("error", "stalled", "passed", "already_passing"):
-        logger.info("Decision Router: Early termination due to status=%r", status)
+        logger.info("[DECISION ROUTER] run_id=%s Early exit on status=%r", run_id, status)
         return "end"
 
     test_data = state.get("test_result")
@@ -62,16 +73,18 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
 
     # Condition 1: Success & Approved
     if test_res and test_res.success and review_res and review_res.approved:
-        logger.info("Decision Router: All tests pass and Reviewer approved -> END")
+        logger.info("[REPAIR SUCCESS] run_id=%s Tests pass and Reviewer approved -> END", run_id)
         state["status"] = "passed"
         state["termination_reason"] = "all_tests_passed"
         return "end"
 
     # Condition 2: Max Iterations Reached
-    current_iteration = state.get("iteration", 1)
     max_iterations = state.get("max_iterations", settings.max_agent_iterations)
     if current_iteration >= max_iterations:
-        logger.info("Decision Router: Max iterations (%d) reached -> END", max_iterations)
+        logger.info(
+            "[REPAIR FAILED] run_id=%s Max iterations (%d) reached -> END",
+            run_id, max_iterations,
+        )
         state["status"] = "failed"
         state["termination_reason"] = "max_iterations_reached"
         return "end"
@@ -80,15 +93,18 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
     curr_fp = compute_failure_fingerprint(test_res)
     prev_fps = state.get("previous_failures", [])
     if is_repeated_failure(curr_fp, prev_fps, threshold=2):
-        logger.warning("Decision Router: Repeated failure detected (%s) -> STALLED", curr_fp)
+        logger.warning(
+            "[REPAIR STALLED] run_id=%s Repeated failure detected (%s) -> STALLED",
+            run_id, curr_fp,
+        )
         state["status"] = "stalled"
         state["termination_reason"] = "repeated_failure"
         return "end"
 
     # Condition 4: Retry next iteration
     logger.info(
-        "Decision Router: Retrying repair loop (iteration %d -> %d)",
-        current_iteration, current_iteration + 1,
+        "[DECISION ROUTER] Retrying repair loop: run_id=%s (iteration %d -> %d)",
+        run_id, current_iteration, current_iteration + 1,
     )
     state["iteration"] = current_iteration + 1
     prev_fps.append(curr_fp)
@@ -181,6 +197,14 @@ def run_repair_workflow(
     start_time = time.monotonic()
     eff_max = max_iterations or settings.max_agent_iterations
 
+    logger.info(
+        "[RUN START] run_id=%s workspace_id=%s max_iterations=%d path=%s",
+        run_id, workspace_id, eff_max, project_path,
+    )
+
+    # Ensure git repo is initialized for diff tracking
+    init_repo(Path(project_path))
+
     initial_state: RepairState = {
         "run_id": run_id,
         "workspace_id": workspace_id,
@@ -206,24 +230,28 @@ def run_repair_workflow(
     try:
         final_state = graph.invoke(initial_state)
     except RateLimitError as exc:
-        logger.warning("Repair graph hit Groq rate limit: %s", exc)
+        logger.warning("[RATE LIMIT EXCEEDED] run_id=%s: %s", run_id, exc)
         final_state = dict(initial_state)
         final_state["status"] = "error"
         final_state["termination_reason"] = f"rate_limit_exceeded: {exc}"
     except Exception as exc:
-        logger.error("Repair graph execution error: %s", exc)
+        logger.error("[REPAIR GRAPH ERROR] run_id=%s: %s", run_id, exc)
         final_state = dict(initial_state)
         final_state["status"] = "error"
         final_state["termination_reason"] = f"llm_error: {exc}"
 
-    # Ensure status is finalised if graph ended while status was still "running"
-    if final_state.get("status") == "running":
+    # Ensure status is finalised strictly based on success criteria
+    if final_state.get("status") in ("running", "passed"):
         test_data = final_state.get("test_result")
+        review_data = final_state.get("review_result")
         test_res = TestResult(**test_data) if test_data else None
+        review_res = ReviewResult(**review_data) if review_data else None
 
-        if test_res and test_res.success:
+        if test_res and test_res.success and review_res and review_res.approved:
             final_state["status"] = "passed"
             final_state["termination_reason"] = "all_tests_passed"
+        elif final_state.get("status") == "already_passing":
+            pass
         else:
             curr_fp = compute_failure_fingerprint(test_res)
             prev_fps = final_state.get("previous_failures", [])
@@ -232,10 +260,18 @@ def run_repair_workflow(
                 final_state["termination_reason"] = "repeated_failure"
             elif final_state.get("iteration", 1) >= eff_max:
                 final_state["status"] = "failed"
-                final_state["termination_reason"] = "max_iterations_reached"
+                final_state["termination_reason"] = (
+                    "reviewer_rejected"
+                    if (review_res and not review_res.approved)
+                    else "max_iterations_reached"
+                )
             else:
                 final_state["status"] = "failed"
-                final_state["termination_reason"] = "stopped"
+                final_state["termination_reason"] = (
+                    "reviewer_rejected"
+                    if (review_res and not review_res.approved)
+                    else "stopped"
+                )
 
     elapsed = time.monotonic() - start_time
     final_state["total_duration"] = elapsed
@@ -247,6 +283,7 @@ def run_repair_workflow(
             if run_rec:
                 run_rec.status = final_state.get("status", "error")
                 run_rec.current_iteration = final_state.get("iteration", 1)
+                run_rec.finished_at = datetime.now(timezone.utc)
                 run_rec.final_summary = (
                     f"Graph terminated with status={run_rec.status!r}, "
                     f"reason={final_state.get('termination_reason')!r}"
@@ -254,5 +291,10 @@ def run_repair_workflow(
                 db.commit()
         except Exception as exc:
             logger.warning("Failed to update Run record status: %s", exc)
+
+    logger.info(
+        "[RUN COMPLETE] run_id=%s final_status=%s duration=%.2fs termination_reason=%s",
+        run_id, final_state.get("status"), elapsed, final_state.get("termination_reason"),
+    )
 
     return final_state

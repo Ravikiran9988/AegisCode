@@ -26,6 +26,7 @@ from starlette.responses import StreamingResponse
 from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event, Iteration, Project, Run
+from backend.database.persistence import upsert_iteration
 from backend.database.session import get_db
 from backend.execution.local import LocalExecutionBackend
 from backend.execution.workspace import WorkspaceError, WorkspaceManager
@@ -242,15 +243,16 @@ def create_run(
     result: TestResult = backend.run_pytest(project_path)
 
     # ── Persist iteration ─────────────────────────────────────────────────────
-    iteration = Iteration(
+    upsert_iteration(
+        db=db,
         run_id=run.id,
         iteration_number=1,
         test_results=result.model_dump(),
         tests_passed=result.passed,
         tests_failed=result.failed,
+        approved=True if result.success else None,
         duration_seconds=result.duration,
     )
-    db.add(iteration)
 
     _emit_event(
         db, run.id, "tester", "agent_output",
@@ -417,6 +419,23 @@ def get_run(run_id: str, db: Session = Depends(get_db)) -> RunResponse:
 def get_run_results(run_id: str, db: Session = Depends(get_db)) -> RunResultsResponse:
     """Return all iteration results for a run."""
     run = _get_run_or_404(run_id, db)
+
+    # Deduplicate iterations by iteration_number (latest/most populated wins)
+    iter_map: dict[int, Iteration] = {}
+    for it in run.iterations:
+        num = it.iteration_number
+        if num not in iter_map:
+            iter_map[num] = it
+        else:
+            curr = iter_map[num]
+            # Prefer the record that has architecture_plan or review_result or code_changes
+            if (
+                (not curr.architecture_plan and it.architecture_plan)
+                or (not curr.review_result and it.review_result)
+                or (not curr.code_changes and it.code_changes)
+            ):
+                iter_map[num] = it
+
     iterations = [
         IterationSchema(
             iteration_number=it.iteration_number,
@@ -429,7 +448,7 @@ def get_run_results(run_id: str, db: Session = Depends(get_db)) -> RunResultsRes
             code_changes=it.code_changes,
             review_result=it.review_result,
         )
-        for it in sorted(run.iterations, key=lambda x: x.iteration_number)
+        for num, it in sorted(iter_map.items(), key=lambda x: x[0])
     ]
     return RunResultsResponse(
         run_id=run.id,

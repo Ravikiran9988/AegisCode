@@ -74,7 +74,7 @@ class TestPatchRecovery:
                 change_type="patch",
                 explanation="Attempting fix for calculator.py",
                 root_cause="Incorrect subtraction in add()",
-                patch="def add(a, b):\n    return a + b\n",  # Invalid patch without hunk headers
+                patch="invalid<<<corrupted>>>patch without hunks",  # Unrecoverable syntax
                 confidence=0.9,
             )
 

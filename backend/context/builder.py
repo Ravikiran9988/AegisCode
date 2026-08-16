@@ -101,7 +101,17 @@ def build_coder_context(
     # Tighter file content budget to reduce input tokens per call
     budget = settings.max_file_context_size // 3
 
-    for file_path in relevant_files[: settings.max_files_per_agent]:
+    target_files = list(relevant_files)
+    if not target_files:
+        from backend.tools.filesystem import list_files
+        flist = list_files(workspace, "**/*.py")
+        if flist.success:
+            target_files = [
+                f for f in flist.files
+                if not f.startswith("test") and "test_" not in f and "_test" not in f
+            ]
+
+    for file_path in target_files[: settings.max_files_per_agent]:
         res = read_file(workspace, file_path)
         if res.success and res.content:
             snippet = f"--- FILE: {file_path} ---\n{res.content}\n"

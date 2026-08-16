@@ -1195,7 +1195,13 @@ with tabs[1]:
                         if plan.get("test_strategy"):
                             st.write(f"**Test Strategy:** {plan.get('test_strategy')}")
                     else:
-                        st.caption("No architect plan recorded for this iteration.")
+                        if run_status == "already_passing":
+                            st.info(
+                                "ℹ️ Project already passed all tests — "
+                                "no architect analysis needed."
+                            )
+                        else:
+                            st.caption("No architect plan recorded for this iteration.")
 
                 with col_code:
                     st.markdown("##### 💻 Coder Agent Modification")
@@ -1286,7 +1292,13 @@ with tabs[1]:
                                         ch["patch"], language="python",
                                     )
                     else:
-                        st.caption("No code changes recorded for this iteration.")
+                        if run_status == "already_passing":
+                            st.info(
+                                "ℹ️ Project already passed all tests — "
+                                "no code modifications needed."
+                            )
+                        else:
+                            st.caption("No code changes recorded for this iteration.")
 
                 st.markdown("---")
                 col_test, col_rev = st.columns(2)
@@ -1326,7 +1338,13 @@ with tabs[1]:
                         if rev.get("reasoning"):
                             st.write(f"**Reasoning:** {rev.get('reasoning')}")
                     else:
-                        st.caption("No reviewer result recorded.")
+                        if run_status == "already_passing":
+                            st.info(
+                                "ℹ️ Project already passed all tests — "
+                                "automatically approved."
+                            )
+                        else:
+                            st.caption("No reviewer result recorded.")
 
     st.markdown("---")
 
@@ -1344,7 +1362,13 @@ with tabs[1]:
             all_changes.extend(changes)
 
         if not all_changes:
-            st.caption("No code changes were recorded for this run.")
+            if run_status in ("passed", "already_passing"):
+                st.info(
+                    "ℹ️ Project already passed all tests — "
+                    "no code modifications were necessary."
+                )
+            else:
+                st.caption("No code changes were recorded for this run.")
         else:
             # Deduplicate by file path (keep last change per file)
             seen: dict[str, dict] = {}

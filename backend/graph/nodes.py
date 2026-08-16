@@ -3,11 +3,12 @@ LangGraph Nodes — Phase 4.
 
 Individual node implementations for the AegisCode repair state machine.
 Each node takes a `RepairState`, invokes the appropriate Phase 2 tools or Phase 3 agents,
-persists DB events, and returns updated state fields.
+persists DB events and iterations via authoritative upserts, and returns updated state fields.
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -18,7 +19,8 @@ from backend.agents.policies import PolicyViolationError
 from backend.agents.reviewer import ReviewerAgent
 from backend.agents.schemas import ArchitecturePlan, CodeChange, ReviewResult
 from backend.core.logging import get_logger
-from backend.database.models import Event, Iteration
+from backend.database.models import Event, Run
+from backend.database.persistence import upsert_iteration
 from backend.execution.workspace import WorkspaceManager
 from backend.graph.state import RepairState
 from backend.llm.base import BaseLLMProvider
@@ -38,7 +40,10 @@ def initial_test_node(
     project_path = Path(state["project_path"])
 
     _emit_event(db, run_id, 0, "system", "INITIAL_TEST_STARTED", {"workspace_id": workspace_id})
-    logger.info("LangGraph Node: initial_test_node executing in %s", project_path)
+    logger.info(
+        "[INITIAL TEST START] run_id=%s workspace=%s path=%s",
+        run_id, workspace_id, project_path,
+    )
 
     res: TestResult = run_pytest(project_path)
     res_dict = res.model_dump()
@@ -50,7 +55,11 @@ def initial_test_node(
             "passed": res.passed,
             "failed": res.failed,
             "duration": res.duration,
-        }
+        },
+    )
+    logger.info(
+        "[INITIAL TEST COMPLETE] run_id=%s exit_code=%d passed=%d failed=%d success=%s",
+        run_id, res.exit_code, res.passed, res.failed, res.success,
     )
 
     updates: dict = {
@@ -61,9 +70,42 @@ def initial_test_node(
     }
 
     if res.success:
-        logger.info("Initial test pass: ALL TESTS PASSED ALREADY")
+        logger.info("[INITIAL TEST] ALL TESTS PASSED ALREADY for run_id=%s", run_id)
         updates["status"] = "already_passing"
         updates["termination_reason"] = "all_tests_passed"
+
+        # Authoritatively persist iteration 1 as healthy and approved
+        upsert_iteration(
+            db=db,
+            run_id=run_id,
+            iteration_number=1,
+            test_results=res_dict,
+            tests_passed=res.passed,
+            tests_failed=0,
+            approved=True,
+            duration_seconds=res.duration,
+        )
+        if db and run_id:
+            try:
+                run_rec = db.get(Run, run_id)
+                if run_rec:
+                    run_rec.status = "already_passing"
+                    run_rec.finished_at = datetime.now(timezone.utc)
+                    run_rec.final_summary = "All tests already pass — project is healthy"
+                    db.commit()
+            except Exception as exc:
+                logger.warning("Failed to update Run record on already_passing: %s", exc)
+    else:
+        # Record baseline test metrics for iteration 1
+        upsert_iteration(
+            db=db,
+            run_id=run_id,
+            iteration_number=1,
+            test_results=res_dict,
+            tests_passed=res.passed,
+            tests_failed=res.failed,
+            duration_seconds=res.duration,
+        )
 
     return updates
 
@@ -79,7 +121,7 @@ def architect_node(
     project_path = state["project_path"]
 
     _emit_event(db, run_id, iteration, "architect", "ARCHITECT_STARTED")
-    logger.info("LangGraph Node: architect_node starting iteration %d", iteration)
+    logger.info("[ARCHITECT START] run_id=%s iteration=%d", run_id, iteration)
 
     wm = WorkspaceManager.from_project_path(project_path)
     agent = ArchitectAgent(llm_provider)
@@ -94,10 +136,22 @@ def architect_node(
 
     _emit_event(
         db, run_id, iteration, "architect", "ARCHITECT_COMPLETED",
-        {"summary": plan.summary, "relevant_files": plan.relevant_files}
+        {"summary": plan.summary, "relevant_files": plan.relevant_files},
+    )
+    logger.info(
+        "[ARCHITECT COMPLETE] run_id=%s iteration=%d summary=%r relevant_files=%s",
+        run_id, iteration, plan.summary, plan.relevant_files,
     )
 
-    return {"architecture_plan": plan.model_dump()}
+    plan_dict = plan.model_dump()
+    upsert_iteration(
+        db=db,
+        run_id=run_id,
+        iteration_number=iteration,
+        architecture_plan=plan_dict,
+    )
+
+    return {"architecture_plan": plan_dict}
 
 
 def coder_node(
@@ -111,7 +165,7 @@ def coder_node(
     project_path = state["project_path"]
 
     _emit_event(db, run_id, iteration, "coder", "CODER_STARTED")
-    logger.info("LangGraph Node: coder_node starting iteration %d", iteration)
+    logger.info("[CODER START] run_id=%s iteration=%d", run_id, iteration)
 
     wm = WorkspaceManager.from_project_path(project_path)
     agent = CoderAgent(llm_provider)
@@ -129,16 +183,30 @@ def coder_node(
         )
     except PolicyViolationError as exc:
         _emit_event(db, run_id, iteration, "coder", "POLICY_VIOLATION", {"error": str(exc)})
-        logger.warning("Coder security policy violation: %s", exc)
+        logger.warning("[CODER POLICY VIOLATION] run_id=%s: %s", run_id, exc)
+        failed_change = CodeChange(
+            file_path=plan.relevant_files[0] if plan.relevant_files else "unknown",
+            change_type="none",
+            explanation=f"Policy violation: {exc}",
+            root_cause=str(exc),
+            patch="",
+            confidence=0.0,
+        )
+        upsert_iteration(
+            db=db,
+            run_id=run_id,
+            iteration_number=iteration,
+            code_changes=[failed_change.model_dump()],
+        )
         return {
             "status": "error",
             "termination_reason": "policy_violation",
-            "code_change": {"change_type": "none", "explanation": str(exc)},
+            "code_change": failed_change.model_dump(),
         }
     except RuntimeError as exc:
         err_msg = str(exc)
         _emit_event(db, run_id, iteration, "coder", "PATCH_ERROR", {"error": err_msg})
-        logger.warning("Coder tool application error in iteration %d: %s", iteration, err_msg)
+        logger.warning("[CODER PATCH ERROR] run_id=%s iteration=%d: %s", run_id, iteration, err_msg)
         diff_res = get_git_diff(wm)
         failed_change = CodeChange(
             file_path=plan.relevant_files[0] if plan.relevant_files else "unknown",
@@ -147,6 +215,12 @@ def coder_node(
             root_cause=err_msg,
             patch="",
             confidence=0.0,
+        )
+        upsert_iteration(
+            db=db,
+            run_id=run_id,
+            iteration_number=iteration,
+            code_changes=[failed_change.model_dump()],
         )
         return {
             "code_change": failed_change.model_dump(),
@@ -159,11 +233,23 @@ def coder_node(
 
     _emit_event(
         db, run_id, iteration, "coder", "CODER_COMPLETED",
-        {"file_path": change.file_path, "change_type": change.change_type}
+        {"file_path": change.file_path, "change_type": change.change_type},
+    )
+    logger.info(
+        "[CODER COMPLETE] run_id=%s iteration=%d file=%s type=%s",
+        run_id, iteration, change.file_path, change.change_type,
+    )
+
+    change_dict = change.model_dump()
+    upsert_iteration(
+        db=db,
+        run_id=run_id,
+        iteration_number=iteration,
+        code_changes=[change_dict],
     )
 
     return {
-        "code_change": change.model_dump(),
+        "code_change": change_dict,
         "git_diff": diff_res.model_dump(),
         "tool_call_count": state.get("tool_call_count", 0) + 1,
     }
@@ -179,7 +265,7 @@ def test_node(
     project_path = Path(state["project_path"])
 
     _emit_event(db, run_id, iteration, "tester", "TEST_STARTED")
-    logger.info("LangGraph Node: test_node starting iteration %d", iteration)
+    logger.info("[TEST START] run_id=%s iteration=%d", run_id, iteration)
 
     res: TestResult = run_pytest(project_path)
     res_dict = res.model_dump()
@@ -191,7 +277,21 @@ def test_node(
             "passed": res.passed,
             "failed": res.failed,
             "duration": res.duration,
-        }
+        },
+    )
+    logger.info(
+        "[TEST COMPLETE] run_id=%s iteration=%d passed=%d failed=%d exit_code=%d",
+        run_id, iteration, res.passed, res.failed, res.exit_code,
+    )
+
+    upsert_iteration(
+        db=db,
+        run_id=run_id,
+        iteration_number=iteration,
+        test_results=res_dict,
+        tests_passed=res.passed,
+        tests_failed=res.failed,
+        duration_seconds=res.duration,
     )
 
     return {
@@ -211,7 +311,7 @@ def reviewer_node(
     project_path = state["project_path"]
 
     _emit_event(db, run_id, iteration, "reviewer", "REVIEWER_STARTED")
-    logger.info("LangGraph Node: reviewer_node starting iteration %d", iteration)
+    logger.info("[REVIEWER START] run_id=%s iteration=%d", run_id, iteration)
 
     wm = WorkspaceManager.from_project_path(project_path)
     agent = ReviewerAgent(llm_provider)
@@ -230,24 +330,14 @@ def reviewer_node(
         db=db,
     )
 
-    # Persist iteration details to DB
-    if db and run_id:
-        try:
-            it = Iteration(
-                run_id=run_id,
-                iteration_number=iteration,
-                architecture_plan=state.get("architecture_plan"),
-                code_changes=[state.get("code_change")] if state.get("code_change") else [],
-                test_results=state.get("test_result"),
-                review_result=review.model_dump(),
-                tests_passed=new_res.passed if new_res else 0,
-                tests_failed=new_res.failed if new_res else 0,
-                duration_seconds=new_res.duration if new_res else 0.0,
-            )
-            db.add(it)
-            db.flush()
-        except Exception as exc:
-            logger.warning("Failed to persist iteration record: %s", exc)
+    review_dict = review.model_dump()
+    upsert_iteration(
+        db=db,
+        run_id=run_id,
+        iteration_number=iteration,
+        review_result=review_dict,
+        approved=review.approved,
+    )
 
     _emit_event(
         db, run_id, iteration, "reviewer", "REVIEWER_COMPLETED",
@@ -255,7 +345,11 @@ def reviewer_node(
             "approved": review.approved,
             "root_cause_fixed": review.root_cause_fixed,
             "regression_risk": review.regression_risk,
-        }
+        },
+    )
+    logger.info(
+        "[REVIEWER COMPLETE] run_id=%s iteration=%d approved=%s root_cause_fixed=%s risk=%s",
+        run_id, iteration, review.approved, review.root_cause_fixed, review.regression_risk,
     )
 
     rejections = state.get("reviewer_rejections", 0)
@@ -263,13 +357,25 @@ def reviewer_node(
         rejections += 1
 
     updates: dict = {
-        "review_result": review.model_dump(),
+        "review_result": review_dict,
         "reviewer_rejections": rejections,
     }
 
     if new_res and new_res.success and review.approved:
         updates["status"] = "passed"
         updates["termination_reason"] = "all_tests_passed"
+        if db and run_id:
+            try:
+                run_rec = db.get(Run, run_id)
+                if run_rec:
+                    run_rec.status = "passed"
+                    run_rec.finished_at = datetime.now(timezone.utc)
+                    run_rec.final_summary = (
+                        "Repair completed successfully — all tests passed and reviewer approved"
+                    )
+                    db.commit()
+            except Exception as exc:
+                logger.warning("Failed to update Run record on review approval: %s", exc)
 
     return updates
 

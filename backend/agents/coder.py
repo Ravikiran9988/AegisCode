@@ -13,6 +13,8 @@ are blocked at tool invocation time and raise a PolicyViolationError.
 
 from __future__ import annotations
 
+import ast
+
 from sqlalchemy.orm import Session
 
 from backend.agents.policies import PolicyViolationError, check_file_modification_policy
@@ -23,7 +25,7 @@ from backend.core.logging import get_logger
 from backend.database.models import Event
 from backend.execution.workspace import WorkspaceManager
 from backend.llm.base import BaseLLMProvider
-from backend.tools.filesystem import apply_patch, write_file
+from backend.tools.filesystem import _clean_patch, apply_patch, write_file
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
@@ -49,7 +51,10 @@ class CoderAgent:
         and apply the modification to the project workspace.
         """
         _emit_agent_event(db, run_id, "coder", "CODER_STARTED")
-        logger.info("CoderAgent starting fix generation for workspace %s", workspace.workspace_id)
+        logger.info(
+            "[CODER START] run_id=%s workspace=%s relevant_files=%s",
+            run_id, workspace.workspace_id, plan.relevant_files,
+        )
 
         # Step 1: Build context & generate CodeChange proposal from LLM
         context = build_coder_context(
@@ -95,6 +100,11 @@ class CoderAgent:
             raise
 
         # Step 3: Execute tool modification
+        logger.info(
+            "[PATCH START] run_id=%s file=%s type=%s",
+            run_id, change.file_path, change.change_type,
+        )
+
         if change.change_type == "write":
             _emit_agent_event(
                 db, run_id, "coder", "TOOL_CALLED",
@@ -115,11 +125,37 @@ class CoderAgent:
             )
             patch_res = apply_patch(workspace, change.file_path, change.patch)
             if not patch_res.success:
-                _emit_agent_event(
-                    db, run_id, "coder", "TOOL_FAILED",
-                    {"tool": "apply_patch", "path": change.file_path, "error": patch_res.error}
-                )
-                raise RuntimeError(f"Failed to patch file {change.file_path}: {patch_res.error}")
+                # Robust fallback: if patch has no hunks but is valid complete Python code
+                clean_p = _clean_patch(change.patch)
+                if "No hunks found in patch" in (patch_res.error or ""):
+                    try:
+                        ast.parse(clean_p)
+                        logger.info(
+                            "apply_patch had no hunks but is valid Python code — write_file %s",
+                            change.file_path,
+                        )
+                        write_res = write_file(workspace, change.file_path, clean_p)
+                        if write_res.success:
+                            change.change_type = "write"
+                            patch_res = patch_res.model_copy(
+                                update={"success": True, "error": None}
+                            )
+                    except Exception as parse_err:
+                        logger.debug("Patch text is not valid Python syntax: %s", parse_err)
+
+                if not patch_res.success:
+                    _emit_agent_event(
+                        db, run_id, "coder", "TOOL_FAILED",
+                        {"tool": "apply_patch", "path": change.file_path, "error": patch_res.error}
+                    )
+                    raise RuntimeError(
+                        f"Failed to patch file {change.file_path}: {patch_res.error}"
+                    )
+
+        logger.info(
+            "[PATCH COMPLETE] run_id=%s file=%s type=%s",
+            run_id, change.file_path, change.change_type,
+        )
 
         _emit_agent_event(
             db, run_id, "coder", "CODER_COMPLETED",
@@ -130,8 +166,8 @@ class CoderAgent:
             }
         )
         logger.info(
-            "CoderAgent successfully applied %s to %s",
-            change.change_type, change.file_path,
+            "[CODER COMPLETE] run_id=%s successfully applied %s to %s",
+            run_id, change.change_type, change.file_path,
         )
         return change
 
