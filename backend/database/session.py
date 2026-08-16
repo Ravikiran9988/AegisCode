@@ -84,12 +84,11 @@ def get_db() -> Generator[Session, None, None]:
     """
     FastAPI dependency that provides a database session per request.
 
-    Automatically commits on success and rolls back on exception.
+    Closes the session cleanly and rolls back on unhandled exceptions.
     """
     db = SessionLocal()
     try:
         yield db
-        db.commit()
     except Exception:
         db.rollback()
         raise

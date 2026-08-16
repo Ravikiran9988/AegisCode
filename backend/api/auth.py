@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.core.logging import get_logger
 from backend.core.security import (
     create_access_token,
     decode_access_token,
@@ -21,6 +22,8 @@ from backend.core.security import (
 )
 from backend.database.models import User
 from backend.database.session import get_db
+
+logger = get_logger(__name__)
 
 auth_router = APIRouter()
 
@@ -200,33 +203,43 @@ def register_user(
 
     # 5. Check duplicate email -> 409 Conflict
     email_clean = req.email.strip().lower()
-    existing = db.scalars(select(User).where(User.email == email_clean)).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email address already exists",
+    try:
+        existing = db.scalars(select(User).where(User.email == email_clean)).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email address already exists",
+            )
+
+        # 6. Create and persist user
+        hashed_pwd = get_password_hash(req.password)
+        user = User(
+            name=display_name,
+            email=email_clean,
+            hashed_password=hashed_pwd,
+            is_active=True,
+            is_superuser=False,
         )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
-    # 6. Create and persist user
-    hashed_pwd = get_password_hash(req.password)
-    user = User(
-        name=display_name,
-        email=email_clean,
-        hashed_password=hashed_pwd,
-        is_active=True,
-        is_superuser=False,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    # 7. Issue JWT access token
-    token = create_access_token(data={"sub": user.id, "email": user.email})
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        user=UserResponse.model_validate(user),
-    )
+        # 7. Issue JWT access token
+        token = create_access_token(data={"sub": user.id, "email": user.email})
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            user=UserResponse.model_validate(user),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.exception("User registration failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration failed: {exc}",
+        ) from exc
 
 
 @auth_router.post(
