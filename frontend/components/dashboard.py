@@ -79,7 +79,9 @@ def _render_metric_cards(runs: list[dict]) -> None:
         """
         for icon, label, value, subtitle in cards
     )
-    st.markdown(f'<div class="aegis-metric-grid">{cards_html}</div>', unsafe_allow_html=True)
+    # st.html is used deliberately here: st.markdown treats sufficiently-indented
+    # HTML as a Markdown code block, which previously exposed the raw markup.
+    st.html(f'<div class="aegis-metric-grid">{cards_html}</div>')
 
 
 def _render_infrastructure_status(api_url: str, health_data: dict) -> None:
@@ -108,7 +110,7 @@ def _render_infrastructure_status(api_url: str, health_data: dict) -> None:
     columns = st.columns(5)
     for column, (icon, state, name, detail, checked) in zip(columns, statuses, strict=False):
         with column:
-            st.markdown(
+            st.html(
                 f"""
                 <div class="aegis-health-card" style="padding: 12px 14px;">
                   <div style="font-weight: 700; font-size: 0.85rem;">{icon} {state}</div>
@@ -117,8 +119,7 @@ def _render_infrastructure_status(api_url: str, health_data: dict) -> None:
                     {detail}<br>Checked: {checked}
                   </div>
                 </div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
 
 
@@ -230,7 +231,7 @@ def render_dashboard(api_url: str, health_data: dict) -> None:
     """Render the main control center overview dashboard."""
     header_col, action_col = st.columns([3, 1])
     with header_col:
-        st.markdown(
+        st.html(
             """
             <div class="aegis-page-header">
               <h1 class="aegis-page-title">AegisCode Control Center</h1>
@@ -238,8 +239,7 @@ def render_dashboard(api_url: str, health_data: dict) -> None:
                 Autonomous software repair infrastructure • Real-time self-healing orchestration
               </p>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
     with action_col:
         st.write("")
