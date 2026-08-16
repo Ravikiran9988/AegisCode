@@ -9,7 +9,10 @@ from datetime import datetime
 
 import streamlit as st
 
-from frontend.utils.api_client import _check_backend_once
+try:
+    from frontend.utils.api_client import _check_backend_once
+except ImportError:
+    from utils.api_client import _check_backend_once
 
 
 def render_system_health(backend_url: str, initial_health_data: dict) -> None:

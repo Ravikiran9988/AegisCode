@@ -13,35 +13,72 @@ Top-tier production dashboard integrating:
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
-import streamlit as st
+# Inject project root and frontend directories into sys.path before any local imports
+_ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_ROOT_DIR))
 
-from frontend.components.agents import render_agents_view
-from frontend.components.code_diff import render_code_changes_view
-from frontend.components.dashboard import render_dashboard
-from frontend.components.docs import render_docs
-from frontend.components.health import render_system_health
-from frontend.components.history import render_history
-from frontend.components.live_repair import render_live_repair
-from frontend.components.settings import render_settings
-from frontend.components.sidebar import render_sidebar
-from frontend.components.test_runs import render_test_runs_view
-from frontend.components.topbar import render_topbar
-from frontend.components.upload import render_upload
-from frontend.utils.api_client import (
-    _check_backend_once,
-    _safe_get,
-    _safe_post,
-    check_backend_with_retry,
-)
-from frontend.utils.helpers import (
-    _detect_rate_limit_error,
-    _duration_str,
-    _extract_filename_from_content_disposition,
-    _normalize_backend_url,
-    _parse_api_error,
-)
+_FRONTEND_DIR = Path(__file__).resolve().parent
+if str(_FRONTEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_FRONTEND_DIR))
+
+import streamlit as st  # noqa: E402
+
+try:
+    from frontend.components.agents import render_agents_view
+    from frontend.components.code_diff import render_code_changes_view
+    from frontend.components.dashboard import render_dashboard
+    from frontend.components.docs import render_docs
+    from frontend.components.health import render_system_health
+    from frontend.components.history import render_history
+    from frontend.components.live_repair import render_live_repair
+    from frontend.components.settings import render_settings
+    from frontend.components.sidebar import render_sidebar
+    from frontend.components.test_runs import render_test_runs_view
+    from frontend.components.topbar import render_topbar
+    from frontend.components.upload import render_upload
+    from frontend.utils.api_client import (
+        _check_backend_once,
+        _safe_get,
+        _safe_post,
+        check_backend_with_retry,
+    )
+    from frontend.utils.helpers import (
+        _detect_rate_limit_error,
+        _duration_str,
+        _extract_filename_from_content_disposition,
+        _normalize_backend_url,
+        _parse_api_error,
+    )
+except ImportError:
+    from components.agents import render_agents_view
+    from components.code_diff import render_code_changes_view
+    from components.dashboard import render_dashboard
+    from components.docs import render_docs
+    from components.health import render_system_health
+    from components.history import render_history
+    from components.live_repair import render_live_repair
+    from components.settings import render_settings
+    from components.sidebar import render_sidebar
+    from components.test_runs import render_test_runs_view
+    from components.topbar import render_topbar
+    from components.upload import render_upload
+    from utils.api_client import (
+        _check_backend_once,
+        _safe_get,
+        _safe_post,
+        check_backend_with_retry,
+    )
+    from utils.helpers import (
+        _detect_rate_limit_error,
+        _duration_str,
+        _extract_filename_from_content_disposition,
+        _normalize_backend_url,
+        _parse_api_error,
+    )
 
 # Export helper functions for test suite compatibility
 __all__ = [

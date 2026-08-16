@@ -7,9 +7,14 @@ from __future__ import annotations
 
 import streamlit as st
 
-from frontend.components.states import render_empty_state
-from frontend.utils.api_client import fetch_recent_runs
-from frontend.utils.helpers import format_timestamp
+try:
+    from frontend.components.states import render_empty_state
+    from frontend.utils.api_client import fetch_recent_runs
+    from frontend.utils.helpers import format_timestamp
+except ImportError:
+    from components.states import render_empty_state
+    from utils.api_client import fetch_recent_runs
+    from utils.helpers import format_timestamp
 
 
 def render_history(api_url: str) -> None:

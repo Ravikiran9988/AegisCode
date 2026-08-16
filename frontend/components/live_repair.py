@@ -9,26 +9,48 @@ import time
 
 import streamlit as st
 
-from frontend.components.agents import (
-    render_architect_panel,
-    render_coder_panel,
-    render_reviewer_panel,
-    render_test_panel,
-)
-from frontend.components.code_diff import render_code_diff_viewer
-from frontend.components.states import (
-    render_empty_state,
-    render_error_alert,
-    render_rate_limit_alert,
-    render_warning_alert,
-)
-from frontend.components.timeline import render_timeline
-from frontend.utils.api_client import _safe_get, fetch_run_results, fetch_run_status
-from frontend.utils.helpers import (
-    _detect_rate_limit_error,
-    _duration_str,
-    _extract_filename_from_content_disposition,
-)
+try:
+    from frontend.components.agents import (
+        render_architect_panel,
+        render_coder_panel,
+        render_reviewer_panel,
+        render_test_panel,
+    )
+    from frontend.components.code_diff import render_code_diff_viewer
+    from frontend.components.states import (
+        render_empty_state,
+        render_error_alert,
+        render_rate_limit_alert,
+        render_warning_alert,
+    )
+    from frontend.components.timeline import render_timeline
+    from frontend.utils.api_client import _safe_get, fetch_run_results, fetch_run_status
+    from frontend.utils.helpers import (
+        _detect_rate_limit_error,
+        _duration_str,
+        _extract_filename_from_content_disposition,
+    )
+except ImportError:
+    from components.agents import (
+        render_architect_panel,
+        render_coder_panel,
+        render_reviewer_panel,
+        render_test_panel,
+    )
+    from components.code_diff import render_code_diff_viewer
+    from components.states import (
+        render_empty_state,
+        render_error_alert,
+        render_rate_limit_alert,
+        render_warning_alert,
+    )
+    from components.timeline import render_timeline
+    from utils.api_client import _safe_get, fetch_run_results, fetch_run_status
+    from utils.helpers import (
+        _detect_rate_limit_error,
+        _duration_str,
+        _extract_filename_from_content_disposition,
+    )
 
 
 def render_live_repair(api_url: str) -> None:

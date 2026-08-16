@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from frontend.utils.api_client import fetch_recent_runs, fetch_run_results
+try:
+    from frontend.utils.api_client import fetch_recent_runs, fetch_run_results
+except ImportError:
+    from utils.api_client import fetch_recent_runs, fetch_run_results
 
 
 def render_code_diff_viewer(iterations: list[dict], is_already_passing: bool = False) -> None:

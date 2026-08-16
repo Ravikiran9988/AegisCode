@@ -6,8 +6,12 @@ from __future__ import annotations
 
 import streamlit as st
 
-from frontend.components.agents import render_test_panel
-from frontend.utils.api_client import fetch_recent_runs, fetch_run_results
+try:
+    from frontend.components.agents import render_test_panel
+    from frontend.utils.api_client import fetch_recent_runs, fetch_run_results
+except ImportError:
+    from components.agents import render_test_panel
+    from utils.api_client import fetch_recent_runs, fetch_run_results
 
 
 def render_test_runs_view(api_url: str) -> None:

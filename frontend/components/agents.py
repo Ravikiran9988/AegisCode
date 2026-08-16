@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from frontend.utils.api_client import fetch_recent_runs, fetch_run_results
+try:
+    from frontend.utils.api_client import fetch_recent_runs, fetch_run_results
+except ImportError:
+    from utils.api_client import fetch_recent_runs, fetch_run_results
 
 
 def render_architect_panel(arch_plan: dict, is_already_passing: bool = False) -> None:
@@ -307,7 +310,9 @@ def render_agents_view(api_url: str) -> None:
 
     if active_run_id:
         st.markdown("---")
-        st.markdown(f"### 📋 Live Agent Traces for Active Run (`RUN-{active_run_id[:8].upper()}`)")
+        st.markdown(
+            f"### 📋 Live Agent Traces for Active Run (`RUN-{active_run_id[:8].upper()}`)"
+        )
         rdata = fetch_run_results(api_url, active_run_id)
         if rdata:
             iterations = rdata.get("iterations", rdata.get("iteration_details", []))
@@ -316,7 +321,9 @@ def render_agents_view(api_url: str) -> None:
                 st.markdown(f"#### Iteration {it_num}")
                 col_t1, col_t2 = st.columns(2)
                 with col_t1:
-                    render_architect_panel(it.get("architecture_plan") or it.get("architect") or {})
+                    render_architect_panel(
+                        it.get("architecture_plan") or it.get("architect") or {}
+                    )
                     render_coder_panel(it.get("code_changes") or it.get("coder") or [])
                 with col_t2:
                     render_test_panel(it.get("test_results") or it.get("tests") or {})

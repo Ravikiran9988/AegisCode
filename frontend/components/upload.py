@@ -9,9 +9,14 @@ import time
 
 import streamlit as st
 
-from frontend.components.states import render_error_alert
-from frontend.utils.api_client import _safe_post
-from frontend.utils.helpers import _parse_api_error, format_file_size
+try:
+    from frontend.components.states import render_error_alert
+    from frontend.utils.api_client import _safe_post
+    from frontend.utils.helpers import _parse_api_error, format_file_size
+except ImportError:
+    from components.states import render_error_alert
+    from utils.api_client import _safe_post
+    from utils.helpers import _parse_api_error, format_file_size
 
 
 def render_upload(api_url: str) -> None:
