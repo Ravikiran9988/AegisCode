@@ -216,9 +216,6 @@ def render_upload(api_url: str) -> None:
                                         st.session_state["nav_view"] = (
                                             "🤖 Active Repairs"
                                         )
-                                        st.session_state["app_navigation_radio"] = (
-                                            "🤖 Active Repairs"
-                                        )
                                 else:
                                     st.session_state["repair_status"] = "error"
                                     st.session_state["repair_error"] = _parse_api_error(create_res)
@@ -264,7 +261,6 @@ def render_upload(api_url: str) -> None:
                         if cur_status in ("passed", "already_passing"):
                             st.session_state["active_run_id"] = repair_run_id
                             st.session_state["nav_view"] = "🤖 Active Repairs"
-                            st.session_state["app_navigation_radio"] = "🤖 Active Repairs"
                             st.session_state.pop("repair_run_id", None)
                             st.session_state.pop("repair_status", None)
                             st.session_state.pop("repair_error", None)
@@ -340,7 +336,6 @@ def render_upload(api_url: str) -> None:
                             use_container_width=True,
                         ):
                             st.session_state["nav_view"] = "📊 Repair History"
-                            st.session_state["app_navigation_radio"] = "📊 Repair History"
                             st.rerun()
 
                 # Terminal Cancelled State Display

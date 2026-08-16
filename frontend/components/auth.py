@@ -67,7 +67,6 @@ def render_auth(api_url: str) -> None:
                         st.session_state["auth_token"] = res["access_token"]
                         st.session_state["current_user"] = res.get("user", {})
                         st.session_state["nav_view"] = "◉ Overview"
-                        st.session_state["app_navigation_radio"] = "◉ Overview"
                         st.success("Authenticated successfully! Redirecting...")
                         st.rerun()
                     else:
@@ -137,7 +136,6 @@ def render_auth(api_url: str) -> None:
                         st.session_state["auth_token"] = res["access_token"]
                         st.session_state["current_user"] = res.get("user", {})
                         st.session_state["nav_view"] = "◉ Overview"
-                        st.session_state["app_navigation_radio"] = "◉ Overview"
                         st.success("Account created successfully! Redirecting to Control Center...")
                         st.rerun()
                     else:

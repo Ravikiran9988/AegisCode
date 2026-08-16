@@ -101,7 +101,6 @@ def render_live_repair(api_url: str) -> None:
     with col_s3:
         if st.button("➕ New Repair", key="btn_live_nav_new", use_container_width=True):
             st.session_state["nav_view"] = "🚀 New Repair"
-            st.session_state["app_navigation_radio"] = "🚀 New Repair"
             st.rerun()
 
     if not active_run_id:
@@ -475,17 +474,14 @@ def render_live_repair(api_url: str) -> None:
         with col_act1:
             if st.button("🔀 View Code Changes", key="btn_view_diffs", use_container_width=True):
                 st.session_state["nav_view"] = "🔀 Code Changes"
-                st.session_state["app_navigation_radio"] = "🔀 Code Changes"
                 st.rerun()
         with col_act2:
             if st.button("🧪 View Test Runs", key="btn_view_tests", use_container_width=True):
                 st.session_state["nav_view"] = "🧪 Test Runs"
-                st.session_state["app_navigation_radio"] = "🧪 Test Runs"
                 st.rerun()
         with col_act3:
             if st.button("📊 Repair History", key="btn_view_hist_done", use_container_width=True):
                 st.session_state["nav_view"] = "📊 Repair History"
-                st.session_state["app_navigation_radio"] = "📊 Repair History"
                 st.rerun()
         with col_act4:
             download_url = f"{api_url}/runs/{active_run_id}/download"
@@ -535,12 +531,10 @@ def render_live_repair(api_url: str) -> None:
                 use_container_width=True,
             ):
                 st.session_state["nav_view"] = "🚀 New Repair"
-                st.session_state["app_navigation_radio"] = "🚀 New Repair"
                 st.rerun()
         with col_f2:
             if st.button("📊 View Repair History", key="btn_fail_hist", use_container_width=True):
                 st.session_state["nav_view"] = "📊 Repair History"
-                st.session_state["app_navigation_radio"] = "📊 Repair History"
                 st.rerun()
 
     elif run_status == "cancelled":
