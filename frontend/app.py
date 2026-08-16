@@ -167,8 +167,9 @@ if not st.session_state["backend_online"]:
     st.session_state["backend_error"] = err_msg
 
 try:
-    from streamlit_cookies_controller import CookieController
     import json
+
+    from streamlit_cookies_controller import CookieController
 
     cookie_controller = CookieController()
     cookie_token = cookie_controller.get("aegis_auth_token")
