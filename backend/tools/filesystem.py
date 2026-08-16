@@ -178,7 +178,8 @@ def write_file(
                 error=f"Writing to {target.name!r} is not allowed"
             )
 
-        encoded = content.encode("utf-8")
+        clean_content = _clean_patch(content)
+        encoded = clean_content.encode("utf-8")
         if len(encoded) > _MAX_FILE_BYTES:
             return FileWriteResult(
                 success=False,
@@ -190,7 +191,7 @@ def write_file(
             )
 
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        target.write_text(clean_content, encoding="utf-8")
         logger.info("write_file: wrote %d bytes to %s", len(encoded), relative_path)
         return FileWriteResult(success=True, path=relative_path, bytes_written=len(encoded))
 
@@ -319,6 +320,19 @@ def _build_tree(
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", re.MULTILINE)
 
 
+def _clean_patch(patch: str) -> str:
+    """Strip markdown code fence blocks from patch string."""
+    cleaned = patch.strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        cleaned = "\n".join(lines)
+    return cleaned
+
+
 def _apply_unified_diff(original: str, patch: str) -> tuple[str, str | None]:
     """
     Apply a unified diff to *original* text.
@@ -328,11 +342,12 @@ def _apply_unified_diff(original: str, patch: str) -> tuple[str, str | None]:
     Supports standard hunks (lines starting with ' ', '+', '-').
     Does NOT support binary patches or extended git diff headers.
     """
+    clean_p = _clean_patch(patch)
     original_lines = original.splitlines(keepends=True)
     result = list(original_lines)
     offset = 0  # cumulative line shift as hunks are applied
 
-    hunk_matches = list(_HUNK_RE.finditer(patch))
+    hunk_matches = list(_HUNK_RE.finditer(clean_p))
     if not hunk_matches:
         return original, "No hunks found in patch"
 
@@ -342,8 +357,8 @@ def _apply_unified_diff(original: str, patch: str) -> tuple[str, str | None]:
 
         # Slice out just this hunk's content lines
         body_start = match.end()
-        body_end = hunk_matches[i + 1].start() if i + 1 < len(hunk_matches) else len(patch)
-        body = patch[body_start:body_end]
+        body_end = hunk_matches[i + 1].start() if i + 1 < len(hunk_matches) else len(clean_p)
+        body = clean_p[body_start:body_end]
 
         # Skip the trailing newline / blank line that separates hunks
         hunk_lines_raw = body.splitlines(keepends=True)

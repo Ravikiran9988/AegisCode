@@ -20,10 +20,13 @@ CRITICAL POLICY & SECURITY RESTRICTIONS:
 OUTPUT REQUIREMENT:
 You must output a structured JSON response matching the CodeChange schema:
 - file_path: Relative path of file to modify (e.g. 'calculator.py').
-- change_type: 'write' or 'patch'.
+- change_type: 'write' or 'patch'. PREFER 'write' (full replacement) for single-file Python fixes.
 - explanation: Clear rationale for the change.
 - root_cause: Explanation of the bug being fixed.
-- patch: The full new content ('write') or unified diff ('patch').
+- patch:
+  - If change_type is 'write': provide the COMPLETE updated python code for the target file.
+  - If change_type is 'patch': provide valid diff starting with '@@ -start,count +start,count @@'.
+  - CRITICAL: Never include markdown code block markers (such as ```python or ```diff) in patch.
 - confidence: Score between 0.0 and 1.0.
 """
 

@@ -135,6 +135,25 @@ def coder_node(
             "termination_reason": "policy_violation",
             "code_change": {"change_type": "none", "explanation": str(exc)},
         }
+    except RuntimeError as exc:
+        err_msg = str(exc)
+        _emit_event(db, run_id, iteration, "coder", "PATCH_ERROR", {"error": err_msg})
+        logger.warning("Coder tool application error in iteration %d: %s", iteration, err_msg)
+        diff_res = get_git_diff(wm)
+        failed_change = CodeChange(
+            file_path=plan.relevant_files[0] if plan.relevant_files else "unknown",
+            change_type="none",
+            explanation=f"Patch application failed: {err_msg}",
+            root_cause=err_msg,
+            patch="",
+            confidence=0.0,
+        )
+        return {
+            "code_change": failed_change.model_dump(),
+            "coder_error": err_msg,
+            "git_diff": diff_res.model_dump(),
+            "tool_call_count": state.get("tool_call_count", 0) + 1,
+        }
 
     diff_res = get_git_diff(wm)
 

@@ -136,6 +136,9 @@ class IterationSchema(BaseModel):
     approved: bool | None
     duration_seconds: float | None
     test_results: dict | None
+    architecture_plan: dict | None = None
+    code_changes: list | dict | None = None
+    review_result: dict | None = None
 
 
 class RunResultsResponse(BaseModel):
@@ -422,6 +425,9 @@ def get_run_results(run_id: str, db: Session = Depends(get_db)) -> RunResultsRes
             approved=it.approved,
             duration_seconds=it.duration_seconds,
             test_results=it.test_results,
+            architecture_plan=it.architecture_plan,
+            code_changes=it.code_changes,
+            review_result=it.review_result,
         )
         for it in sorted(run.iterations, key=lambda x: x.iteration_number)
     ]

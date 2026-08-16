@@ -633,6 +633,58 @@ with tabs[1]:
         it_tabs = st.tabs([f"Iteration {it['iteration_number']}" for it in iterations])
         for idx, it in enumerate(iterations):
             with it_tabs[idx]:
+                it_num = it.get("iteration_number", idx + 1)
+                changes = it.get("code_changes") or []
+                if isinstance(changes, dict):
+                    changes = [changes]
+
+                # Check for patch application failure in this iteration
+                patch_error = None
+                target_file = None
+                for ch in changes:
+                    expl = ch.get("explanation", "")
+                    rc = ch.get("root_cause", "")
+                    combined = f"{expl} {rc}".lower()
+                    err_keywords = ("patch application failed", "failed to patch", "no hunks found")
+                    if any(k in combined for k in err_keywords):
+                        patch_error = expl or rc
+                        target_file = ch.get("file_path", "unknown")
+                        break
+
+                if patch_error:
+                    tres = it.get("test_results") or {}
+                    passed_cnt = tres.get("passed", 0)
+                    failed_cnt = tres.get("failed", 0)
+                    will_retry = (it_num < max_iter)
+                    retry_str = (
+                        f"Yes — System retries in Iteration {it_num + 1} of {max_iter}"
+                        if will_retry else "No — Final iteration reached"
+                    )
+                    dl_str = (
+                        "Unavailable until repair completes successfully and Reviewer approves"
+                        if run_status not in ("passed", "already_passing") else "Available"
+                    )
+
+                    card_html = (
+                        f'<div style="background-color: rgba(239, 68, 68, 0.12); '
+                        f'border-left: 4px solid #ef4444; padding: 14px 18px; '
+                        f'border-radius: 8px; margin-bottom: 16px;">\n'
+                        f'  <h4 style="color: #ef4444; margin: 0 0 8px 0;">'
+                        f'⚠️ Patch Application Failed in Iteration {it_num}</h4>\n'
+                        f'  <p style="margin: 4px 0;"><strong>File Being Patched:</strong> '
+                        f'<code>{target_file}</code></p>\n'
+                        f'  <p style="margin: 4px 0;"><strong>Patch Error:</strong> '
+                        f'{patch_error}</p>\n'
+                        f'  <p style="margin: 4px 0;"><strong>Tests Passed / Failed:</strong> '
+                        f'{passed_cnt} passed, {failed_cnt} failed</p>\n'
+                        f'  <p style="margin: 4px 0;"><strong>Will System Retry?</strong> '
+                        f'{retry_str}</p>\n'
+                        f'  <p style="margin: 4px 0;">'
+                        f'<strong>Final Download Availability:</strong> {dl_str}</p>\n'
+                        f'</div>'
+                    )
+                    st.markdown(card_html, unsafe_allow_html=True)
+
                 col_arch, col_code = st.columns(2)
 
                 with col_arch:
@@ -653,10 +705,6 @@ with tabs[1]:
 
                 with col_code:
                     st.markdown("##### 💻 Coder Agent Modification")
-                    # code_changes is a list; support both old dict and new list
-                    changes = it.get("code_changes") or []
-                    if isinstance(changes, dict):
-                        changes = [changes]
                     if changes:
                         for ch in changes:
                             fpath = ch.get("file_path", "N/A")
