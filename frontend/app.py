@@ -33,7 +33,9 @@ _orig_markdown = DeltaGenerator.markdown
 
 def _patched_markdown(self, body, unsafe_allow_html=False, *args, **kwargs):
     if unsafe_allow_html and isinstance(body, str):
-        body = textwrap.dedent(body)
+        # Remove all leading whitespace to prevent Markdown from ever parsing 
+        # indented HTML lines as code blocks, even if there are blank lines.
+        body = "\n".join(line.lstrip() for line in body.splitlines())
     return _orig_markdown(self, body, unsafe_allow_html=unsafe_allow_html, *args, **kwargs)
 
 DeltaGenerator.markdown = _patched_markdown
