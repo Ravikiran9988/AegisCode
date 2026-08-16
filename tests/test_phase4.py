@@ -291,12 +291,60 @@ class TestRepairAPI:
         assert rep_resp.status_code == 202
         assert rep_resp.json()["status"] == "running"
 
-        # 4. Check status endpoint
+        # 4. Check status endpoint and rich telemetry structure
         stat_resp = api_client.get(f"/api/runs/{rid}/status")
         assert stat_resp.status_code == 200
         sdata = stat_resp.json()
+
+        # Core status fields
+        assert sdata["run_id"] == rid
+        assert sdata["project_id"] == pid
         assert "status" in sdata
+        assert "current_iteration" in sdata
+        assert "max_iterations" in sdata
         assert "tests_passed" in sdata
+        assert "review_approved" in sdata
+
+        # Real-time state machine telemetry
+        assert "current_node" in sdata
+        assert "current_agent" in sdata
+        assert "current_phase" in sdata
+        assert "current_action" in sdata
+        assert "description" in sdata["current_action"]
+
+        # Pipeline nodes
+        assert "pipeline_nodes" in sdata
+        assert isinstance(sdata["pipeline_nodes"], list)
+        assert len(sdata["pipeline_nodes"]) == 5
+        node_names = [n["node"] for n in sdata["pipeline_nodes"]]
+        assert node_names == ["initial_test", "architect", "coder", "test", "reviewer"]
+        for pnode in sdata["pipeline_nodes"]:
+            assert pnode["status"] in ("completed", "running", "pending", "failed")
+            assert "name" in pnode
+            assert "agent" in pnode
+
+        # Real progress percentage
+        assert "progress_percent" in sdata
+        assert 0 <= sdata["progress_percent"] <= 100
+
+        # Structured testing and files info
+        assert "tests" in sdata
+        assert "total" in sdata["tests"]
+        assert "executed" in sdata["tests"]
+        assert "passed" in sdata["tests"]
+        assert "failed" in sdata["tests"]
+        assert "coverage_percent" in sdata["tests"]
+
+        assert "files" in sdata
+        assert "analyzed" in sdata["files"]
+        assert "changed" in sdata["files"]
+        assert isinstance(sdata["files"]["changed_files"], list)
+
+        # Timeline list
+        assert "timeline" in sdata
+        assert isinstance(sdata["timeline"], list)
+        assert "elapsed_seconds" in sdata
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -39,7 +39,20 @@ def initial_test_node(
     workspace_id = state.get("workspace_id", "")
     project_path = Path(state["project_path"])
 
-    _emit_event(db, run_id, 0, "system", "INITIAL_TEST_STARTED", {"workspace_id": workspace_id})
+    _emit_event(
+        db,
+        run_id,
+        0,
+        "system",
+        "INITIAL_TEST_STARTED",
+        {
+            "node": "initial_test",
+            "agent": "Test Agent",
+            "phase": "Repository Assessment",
+            "description": "Executing initial baseline pytest pass to inspect test failures...",
+            "workspace_id": workspace_id,
+        },
+    )
     logger.info(
         "[INITIAL TEST START] run_id=%s workspace=%s path=%s",
         run_id, workspace_id, project_path,
@@ -49,8 +62,19 @@ def initial_test_node(
     res_dict = res.model_dump()
 
     _emit_event(
-        db, run_id, 0, "tester", "INITIAL_TEST_COMPLETED",
+        db,
+        run_id,
+        0,
+        "tester",
+        "INITIAL_TEST_COMPLETED",
         {
+            "node": "initial_test",
+            "agent": "Test Agent",
+            "phase": "Repository Assessment",
+            "description": (
+                f"Initial assessment completed: {res.passed} passed, {res.failed} failed "
+                f"(Pytest exit code {res.exit_code})."
+            ),
             "exit_code": res.exit_code,
             "passed": res.passed,
             "failed": res.failed,
@@ -120,7 +144,22 @@ def architect_node(
     iteration = state.get("iteration", 1)
     project_path = state["project_path"]
 
-    _emit_event(db, run_id, iteration, "architect", "ARCHITECT_STARTED")
+    _emit_event(
+        db,
+        run_id,
+        iteration,
+        "architect",
+        "ARCHITECT_STARTED",
+        {
+            "node": "architect",
+            "agent": "Architect Agent",
+            "phase": "Root Cause Analysis",
+            "description": (
+                f"Iteration {iteration}: Analyzing pytest diagnostics, error traces, and source "
+                "repository..."
+            ),
+        },
+    )
     logger.info("[ARCHITECT START] run_id=%s iteration=%d", run_id, iteration)
 
     wm = WorkspaceManager.from_project_path(project_path)
@@ -135,8 +174,19 @@ def architect_node(
     )
 
     _emit_event(
-        db, run_id, iteration, "architect", "ARCHITECT_COMPLETED",
-        {"summary": plan.summary, "relevant_files": plan.relevant_files},
+        db,
+        run_id,
+        iteration,
+        "architect",
+        "ARCHITECT_COMPLETED",
+        {
+            "node": "architect",
+            "agent": "Architect Agent",
+            "phase": "Root Cause Analysis",
+            "summary": plan.summary,
+            "relevant_files": plan.relevant_files,
+            "description": f"Iteration {iteration}: Root cause plan formulated — {plan.summary}",
+        },
     )
     logger.info(
         "[ARCHITECT COMPLETE] run_id=%s iteration=%d summary=%r relevant_files=%s",
@@ -164,7 +214,26 @@ def coder_node(
     iteration = state.get("iteration", 1)
     project_path = state["project_path"]
 
-    _emit_event(db, run_id, iteration, "coder", "CODER_STARTED")
+    rel_file = ""
+    if state.get("architecture_plan") and state["architecture_plan"].get("relevant_files"):
+        rel_file = state["architecture_plan"]["relevant_files"][0]
+
+    _emit_event(
+        db,
+        run_id,
+        iteration,
+        "coder",
+        "CODER_STARTED",
+        {
+            "node": "coder",
+            "agent": "Coder Agent",
+            "phase": "Code Repair & Patch",
+            "file_path": rel_file,
+            "description": (
+                f"Iteration {iteration}: Synthesizing unified diff patch and updating workspace..."
+            ),
+        },
+    )
     logger.info("[CODER START] run_id=%s iteration=%d", run_id, iteration)
 
     wm = WorkspaceManager.from_project_path(project_path)
@@ -182,7 +251,20 @@ def coder_node(
             db=db,
         )
     except PolicyViolationError as exc:
-        _emit_event(db, run_id, iteration, "coder", "POLICY_VIOLATION", {"error": str(exc)})
+        _emit_event(
+            db,
+            run_id,
+            iteration,
+            "coder",
+            "POLICY_VIOLATION",
+            {
+                "node": "coder",
+                "agent": "Coder Agent",
+                "phase": "Code Repair & Patch",
+                "error": str(exc),
+                "description": f"Iteration {iteration}: Policy violation detected — {exc}",
+            },
+        )
         logger.warning("[CODER POLICY VIOLATION] run_id=%s: %s", run_id, exc)
         failed_change = CodeChange(
             file_path=plan.relevant_files[0] if plan.relevant_files else "unknown",
@@ -205,7 +287,20 @@ def coder_node(
         }
     except RuntimeError as exc:
         err_msg = str(exc)
-        _emit_event(db, run_id, iteration, "coder", "PATCH_ERROR", {"error": err_msg})
+        _emit_event(
+            db,
+            run_id,
+            iteration,
+            "coder",
+            "PATCH_ERROR",
+            {
+                "node": "coder",
+                "agent": "Coder Agent",
+                "phase": "Code Repair & Patch",
+                "error": err_msg,
+                "description": f"Iteration {iteration}: Patch application failed — {err_msg}",
+            },
+        )
         logger.warning("[CODER PATCH ERROR] run_id=%s iteration=%d: %s", run_id, iteration, err_msg)
         diff_res = get_git_diff(wm)
         failed_change = CodeChange(
@@ -232,8 +327,23 @@ def coder_node(
     diff_res = get_git_diff(wm)
 
     _emit_event(
-        db, run_id, iteration, "coder", "CODER_COMPLETED",
-        {"file_path": change.file_path, "change_type": change.change_type},
+        db,
+        run_id,
+        iteration,
+        "coder",
+        "CODER_COMPLETED",
+        {
+            "node": "coder",
+            "agent": "Coder Agent",
+            "phase": "Code Repair & Patch",
+            "file_path": change.file_path,
+            "change_type": change.change_type,
+            "explanation": change.explanation,
+            "description": (
+                f"Iteration {iteration}: Applied patch to `{change.file_path}` "
+                f"({change.change_type}) — {change.explanation}"
+            ),
+        },
     )
     logger.info(
         "[CODER COMPLETE] run_id=%s iteration=%d file=%s type=%s",
@@ -264,15 +374,40 @@ def test_node(
     iteration = state.get("iteration", 1)
     project_path = Path(state["project_path"])
 
-    _emit_event(db, run_id, iteration, "tester", "TEST_STARTED")
+    _emit_event(
+        db,
+        run_id,
+        iteration,
+        "tester",
+        "TEST_STARTED",
+        {
+            "node": "test",
+            "agent": "Test Agent",
+            "phase": "Test & Validation",
+            "description": (
+                f"Iteration {iteration}: Running pytest to validate synthesized patch..."
+            ),
+        },
+    )
     logger.info("[TEST START] run_id=%s iteration=%d", run_id, iteration)
 
     res: TestResult = run_pytest(project_path)
     res_dict = res.model_dump()
 
     _emit_event(
-        db, run_id, iteration, "tester", "TEST_COMPLETED",
+        db,
+        run_id,
+        iteration,
+        "tester",
+        "TEST_COMPLETED",
         {
+            "node": "test",
+            "agent": "Test Agent",
+            "phase": "Test & Validation",
+            "description": (
+                f"Iteration {iteration}: Pytest finished with {res.passed} passed, "
+                f"{res.failed} failed in {res.duration:.2f}s."
+            ),
             "exit_code": res.exit_code,
             "passed": res.passed,
             "failed": res.failed,
@@ -310,7 +445,22 @@ def reviewer_node(
     iteration = state.get("iteration", 1)
     project_path = state["project_path"]
 
-    _emit_event(db, run_id, iteration, "reviewer", "REVIEWER_STARTED")
+    _emit_event(
+        db,
+        run_id,
+        iteration,
+        "reviewer",
+        "REVIEWER_STARTED",
+        {
+            "node": "reviewer",
+            "agent": "Reviewer Agent",
+            "phase": "Reviewer Gate",
+            "description": (
+                f"Iteration {iteration}: Auditing code changes for safety, style, and regression "
+                "risks..."
+            ),
+        },
+    )
     logger.info("[REVIEWER START] run_id=%s iteration=%d", run_id, iteration)
 
     wm = WorkspaceManager.from_project_path(project_path)
@@ -339,9 +489,21 @@ def reviewer_node(
         approved=review.approved,
     )
 
+    appr_str = "approved ✓" if review.approved else "rejected ✗"
     _emit_event(
-        db, run_id, iteration, "reviewer", "REVIEWER_COMPLETED",
+        db,
+        run_id,
+        iteration,
+        "reviewer",
+        "REVIEWER_COMPLETED",
         {
+            "node": "reviewer",
+            "agent": "Reviewer Agent",
+            "phase": "Reviewer Gate",
+            "description": (
+                f"Iteration {iteration}: Reviewer {appr_str} "
+                f"patch (Regression Risk: {review.regression_risk.upper()})."
+            ),
             "approved": review.approved,
             "root_cause_fixed": review.root_cause_fixed,
             "regression_risk": review.regression_risk,
@@ -399,6 +561,11 @@ def _emit_event(
             iteration_number=iteration,
         )
         db.add(ev)
-        db.flush()
+        if iteration > 0:
+            run_rec = db.get(Run, run_id)
+            if run_rec and run_rec.current_iteration < iteration:
+                run_rec.current_iteration = iteration
+        db.commit()
     except Exception as exc:
         logger.warning("Failed to emit event %s: %s", event_type, exc)
+

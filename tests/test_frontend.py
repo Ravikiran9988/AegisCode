@@ -487,5 +487,171 @@ class TestNewRepairFlow:
             assert mock_st.rerun.called
 
 
+class TestLiveRepairDashboard:
+    """Unit tests for the production-grade Active Repairs Progress Dashboard."""
+
+    def test_live_repair_empty_state_rendered(self):
+        """When no active run is selected and no recent runs exist, renders empty state."""
+        session = {}
+        with patch("frontend.components.live_repair.st") as mock_st, \
+             patch("frontend.components.live_repair.fetch_recent_runs", return_value=[]), \
+             patch("frontend.components.live_repair.render_empty_state") as mock_empty:
+            mock_st.session_state = session
+            mock_st.columns.side_effect = lambda s: [
+                MagicMock() for _ in range(s if isinstance(s, int) else len(s))
+            ]
+            mock_st.text_input.return_value = ""
+
+            from frontend.components.live_repair import render_live_repair
+
+            render_live_repair("http://localhost:8000/api")
+            assert mock_empty.called
+
+    def test_live_repair_auto_recovers_active_running_run(self):
+        """When active_run_id is empty, auto-recovers running run from backend."""
+        session = {}
+        fake_recent = [{"run_id": "run-auto-123", "status": "running"}]
+        fake_status = {
+            "run_id": "run-auto-123",
+            "project_name": "Calculator",
+            "status": "running",
+            "current_iteration": 2,
+            "max_iterations": 5,
+            "progress_percent": 45,
+            "current_phase": "Code Repair & Patch",
+            "current_action": {
+                "agent": "Coder Agent",
+                "node": "coder",
+                "description": "Applying unified patch to calculator.py",
+                "file": "calculator.py",
+            },
+            "pipeline_nodes": [
+                {"node": "initial_test", "name": "Repository Assessment", "status": "completed"},
+                {"node": "architect", "name": "Root Cause Analysis", "status": "completed"},
+                {"node": "coder", "name": "Code Repair & Patch", "status": "running"},
+                {"node": "test", "name": "Test & Validation", "status": "pending"},
+                {"node": "reviewer", "name": "Reviewer Gate", "status": "pending"},
+            ],
+            "tests": {
+                "total": 10,
+                "executed": 10,
+                "passed": 8,
+                "failed": 2,
+                "coverage_percent": 80.0,
+            },
+            "files": {"analyzed": 5, "changed": 1, "changed_files": ["calculator.py"]},
+            "timeline": [
+                {
+                    "timestamp": "02:00:00",
+                    "agent": "Architect Agent",
+                    "message": "Plan ready",
+                    "iteration": 1,
+                }
+            ],
+            "elapsed_seconds": 18.5,
+        }
+        fake_results = {"iterations": [], "duration": 18.5}
+
+        with patch("frontend.components.live_repair.st") as mock_st, \
+             patch(
+                 "frontend.components.live_repair.fetch_recent_runs",
+                 return_value=fake_recent,
+             ), \
+             patch(
+                 "frontend.components.live_repair.fetch_run_status",
+                 return_value=fake_status,
+             ), \
+             patch(
+                 "frontend.components.live_repair.fetch_run_results",
+                 return_value=fake_results,
+             ), \
+             patch("time.sleep"):
+            mock_st.session_state = session
+            mock_st.columns.side_effect = lambda s: [
+                MagicMock() for _ in range(s if isinstance(s, int) else len(s))
+            ]
+            mock_st.text_input.return_value = "run-auto-123"
+            mock_st.tabs.return_value = [
+                MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock()
+            ]
+
+            from frontend.components.live_repair import render_live_repair
+
+            render_live_repair("http://localhost:8000/api")
+
+            # Must have recovered run-auto-123
+            assert session.get("active_run_id") == "run-auto-123"
+            # Since status is 'running', must call rerun()
+            assert mock_st.rerun.called
+
+    def test_live_repair_completed_state_renders_navigation(self):
+        """When repair is passed, renders completed state without infinite polling."""
+        session = {"active_run_id": "run-pass-999"}
+        fake_status = {
+            "run_id": "run-pass-999",
+            "project_name": "Calculator",
+            "status": "passed",
+            "current_iteration": 1,
+            "max_iterations": 5,
+            "progress_percent": 100,
+            "current_phase": "Repair Complete & Verified",
+            "current_action": {
+                "agent": "Test Agent",
+                "node": "test",
+                "description": "All tests passed",
+                "file": None,
+            },
+            "pipeline_nodes": [
+                {"node": "initial_test", "name": "Repository Assessment", "status": "completed"},
+                {"node": "architect", "name": "Root Cause Analysis", "status": "completed"},
+                {"node": "coder", "name": "Code Repair & Patch", "status": "completed"},
+                {"node": "test", "name": "Test & Validation", "status": "completed"},
+                {"node": "reviewer", "name": "Reviewer Gate", "status": "completed"},
+            ],
+            "tests": {
+                "total": 10,
+                "executed": 10,
+                "passed": 10,
+                "failed": 0,
+                "coverage_percent": 100.0,
+            },
+            "files": {"analyzed": 5, "changed": 1, "changed_files": ["calculator.py"]},
+            "timeline": [],
+            "elapsed_seconds": 12.0,
+        }
+        fake_results = {"iterations": [], "duration": 12.0}
+
+        with patch("frontend.components.live_repair.st") as mock_st, \
+             patch(
+                 "frontend.components.live_repair.fetch_run_status",
+                 return_value=fake_status,
+             ), \
+             patch(
+                 "frontend.components.live_repair.fetch_run_results",
+                 return_value=fake_results,
+             ), \
+             patch("frontend.components.live_repair._safe_get") as mock_get:
+            mock_st.session_state = session
+            mock_st.columns.side_effect = lambda s: [
+                MagicMock() for _ in range(s if isinstance(s, int) else len(s))
+            ]
+            mock_st.text_input.return_value = "run-pass-999"
+            mock_st.button.return_value = False
+            mock_st.tabs.return_value = [
+                MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock()
+            ]
+            mock_get.return_value = None
+
+            from frontend.components.live_repair import render_live_repair
+
+            render_live_repair("http://localhost:8000/api")
+
+            # Progress bar set to 1.0 (100%)
+            assert mock_st.progress.called
+            # Must NOT call rerun since status is passed
+            assert not mock_st.rerun.called
+
+
+
 
 

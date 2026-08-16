@@ -368,39 +368,264 @@ def get_run_status(
     db: Session = Depends(get_db),
 ) -> dict:
     """
-    Return detailed status, iteration progress, test metrics, and termination status.
+    Return detailed status, iteration progress, test metrics, real-time node state, and timeline.
     """
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found.")
 
-    # Get latest iteration
+    # Get iterations
     iterations = (
         db.query(Iteration)
         .filter(Iteration.run_id == run_id)
-        .order_by(Iteration.iteration_number.desc())
+        .order_by(Iteration.iteration_number.asc())
         .all()
     )
 
-    latest = iterations[0] if iterations else None
-
-    tests_passed = (latest.tests_failed == 0) if latest else False
-    review_approved = (
-        latest.review_result.get("approved", False)
-        if latest and latest.review_result else False
+    # Get events
+    events = (
+        db.query(Event)
+        .filter(Event.run_id == run_id)
+        .order_by(Event.created_at.asc())
+        .all()
     )
+
+    latest_it = iterations[-1] if iterations else None
+
+    if latest_it and latest_it.tests_failed is not None:
+        tests_passed = (latest_it.tests_failed == 0)
+    else:
+        tests_passed = True if run.status in ("passed", "already_passing") else False
+
+    if latest_it and latest_it.review_result:
+        review_approved = latest_it.review_result.get("approved", False)
+    else:
+        review_approved = True if run.status in ("passed", "already_passing") else False
+
+    # Determine current node, agent, phase, and action from events
+    cur_node = "initial_test"
+    cur_agent = "Test Agent"
+    cur_phase = "Repository Assessment"
+    cur_action_desc = "Initializing autonomous repair pipeline..."
+    cur_file = None
+
+    if events:
+        last_ev = events[-1]
+        payload = last_ev.payload or {}
+        cur_node = payload.get("node", last_ev.agent)
+        cur_agent = payload.get("agent", last_ev.agent.replace("_", " ").title() + " Agent")
+        cur_phase = payload.get("phase", "Autonomous Execution")
+        cur_action_desc = payload.get("description", last_ev.event_type.replace("_", " ").title())
+        cur_file = payload.get("file_path") or payload.get("file")
+
+    # If run has reached a terminal state, reflect terminal phase
+    if run.status in ("passed", "already_passing"):
+        cur_phase = "Repair Complete & Verified"
+        cur_action_desc = "All pytest assertions passed and reviewer approved patch."
+    elif run.status in ("failed", "stalled"):
+        cur_phase = "Repair Terminated"
+        cur_action_desc = run.final_summary or "Repair concluded without passing patch."
+    elif run.status == "error":
+        cur_phase = "Execution Error"
+        cur_action_desc = run.final_summary or "Encountered runtime error during repair."
+    elif run.status == "cancelled":
+        cur_phase = "Repair Cancelled"
+        cur_action_desc = "Repair was cancelled by user."
+
+    # Compute pipeline nodes for the current iteration
+    cur_iter_num = max(run.current_iteration, 1)
+    ev_types_cur_iter = {
+        ev.event_type for ev in events
+        if (ev.iteration_number == cur_iter_num or (ev.iteration_number == 0 and cur_iter_num == 1))
+    }
+
+    def _get_node_status(node_name: str, start_tag: str, complete_tag: str) -> str:
+        if complete_tag in ev_types_cur_iter:
+            return "completed"
+        if start_tag in ev_types_cur_iter:
+            if run.status in ("failed", "stalled", "error") and cur_node == node_name:
+                return "failed"
+            return "running"
+        if run.status in ("passed", "already_passing"):
+            return "completed"
+        return "pending"
+
+    pipeline_nodes = [
+        {
+            "node": "initial_test",
+            "name": "Repository Assessment",
+            "agent": "Test Agent",
+            "status": _get_node_status(
+                "initial_test", "INITIAL_TEST_STARTED", "INITIAL_TEST_COMPLETED"
+            ),
+        },
+        {
+            "node": "architect",
+            "name": "Root Cause Analysis",
+            "agent": "Architect Agent",
+            "status": _get_node_status(
+                "architect", "ARCHITECT_STARTED", "ARCHITECT_COMPLETED"
+            ),
+        },
+        {
+            "node": "coder",
+            "name": "Code Repair & Patch",
+            "agent": "Coder Agent",
+            "status": _get_node_status(
+                "coder", "CODER_STARTED", "CODER_COMPLETED"
+            ),
+        },
+        {
+            "node": "test",
+            "name": "Test & Validation",
+            "agent": "Test Agent",
+            "status": _get_node_status(
+                "test", "TEST_STARTED", "TEST_COMPLETED"
+            ),
+        },
+        {
+            "node": "reviewer",
+            "name": "Reviewer Audit Gate",
+            "agent": "Reviewer Agent",
+            "status": _get_node_status(
+                "reviewer", "REVIEWER_STARTED", "REVIEWER_COMPLETED"
+            ),
+        },
+    ]
+
+    # Iteration summary list
+    iterations_summary = []
+    files_changed_set: set[str] = set()
+    for it in iterations:
+        t_pass = it.tests_passed
+        t_fail = it.tests_failed
+        it_appr = it.approved
+        it_status = "running"
+        if it_appr is True and (t_fail == 0):
+            it_status = "passed"
+        elif t_fail is not None and (t_fail > 0 or it_appr is False):
+            it_status = "failed"
+
+        # Check code changes in this iteration
+        if it.code_changes and isinstance(it.code_changes, list):
+            for c in it.code_changes:
+                if isinstance(c, dict) and c.get("file_path"):
+                    files_changed_set.add(c["file_path"])
+
+        iterations_summary.append({
+            "iteration_number": it.iteration_number,
+            "status": it_status,
+            "tests_passed": t_pass,
+            "tests_failed": t_fail,
+            "approved": it_appr,
+            "duration_seconds": it.duration_seconds,
+        })
+
+    # Test execution stats from latest available iteration
+    tres_dict = (latest_it.test_results or {}) if latest_it else {}
+    if latest_it and latest_it.tests_passed is not None:
+        t_pass_val = latest_it.tests_passed
+    else:
+        t_pass_val = tres_dict.get("passed", 0)
+
+    if latest_it and latest_it.tests_failed is not None:
+        t_fail_val = latest_it.tests_failed
+    else:
+        t_fail_val = tres_dict.get("failed", 0)
+
+    t_skip_val = tres_dict.get("skipped", 0)
+    t_total_val = t_pass_val + t_fail_val + t_skip_val
+    t_exec_val = t_pass_val + t_fail_val
+    t_cov_val = round((t_pass_val / t_total_val) * 100, 1) if t_total_val > 0 else 0.0
+
+    # Calculate real progress percentage
+    max_its = max(run.max_iterations, 1)
+    completed_nodes_in_cur = sum(1 for n in pipeline_nodes if n["status"] == "completed")
+    if run.status in ("passed", "already_passing"):
+        prog_pct = 100
+    elif run.status in ("failed", "stalled", "error", "cancelled"):
+        total_steps = max_its * 4
+        done_steps = (max(run.current_iteration, 1) - 1) * 4 + completed_nodes_in_cur
+        prog_pct = min(90, max(5, int((done_steps / total_steps) * 100)))
+    else:
+        total_steps = max_its * 4
+        active_step = (max(run.current_iteration, 1) - 1) * 4 + completed_nodes_in_cur
+        prog_pct = min(95, max(5, int((active_step / total_steps) * 100)))
+
+    # Elapsed duration
+    elapsed_sec = 0.0
+    if run.started_at:
+        end_time = run.finished_at or datetime.now(timezone.utc)
+        if run.started_at.tzinfo is None:
+            st_time = run.started_at.replace(tzinfo=timezone.utc)
+        else:
+            st_time = run.started_at
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
+        elapsed_sec = round((end_time - st_time).total_seconds(), 1)
+
+    # Timeline list
+    timeline = []
+    for ev in events:
+        ev_pl = ev.payload or {}
+        ts_str = ev.created_at.strftime("%H:%M:%S") if ev.created_at else ""
+        msg = (
+            ev_pl.get("description")
+            or ev_pl.get("summary")
+            or ev.event_type.replace("_", " ").title()
+        )
+        timeline.append({
+            "timestamp": ts_str,
+            "created_at": ev.created_at.isoformat() if ev.created_at else None,
+            "agent": ev_pl.get("agent", ev.agent.replace("_", " ").title() + " Agent"),
+            "event_type": ev.event_type,
+            "message": msg,
+            "iteration": ev.iteration_number,
+        })
+
+    p_name = run.project.name if run.project else "Python Project"
+    f_analyzed = run.project.file_count if run.project else 0
 
     return {
         "run_id": run.id,
         "project_id": run.project_id,
+        "project_name": p_name,
         "status": run.status,
+        "current_node": cur_node,
+        "current_agent": cur_agent,
+        "current_phase": cur_phase,
+        "current_action": {
+            "agent": cur_agent,
+            "node": cur_node,
+            "description": cur_action_desc,
+            "file": cur_file,
+        },
+        "iteration": run.current_iteration,
         "current_iteration": run.current_iteration,
         "max_iterations": run.max_iterations,
+        "progress_percent": prog_pct,
+        "pipeline_nodes": pipeline_nodes,
+        "iterations_summary": iterations_summary,
+        "tests": {
+            "total": t_total_val,
+            "executed": t_exec_val,
+            "passed": t_pass_val,
+            "failed": t_fail_val,
+            "skipped": t_skip_val,
+            "coverage_percent": t_cov_val,
+        },
+        "files": {
+            "analyzed": f_analyzed,
+            "changed": len(files_changed_set),
+            "changed_files": sorted(files_changed_set),
+        },
+        "timeline": timeline,
         "tests_passed": tests_passed,
         "review_approved": review_approved,
         "final_summary": run.final_summary,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        "elapsed_seconds": elapsed_sec,
     }
 
 

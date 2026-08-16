@@ -193,6 +193,7 @@ def render_upload(api_url: str) -> None:
                                 elif create_res.status_code == 201:
                                     run_id = create_res.json()["run_id"]
                                     st.session_state["repair_run_id"] = run_id
+                                    st.session_state["active_run_id"] = run_id
                                     st.session_state["repair_status"] = "running"
                                     st.session_state.pop("repair_error", None)
 
@@ -209,6 +210,14 @@ def render_upload(api_url: str) -> None:
                                             _parse_api_error(repair_res)
                                             if repair_res
                                             else "Failed to launch repair graph in background."
+                                        )
+                                    else:
+                                        # Navigate to Active Repairs
+                                        st.session_state["nav_view"] = (
+                                            "🤖 Active Repairs"
+                                        )
+                                        st.session_state["app_navigation_radio"] = (
+                                            "🤖 Active Repairs"
                                         )
                                 else:
                                     st.session_state["repair_status"] = "error"
