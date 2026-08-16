@@ -8,6 +8,9 @@ Tests:
 4. test_reviewer_rejection_prevents_false_success
 5. test_download_endpoint_after_repair
 6. test_repair_results_api_contains_full_agent_data
+7. test_failed_run_retains_partial_iteration_details
+8. test_api_response_contains_nested_conceptual_schema
+9. test_persistence_survives_db_session_reopen
 """
 
 from __future__ import annotations
@@ -16,8 +19,8 @@ import io
 import zipfile
 from unittest.mock import MagicMock
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -31,7 +34,6 @@ from backend.graph.graph import run_repair_workflow
 from backend.llm.base import BaseLLMProvider
 from backend.main import create_app
 from backend.tools.git_tools import init_repo
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -286,7 +288,6 @@ class TestEndToEndRepair:
                         test_strategy="Run pytest",
                     )
                 elif schema == CodeChange:
-                    # change_type is 'patch' but patch contains full python code without @@ hunks
                     return CodeChange(
                         file_path="calculator.py",
                         change_type="patch",
@@ -350,7 +351,7 @@ class TestEndToEndRepair:
                 id="run-reject-1",
                 project_id=project.id,
                 status="running",
-                max_iterations=1,  # limit to 1 iteration to check termination
+                max_iterations=1,
             )
             e2e_db.add(project)
             e2e_db.add(run)
@@ -375,7 +376,6 @@ class TestEndToEndRepair:
                         confidence=0.9,
                     )
                 elif schema == ReviewResult:
-                    # Reviewer explicitly REJECTS
                     return ReviewResult(
                         approved=False,
                         root_cause_fixed=False,
@@ -397,7 +397,6 @@ class TestEndToEndRepair:
                 max_iterations=1,
             )
 
-            # Must NOT be passed!
             assert final_state["status"] == "failed"
             assert final_state["termination_reason"] in (
                 "reviewer_rejected", "max_iterations_reached",
@@ -462,6 +461,7 @@ class TestEndToEndRepair:
             architecture_plan={
                 "summary": "Fix operator in calculator.py",
                 "relevant_files": ["calculator.py"],
+                "test_strategy": "Run pytest",
             },
             code_changes=[
                 {
@@ -503,3 +503,188 @@ class TestEndToEndRepair:
         assert it_data["test_results"]["passed"] == 4
         assert it_data["review_result"]["approved"] is True
         assert it_data["approved"] is True
+
+        # Check conceptual aliases
+        assert it_data["architect"]["summary"] == "Fix operator in calculator.py"
+        assert it_data["coder"]["file_path"] == "calculator.py"
+        assert it_data["tests"]["passed"] == 4
+        assert it_data["reviewer"]["approved"] is True
+
+    def test_failed_run_retains_partial_iteration_details(self, e2e_client, e2e_db):
+        """Verify that when a run fails/rejects, all intermediate agent outputs are retained."""
+        run = Run(
+            id="run-failed-partial",
+            project_id="dummy-proj",
+            status="failed",
+            max_iterations=1,
+            current_iteration=1,
+            final_summary="Graph terminated with status='failed', reason='reviewer_rejected'",
+        )
+        e2e_db.add(run)
+
+        # Architect and Coder and Test completed, but Reviewer rejected
+        upsert_iteration(
+            db=e2e_db,
+            run_id=run.id,
+            iteration_number=1,
+            architecture_plan={
+                "summary": "Attempted fix for math bug",
+                "relevant_files": ["calculator.py"],
+                "suspected_issues": ["Bug in add"],
+                "test_strategy": "Run test_calculator.py",
+            },
+            code_changes=[
+                {
+                    "file_path": "calculator.py",
+                    "change_type": "write",
+                    "explanation": "Applied temporary patch",
+                    "root_cause": "Bug in add",
+                    "patch": "def add(a, b): return a + b",
+                }
+            ],
+            test_results={
+                "passed": 4,
+                "failed": 0,
+                "exit_code": 0,
+                "duration": 0.5,
+                "stdout": "4 passed",
+                "stderr": "",
+            },
+            review_result={
+                "approved": False,
+                "root_cause_fixed": False,
+                "regression_risk": "high",
+                "reasoning": "Code style violation and missing docstring",
+            },
+            tests_passed=4,
+            tests_failed=0,
+            approved=False,
+            duration_seconds=0.5,
+        )
+
+        resp = e2e_client.get(f"/api/runs/{run.id}/results")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "failed"
+        assert data["reviewer_approved"] is False
+        assert data["termination_reason"] == "reviewer_rejected"
+
+        it = data["iterations"][0]
+        # Verify Architect data is NOT lost
+        assert it["architect"]["summary"] == "Attempted fix for math bug"
+        # Verify Coder data is NOT lost
+        assert it["coder"]["file_path"] == "calculator.py"
+        # Verify Test data is NOT lost
+        assert it["tests"]["passed"] == 4
+        # Verify Reviewer rejection is clear
+        assert it["reviewer"]["approved"] is False
+
+    def test_api_response_contains_nested_conceptual_schema(self, e2e_client, e2e_db):
+        """Verify the exact conceptual JSON schema returned by the results endpoint."""
+        run = Run(
+            id="run-nested-schema",
+            project_id="dummy-proj",
+            status="passed",
+            max_iterations=5,
+            current_iteration=1,
+            final_summary="Graph terminated with status='passed', reason='all_tests_passed'",
+        )
+        e2e_db.add(run)
+
+        upsert_iteration(
+            db=e2e_db,
+            run_id=run.id,
+            iteration_number=1,
+            architecture_plan={
+                "summary": "Architectural repair plan",
+                "relevant_files": ["calculator.py"],
+                "suspected_issues": ["Wrong operator"],
+                "test_strategy": "pytest -v",
+            },
+            code_changes=[
+                {
+                    "file_path": "calculator.py",
+                    "change_type": "write",
+                    "explanation": "Fixed operator",
+                    "root_cause": "Typo",
+                    "patch": "def add(a, b): return a + b",
+                }
+            ],
+            test_results={
+                "passed": 4,
+                "failed": 0,
+                "exit_code": 0,
+                "duration": 7.7,
+                "stdout": "4 passed in 7.70s",
+                "stderr": "",
+            },
+            review_result={
+                "approved": True,
+                "root_cause_fixed": True,
+                "regression_risk": "low",
+                "reasoning": "Clean fix",
+            },
+            tests_passed=4,
+            tests_failed=0,
+            approved=True,
+            duration_seconds=7.7,
+        )
+
+        resp = e2e_client.get(f"/api/runs/{run.id}/results")
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # Top-level conceptual fields
+        assert data["status"] == "passed"
+        assert data["tests_passed"] == 4
+        assert data["tests_failed"] == 0
+        assert data["reviewer_approved"] is True
+        assert data["total_iterations"] == 1
+        assert data["termination_reason"] == "all_tests_passed"
+
+        # Nested iteration_details
+        assert "iteration_details" in data
+        it = data["iteration_details"][0]
+        assert it["iteration"] == 1
+        assert it["architect"]["summary"] == "Architectural repair plan"
+        assert it["coder"]["change_type"] == "write"
+        assert it["tests"]["exit_code"] == 0
+        assert it["reviewer"]["approved"] is True
+
+    def test_persistence_survives_db_session_reopen(self, e2e_db):
+        """Verify that persisting iteration data can be queried from fresh database sessions."""
+        run = Run(
+            id="run-reopen-test",
+            project_id="proj-123",
+            status="passed",
+            max_iterations=3,
+        )
+        e2e_db.add(run)
+        e2e_db.commit()
+
+        # Stage 1: Architect writes
+        upsert_iteration(
+            db=e2e_db,
+            run_id=run.id,
+            iteration_number=1,
+            architecture_plan={"summary": "Plan stage"},
+        )
+
+        # Query in fresh transaction
+        it1 = e2e_db.query(Iteration).filter(Iteration.run_id == run.id).first()
+        assert it1 is not None
+        assert it1.architecture_plan["summary"] == "Plan stage"
+        assert it1.code_changes is None
+
+        # Stage 2: Coder updates without overwriting Architect
+        upsert_iteration(
+            db=e2e_db,
+            run_id=run.id,
+            iteration_number=1,
+            code_changes=[{"file_path": "main.py", "change_type": "write"}],
+        )
+
+        it2 = e2e_db.query(Iteration).filter(Iteration.run_id == run.id).first()
+        assert it2 is not None
+        assert it2.architecture_plan["summary"] == "Plan stage"
+        assert it2.code_changes[0]["file_path"] == "main.py"

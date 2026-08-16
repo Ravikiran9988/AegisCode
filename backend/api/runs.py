@@ -132,21 +132,35 @@ class TestResultSchema(BaseModel):
 
 class IterationSchema(BaseModel):
     iteration_number: int
-    tests_passed: int | None
-    tests_failed: int | None
-    approved: bool | None
-    duration_seconds: float | None
-    test_results: dict | None
+    iteration: int | None = None
+    tests_passed: int | None = None
+    tests_failed: int | None = None
+    approved: bool | None = None
+    duration_seconds: float | None = None
+    test_results: dict | None = None
     architecture_plan: dict | None = None
     code_changes: list | dict | None = None
     review_result: dict | None = None
+
+    # Nested structured fields matching conceptual schema
+    architect: dict | None = None
+    coder: dict | list | None = None
+    tests: dict | None = None
+    reviewer: dict | None = None
 
 
 class RunResultsResponse(BaseModel):
     run_id: str
     status: str
     iterations: list[IterationSchema]
-    final_summary: str | None
+    iteration_details: list[IterationSchema] | None = None
+    final_summary: str | None = None
+    tests_passed: int | None = None
+    tests_failed: int | None = None
+    reviewer_approved: bool | None = None
+    total_iterations: int | None = None
+    duration: float | None = None
+    termination_reason: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -436,25 +450,74 @@ def get_run_results(run_id: str, db: Session = Depends(get_db)) -> RunResultsRes
             ):
                 iter_map[num] = it
 
-    iterations = [
-        IterationSchema(
-            iteration_number=it.iteration_number,
-            tests_passed=it.tests_passed,
-            tests_failed=it.tests_failed,
-            approved=it.approved,
-            duration_seconds=it.duration_seconds,
-            test_results=it.test_results,
-            architecture_plan=it.architecture_plan,
-            code_changes=it.code_changes,
-            review_result=it.review_result,
+    iterations = []
+    for it in sorted(iter_map.values(), key=lambda x: x.iteration_number):
+        changes = it.code_changes
+        coder_obj = changes[0] if (isinstance(changes, list) and changes) else changes
+        iterations.append(
+            IterationSchema(
+                iteration_number=it.iteration_number,
+                iteration=it.iteration_number,
+                tests_passed=it.tests_passed,
+                tests_failed=it.tests_failed,
+                approved=it.approved,
+                duration_seconds=it.duration_seconds,
+                test_results=it.test_results,
+                architecture_plan=it.architecture_plan,
+                code_changes=it.code_changes,
+                review_result=it.review_result,
+                architect=it.architecture_plan,
+                coder=coder_obj,
+                tests=it.test_results,
+                reviewer=it.review_result,
+            )
         )
-        for num, it in sorted(iter_map.items(), key=lambda x: x[0])
-    ]
+
+    # Compute duration
+    dur = None
+    if run.started_at and run.finished_at:
+        dur = round((run.finished_at - run.started_at).total_seconds(), 2)
+    elif iterations:
+        dur = round(sum(it.duration_seconds or 0 for it in iterations), 2)
+
+    # Extract termination reason
+    term_reason = None
+    if run.final_summary and "reason=" in run.final_summary:
+        try:
+            term_reason = run.final_summary.split("reason=")[1].strip("'\" ")
+        except Exception:
+            term_reason = None
+    if not term_reason:
+        if run.status in ("passed", "already_passing"):
+            term_reason = "all_tests_passed"
+        elif run.status == "stalled":
+            term_reason = "repeated_failure"
+        elif run.status == "failed":
+            term_reason = "max_iterations_reached"
+        elif run.status == "error":
+            term_reason = "graph_error"
+
+    latest_it = iterations[-1] if iterations else None
+    t_passed = latest_it.tests_passed if latest_it else None
+    t_failed = latest_it.tests_failed if latest_it else None
+    r_approved = (
+        latest_it.approved
+        if (latest_it and latest_it.approved is not None)
+        else (True if run.status in ("passed", "already_passing") else False)
+    )
+
     return RunResultsResponse(
         run_id=run.id,
         status=run.status,
         iterations=iterations,
+        iteration_details=iterations,
         final_summary=run.final_summary,
+        tests_passed=t_passed,
+        tests_failed=t_failed,
+        reviewer_approved=r_approved,
+        total_iterations=len(iterations),
+        duration=dur,
+        termination_reason=term_reason,
     )
 
 
