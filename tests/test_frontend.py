@@ -337,3 +337,155 @@ class TestSidebarNavigation:
             assert session["app_navigation_radio"] == "◉ Overview"
 
 
+class TestNewRepairFlow:
+    """Tests for the automated workspace initialization and repair lifecycle UX."""
+
+    def test_upload_auto_initializes_workspace(self):
+        """Uploading a file automatically calls /projects/upload without extra button."""
+        session = {}
+        mock_file = MagicMock()
+        mock_file.name = "calc.zip"
+        mock_file.getvalue.return_value = b"PK\x03\x04testdata"
+        mock_file.__len__.return_value = 100
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_resp.json.return_value = {
+            "project_id": "proj-123",
+            "name": "calc.zip",
+            "file_count": 4,
+        }
+
+        with patch("frontend.components.upload.st") as mock_st, \
+             patch("frontend.components.upload._safe_post") as mock_post:
+            mock_st.session_state = session
+            mock_st.file_uploader.return_value = mock_file
+            mock_st.columns.return_value = [MagicMock(), MagicMock(), MagicMock()]
+            mock_st.button.return_value = False
+            mock_st.slider.return_value = 5
+            mock_post.return_value = mock_resp
+
+            from frontend.components.upload import render_upload
+
+            render_upload("http://localhost:8000/api")
+
+            # Project should be stored in session state automatically
+            assert session.get("project_id") == "proj-123"
+            assert session.get("file_count") == 4
+            assert session.get("uploaded_filename") == "calc.zip"
+            assert mock_st.rerun.called
+
+    def test_repair_success_navigates_to_active_repairs(self):
+        """When repair completes successfully ('passed'), navigates to Active Repairs."""
+        file_bytes = b"PK\x03\x04testdata"
+        sig = f"calc.zip_{len(file_bytes)}"
+        session = {
+            "project_id": "proj-123",
+            "uploaded_file_sig": sig,
+            "repair_status": "running",
+            "repair_run_id": "run-456",
+        }
+        mock_file = MagicMock()
+        mock_file.name = "calc.zip"
+        mock_file.getvalue.return_value = file_bytes
+
+        with patch("frontend.components.upload.st") as mock_st, \
+             patch("frontend.components.upload.fetch_run_status") as mock_status:
+            mock_st.session_state = session
+            mock_st.file_uploader.return_value = mock_file
+            mock_st.columns.return_value = [MagicMock(), MagicMock(), MagicMock()]
+            mock_status.return_value = {
+                "run_id": "run-456",
+                "status": "passed",
+                "current_iteration": 2,
+                "max_iterations": 5,
+                "final_summary": "All tests passed",
+            }
+
+            from frontend.components.upload import render_upload
+
+            render_upload("http://localhost:8000/api")
+
+            # Must navigate to Active Repairs and set active_run_id
+            assert session.get("nav_view") == "🤖 Active Repairs"
+            assert session.get("active_run_id") == "run-456"
+            assert session.get("app_navigation_radio") == "🤖 Active Repairs"
+            assert session.get("repair_status") is None
+            assert mock_st.rerun.called
+
+    def test_repair_failure_stays_on_page(self):
+        """When repair finishes with 'failed', remains on New Repair page with error."""
+        file_bytes = b"PK\x03\x04testdata"
+        sig = f"calc.zip_{len(file_bytes)}"
+        session = {
+            "project_id": "proj-123",
+            "uploaded_file_sig": sig,
+            "repair_status": "running",
+            "repair_run_id": "run-789",
+        }
+        mock_file = MagicMock()
+        mock_file.name = "calc.zip"
+        mock_file.getvalue.return_value = file_bytes
+
+        with patch("frontend.components.upload.st") as mock_st, \
+             patch("frontend.components.upload.fetch_run_status") as mock_status:
+            mock_st.session_state = session
+            mock_st.file_uploader.return_value = mock_file
+            mock_st.columns.return_value = [MagicMock(), MagicMock(), MagicMock()]
+            mock_status.return_value = {
+                "run_id": "run-789",
+                "status": "failed",
+                "current_iteration": 5,
+                "max_iterations": 5,
+                "final_summary": "Max iterations reached without passing tests",
+            }
+
+            from frontend.components.upload import render_upload
+
+            render_upload("http://localhost:8000/api")
+
+            # Must NOT navigate to Active Repairs
+            assert session.get("nav_view") != "🤖 Active Repairs"
+            assert session.get("repair_status") == "failed"
+            assert "Max iterations" in session.get("repair_error", "")
+            assert mock_st.rerun.called
+
+    def test_repair_cancelled_stays_on_page(self):
+        """When repair finishes with 'cancelled', remains on New Repair page."""
+        file_bytes = b"PK\x03\x04testdata"
+        sig = f"calc.zip_{len(file_bytes)}"
+        session = {
+            "project_id": "proj-123",
+            "uploaded_file_sig": sig,
+            "repair_status": "running",
+            "repair_run_id": "run-999",
+        }
+        mock_file = MagicMock()
+        mock_file.name = "calc.zip"
+        mock_file.getvalue.return_value = file_bytes
+
+        with patch("frontend.components.upload.st") as mock_st, \
+             patch("frontend.components.upload.fetch_run_status") as mock_status:
+            mock_st.session_state = session
+            mock_st.file_uploader.return_value = mock_file
+            mock_st.columns.return_value = [MagicMock(), MagicMock(), MagicMock()]
+            mock_status.return_value = {
+                "run_id": "run-999",
+                "status": "cancelled",
+                "current_iteration": 1,
+                "max_iterations": 5,
+                "final_summary": "Run was stopped",
+            }
+
+            from frontend.components.upload import render_upload
+
+            render_upload("http://localhost:8000/api")
+
+            # Must NOT navigate to Active Repairs
+            assert session.get("nav_view") != "🤖 Active Repairs"
+            assert session.get("repair_status") == "cancelled"
+            assert mock_st.rerun.called
+
+
+
+
