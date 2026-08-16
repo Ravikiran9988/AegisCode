@@ -36,7 +36,6 @@ jobs:
 
       - name: Run Complete Pytest Suite (Phases 1-5)
         env:
-          LLM_PROVIDER: mock
           EXECUTION_BACKEND: local
           DATABASE_URL: sqlite:///./test_ci.db
         run: python -m pytest -v --cov=backend --cov-report=term-missing
