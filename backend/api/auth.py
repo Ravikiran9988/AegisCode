@@ -215,6 +215,7 @@ def register_user(
         hashed_pwd = get_password_hash(req.password)
         user = User(
             name=display_name,
+            full_name=display_name,
             email=email_clean,
             hashed_password=hashed_pwd,
             is_active=True,

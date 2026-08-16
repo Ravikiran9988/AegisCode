@@ -1,11 +1,13 @@
 """
 SQLAlchemy ORM models for AegisCode.
 
-Four tables:
-    projects   – uploaded Python projects (metadata + path)
-    runs       – a single repair session for a project
-    iterations – one repair cycle within a run
-    events     – fine-grained agent activity log (append-only)
+Tables
+------
+- users       : registered user accounts for authentication and workspace isolation
+- projects    : uploaded codebases under repair
+- runs        : autonomous repair execution records
+- iterations  : per-iteration agent logs, patches, and test results
+- events      : append-only telemetry and agent activity stream
 """
 
 from __future__ import annotations
@@ -40,12 +42,15 @@ class Base(DeclarativeBase):
 # ────────────────────────────────────────────────────────────────────────────
 
 class User(Base):
+    """Registered user account for authentication and user-specific repair tracking."""
+
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    full_name: Mapped[str] = mapped_column(String(255), nullable=True, default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -53,24 +58,22 @@ class User(Base):
     )
 
     # Relationships
-    projects: Mapped[list[Project]] = relationship("Project", back_populates="user")
-    runs: Mapped[list[Run]] = relationship("Run", back_populates="user")
+    projects: Mapped[list[Project]] = relationship(
+        "Project", back_populates="user", cascade="all, delete-orphan"
+    )
+    runs: Mapped[list[Run]] = relationship(
+        "Run", back_populates="user", cascade="all, delete-orphan"
+    )
 
     @property
     def nickname(self) -> str:
-        return self.name
+        """Alias for name/full_name."""
+        return self.name or self.full_name or ""
 
     @nickname.setter
     def nickname(self, value: str) -> None:
         self.name = value
-
-    @property
-    def full_name(self) -> str:
-        return self.name
-
-    @full_name.setter
-    def full_name(self, value: str) -> None:
-        self.name = value
+        self.full_name = value
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email!r}>"
@@ -81,11 +84,13 @@ class User(Base):
 # ────────────────────────────────────────────────────────────────────────────
 
 class Project(Base):
+    """An uploaded user codebase under repair."""
+
     __tablename__ = "projects"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     user_id: Mapped[str | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True, index=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -98,7 +103,9 @@ class Project(Base):
 
     # Relationships
     user: Mapped[User | None] = relationship("User", back_populates="projects")
-    runs: Mapped[list[Run]] = relationship("Run", back_populates="project")
+    runs: Mapped[list[Run]] = relationship(
+        "Run", back_populates="project", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Project id={self.id} name={self.name!r}>"
@@ -109,11 +116,13 @@ class Project(Base):
 # ────────────────────────────────────────────────────────────────────────────
 
 class Run(Base):
+    """A single execution of the autonomous repair graph."""
+
     __tablename__ = "runs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     user_id: Mapped[str | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True, index=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
     status: Mapped[str] = mapped_column(
@@ -133,8 +142,12 @@ class Run(Base):
     # Relationships
     user: Mapped[User | None] = relationship("User", back_populates="runs")
     project: Mapped[Project] = relationship("Project", back_populates="runs")
-    iterations: Mapped[list[Iteration]] = relationship("Iteration", back_populates="run")
-    events: Mapped[list[Event]] = relationship("Event", back_populates="run")
+    iterations: Mapped[list[Iteration]] = relationship(
+        "Iteration", back_populates="run", cascade="all, delete-orphan"
+    )
+    events: Mapped[list[Event]] = relationship(
+        "Event", back_populates="run", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Run id={self.id} status={self.status!r}>"
@@ -145,13 +158,15 @@ class Run(Base):
 # ────────────────────────────────────────────────────────────────────────────
 
 class Iteration(Base):
+    """Detailed record of a single repair cycle within a run."""
+
     __tablename__ = "iterations"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), nullable=False)
     iteration_number: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # Agent outputs stored as JSON blobs (populated by later phases)
+    # Agent outputs stored as JSON blobs
     architecture_plan: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     code_changes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -180,6 +195,8 @@ class Iteration(Base):
 # ────────────────────────────────────────────────────────────────────────────
 
 class Event(Base):
+    """Event log stream for real-time telemetry."""
+
     __tablename__ = "events"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)

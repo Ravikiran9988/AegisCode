@@ -48,6 +48,11 @@ def init_db() -> None:
                     conn.execute(
                         text("ALTER TABLE users ADD COLUMN name VARCHAR(255) DEFAULT ''")
                     )
+                if "full_name" not in user_cols:
+                    logger.info("Adding full_name column to users table")
+                    conn.execute(
+                        text("ALTER TABLE users ADD COLUMN full_name VARCHAR(255) DEFAULT ''")
+                    )
                 if "is_active" not in user_cols:
                     conn.execute(
                         text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE")
