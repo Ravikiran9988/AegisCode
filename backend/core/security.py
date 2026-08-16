@@ -23,21 +23,24 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not plain_password or not hashed_password:
         return False
     try:
+        # Bcrypt strictly enforces 72-byte max limit
+        pwd_bytes = plain_password.encode("utf-8")[:72]
         return bcrypt.checkpw(
-            plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+            pwd_bytes, hashed_password.encode("utf-8")
         )
     except Exception:
         try:
             from passlib.context import CryptContext
             pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-            return pwd_context.verify(plain_password, hashed_password)
+            return pwd_context.verify(plain_password[:72], hashed_password)
         except Exception:
             return False
 
 
 def get_password_hash(password: str) -> str:
     """Generate a secure bcrypt hash for a plain-text password."""
-    pwd_bytes = password.encode("utf-8")
+    # Bcrypt strictly enforces 72-byte max limit
+    pwd_bytes = password.encode("utf-8")[:72]
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
