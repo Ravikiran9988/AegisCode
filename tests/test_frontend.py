@@ -196,3 +196,144 @@ class TestFrontendHealthConnectivity:
         assert _detect_rate_limit_error(
             "No hunks found in patch"
         ) is False
+
+
+class TestSidebarNavigation:
+    """Tests for sidebar navigation and session-state synchronization."""
+
+    @staticmethod
+    def _mock_radio(label, options, index, key, on_change=None, label_visibility="visible"):
+        # Helper that mirrors Streamlit radio retrieval behavior
+        return options[index]
+
+    def test_sidebar_initial_default_navigation(self):
+        session = {}
+        with patch("frontend.components.sidebar.st") as mock_st:
+            mock_st.session_state = session
+            mock_st.toggle.return_value = False
+            mock_st.radio.side_effect = (
+                lambda label, options, index, key, on_change=None, label_visibility="visible": (
+                    session.get(key, options[index])
+                )
+            )
+            mock_st.text_input.return_value = "https://aegiscode-vrob.onrender.com"
+
+            from frontend.components.sidebar import render_sidebar
+
+            selected_nav, backend = render_sidebar("https://aegiscode-vrob.onrender.com")
+
+            assert selected_nav == "◉ Overview"
+            assert session["nav_view"] == "◉ Overview"
+            assert session["app_navigation_radio"] == "◉ Overview"
+
+    def test_sidebar_programmatic_new_repair_navigation(self):
+        """Simulate clicking 'Start New Repair' button on Overview page."""
+        # Initial state was Overview
+        session = {
+            "nav_view": "◉ Overview",
+            "app_navigation_radio": "◉ Overview",
+        }
+
+        # Button on Dashboard is clicked:
+        session["nav_view"] = "🚀 New Repair"
+
+        with patch("frontend.components.sidebar.st") as mock_st:
+            mock_st.session_state = session
+            mock_st.toggle.return_value = False
+            mock_st.radio.side_effect = (
+                lambda label, options, index, key, on_change=None, label_visibility="visible": (
+                    session.get(key, options[index])
+                )
+            )
+            mock_st.text_input.return_value = "https://aegiscode-vrob.onrender.com"
+
+            from frontend.components.sidebar import render_sidebar
+
+            selected_nav, _ = render_sidebar("https://aegiscode-vrob.onrender.com")
+
+            # Must synchronize app_navigation_radio to 🚀 New Repair and return it
+            assert session["app_navigation_radio"] == "🚀 New Repair"
+            assert selected_nav == "🚀 New Repair"
+            assert session["nav_view"] == "🚀 New Repair"
+
+    def test_sidebar_programmatic_active_repairs_navigation(self):
+        """Simulate in-page navigation to Active Repairs."""
+        session = {
+            "nav_view": "🤖 Active Repairs",
+            "app_navigation_radio": "◉ Overview",
+        }
+
+        with patch("frontend.components.sidebar.st") as mock_st:
+            mock_st.session_state = session
+            mock_st.toggle.return_value = False
+            mock_st.radio.side_effect = (
+                lambda label, options, index, key, on_change=None, label_visibility="visible": (
+                    session.get(key, options[index])
+                )
+            )
+            mock_st.text_input.return_value = "https://aegiscode-vrob.onrender.com"
+
+            from frontend.components.sidebar import render_sidebar
+
+            selected_nav, _ = render_sidebar("https://aegiscode-vrob.onrender.com")
+
+            assert session["app_navigation_radio"] == "🤖 Active Repairs"
+            assert selected_nav == "🤖 Active Repairs"
+            assert session["nav_view"] == "🤖 Active Repairs"
+
+    def test_sidebar_manual_radio_change(self):
+        """Simulate user manually clicking an option in the sidebar radio widget."""
+        session = {
+            "nav_view": "◉ Overview",
+            "app_navigation_radio": "◉ Overview",
+        }
+
+        with patch("frontend.components.sidebar.st") as mock_st:
+            mock_st.session_state = session
+            mock_st.toggle.return_value = False
+
+            def fake_radio(
+                label, options, index, key, on_change=None, label_visibility="visible"
+            ):
+                # Simulate user selecting "❤️ System Health"
+                session[key] = "❤️ System Health"
+                if on_change:
+                    on_change()
+                return session[key]
+
+            mock_st.radio.side_effect = fake_radio
+            mock_st.text_input.return_value = "https://aegiscode-vrob.onrender.com"
+
+            from frontend.components.sidebar import render_sidebar
+
+            selected_nav, _ = render_sidebar("https://aegiscode-vrob.onrender.com")
+
+            assert selected_nav == "❤️ System Health"
+            assert session["nav_view"] == "❤️ System Health"
+            assert session["app_navigation_radio"] == "❤️ System Health"
+
+    def test_sidebar_invalid_nav_view_fallback(self):
+        """Invalid nav_view should fallback to Overview."""
+        session = {
+            "nav_view": "Unknown View",
+        }
+
+        with patch("frontend.components.sidebar.st") as mock_st:
+            mock_st.session_state = session
+            mock_st.toggle.return_value = False
+            mock_st.radio.side_effect = (
+                lambda label, options, index, key, on_change=None, label_visibility="visible": (
+                    session.get(key, options[index])
+                )
+            )
+            mock_st.text_input.return_value = "https://aegiscode-vrob.onrender.com"
+
+            from frontend.components.sidebar import render_sidebar
+
+            selected_nav, _ = render_sidebar("https://aegiscode-vrob.onrender.com")
+
+            assert selected_nav == "◉ Overview"
+            assert session["nav_view"] == "◉ Overview"
+            assert session["app_navigation_radio"] == "◉ Overview"
+
+

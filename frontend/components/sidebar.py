@@ -59,6 +59,15 @@ def render_sidebar(
         if current_nav not in nav_options:
             current_nav = "◉ Overview"
 
+        # Synchronize radio widget state if nav_view was modified programmatically
+        if st.session_state.get("app_navigation_radio") != current_nav:
+            st.session_state["app_navigation_radio"] = current_nav
+
+        def _on_nav_change() -> None:
+            st.session_state["nav_view"] = st.session_state.get(
+                "app_navigation_radio", "◉ Overview"
+            )
+
         st.markdown(
             "<div class='aegis-nav-group-header'>CONTROL CENTER</div>",
             unsafe_allow_html=True,
@@ -68,6 +77,7 @@ def render_sidebar(
             options=nav_options,
             index=nav_options.index(current_nav),
             key="app_navigation_radio",
+            on_change=_on_nav_change,
             label_visibility="collapsed",
         )
         st.session_state["nav_view"] = selected_nav
@@ -102,7 +112,9 @@ def render_sidebar(
               <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
                 <div>LLM: <strong style="color: #c084fc;">openai/gpt-oss-120b</strong></div>
                 <div>Database: <strong style="color: #38bdf8;">{db_stat}</strong></div>
-                <div>Backend: <strong style="color: var(--text-primary);">FastAPI REST</strong></div>
+                <div>
+                  Backend: <strong style="color: var(--text-primary);">FastAPI REST</strong>
+                </div>
               </div>
             </div>
             """,
