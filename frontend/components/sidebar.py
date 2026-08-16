@@ -102,7 +102,9 @@ def render_sidebar(
               <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
                 <div>LLM: <strong style="color: #c084fc;">openai/gpt-oss-120b</strong></div>
                 <div>Database: <strong style="color: #38bdf8;">{db_stat}</strong></div>
-                <div>Backend: <strong style="color: var(--text-primary);">FastAPI REST</strong></div>
+                <div>Backend:
+                  <strong style="color: var(--text-primary);">FastAPI REST</strong>
+                </div>
               </div>
             </div>
             """,
