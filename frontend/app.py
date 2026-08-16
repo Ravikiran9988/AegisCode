@@ -14,6 +14,7 @@ Improvements over Phase 4:
 """
 
 import os
+import re
 import time
 
 import requests
@@ -176,6 +177,23 @@ def _parse_api_error(resp: requests.Response) -> str:
     return f"HTTP {resp.status_code}: {text}"
 
 
+def _extract_filename_from_content_disposition(
+    resp: requests.Response, run_id: str
+) -> str:
+    """
+    Parse the filename from the backend's ``Content-Disposition`` header.
+
+    Falls back to ``aegiscode-repaired-{run_id}.zip`` if the header is
+    absent or malformed.
+    """
+    cd = resp.headers.get("Content-Disposition", "")
+    # Match: attachment; filename="foo.zip"
+    match = re.search(r'filename="([^"]+)"', cd)
+    if match:
+        return match.group(1)
+    return f"aegiscode-repaired-{run_id}.zip"
+
+
 def _check_backend_once(
     backend_url: str, timeout: int = _HEALTH_TIMEOUT
 ) -> tuple[bool, dict, str]:
@@ -243,16 +261,18 @@ def _safe_get(
     timeout: int = _API_TIMEOUT,
     retries: int = 3,
     backoff: float = 1.5,
+    **kwargs,
 ) -> requests.Response | None:
     """
     GET request with retry for transient network errors.
 
     Retries on connection errors and timeouts.
+    Extra kwargs (e.g., stream=True) are forwarded to requests.get.
     Returns the response object on success, None on permanent failure.
     """
     for attempt in range(retries):
         try:
-            return requests.get(url, timeout=timeout)
+            return requests.get(url, timeout=timeout, **kwargs)
         except (requests.exceptions.Timeout,
                 requests.exceptions.ConnectionError):
             if attempt < retries - 1:
@@ -1071,9 +1091,11 @@ with tabs[1]:
         )
 
         # Fetch the ZIP from the backend download endpoint
+        # Backend: GET /api/runs/{run_id}/download (StreamingResponse)
         download_url = f"{api_url}/runs/{active_run_id}/download"
         try:
-            dl_resp = _safe_post(download_url, timeout=60, stream=True)
+            with st.spinner("⏳ Preparing repaired project..."):
+                dl_resp = _safe_get(download_url, timeout=60, stream=True)
             if dl_resp is None:
                 st.error(
                     "❌ Connection error — could not reach backend for "
@@ -1082,10 +1104,15 @@ with tabs[1]:
                 )
             elif dl_resp.status_code == 200:
                 zip_bytes = dl_resp.content
+                # Prefer the filename from the backend's Content-Disposition
+                # header; fall back to the standard naming convention.
+                filename = _extract_filename_from_content_disposition(
+                    dl_resp, active_run_id
+                )
                 st.download_button(
                     label="⬇️ Download Repaired Project",
                     data=zip_bytes,
-                    file_name=f"aegiscode-repaired-{active_run_id}.zip",
+                    file_name=filename,
                     mime="application/zip",
                     type="primary",
                     key="btn_download_zip",
@@ -1106,16 +1133,21 @@ with tabs[1]:
                     "⚠️ LLM rate limit reached. Please wait "
                     "and try again."
                 )
+            elif dl_resp.status_code == 405:
+                st.error(
+                    "❌ Download failed (HTTP 405 — Method Not Allowed).\n\n"
+                    "This indicates a frontend/backend method mismatch.\n"
+                    f"Backend response: {_parse_api_error(dl_resp)}."
+                )
             elif dl_resp.status_code >= 500:
                 st.error(
                     f"❌ Server error (HTTP {dl_resp.status_code}) "
                     "during download. Please try again."
                 )
             else:
-                st.error(
-                    f"❌ Download failed (HTTP {dl_resp.status_code}). "
-                    "Please try again or contact support."
-                )
+                # Catch-all: show the actual backend error, never swallow it
+                detail = _parse_api_error(dl_resp)
+                st.error(f"❌ Download failed — {detail}")
         except Exception as exc:
             st.error(f"❌ Download unavailable — could not reach backend: {exc}")
 
