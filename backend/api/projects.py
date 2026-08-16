@@ -113,7 +113,8 @@ async def upload_project(
         size_bytes=len(data),
     )
     db.add(project)
-    db.flush()  # get project.id before commit (session commits in get_db)
+    db.flush()  # get project.id before commit
+    db.commit()
 
     logger.info(
         "Project uploaded: id=%s name=%r files=%d bytes=%d",
