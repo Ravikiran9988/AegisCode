@@ -52,10 +52,30 @@ def _render_metric_cards(runs: list[dict]) -> None:
 
     if total_runs:
         cards = [
-            ("📊", "Total Repairs", str(total_runs), f"{len(passed_runs)} ok / {failed_count} fail"),
-            ("🎯", "Success Rate", success_rate_str, "Authoritative Pytest + Reviewer"),
-            ("🛡️", "Projects Repaired", str(len(repaired_projects)), "Verified zero regressions"),
-            ("🧪", "Tests Executed", str(tests_executed), f"{tests_passed} ok / {tests_failed} fail"),
+            (
+                "📊",
+                "Total Repairs",
+                str(total_runs),
+                f"{len(passed_runs)} ok / {failed_count} fail",
+            ),
+            (
+                "🎯",
+                "Success Rate",
+                success_rate_str,
+                "Authoritative Pytest + Reviewer",
+            ),
+            (
+                "🛡️",
+                "Projects Repaired",
+                str(len(repaired_projects)),
+                "Verified zero regressions",
+            ),
+            (
+                "🧪",
+                "Tests Executed",
+                str(tests_executed),
+                f"{tests_passed} ok / {tests_failed} fail",
+            ),
             ("✓", "Tests Passed", str(tests_passed), "Authoritative assertions"),
             ("⚡", "Average Duration", avg_duration, "End-to-end repair cycle"),
         ]
