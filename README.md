@@ -9,7 +9,7 @@
 - **Multi-Agent Orchestration**: Decoupled **Architect**, **Coder**, and **Reviewer** agents operating in a controlled **LangGraph** state graph loop.
 - **Authoritative Pytest Feedback**: The system relies strictly on Pytest exit codes and outputs, never asking an LLM to "guess" if tests passed.
 - **Strict Security & Test Protection**: Intercepts and blocks any agent attempts to modify test files (`tests/*`, `test_*.py`), configuration (`.env`), or escape workspace bounds.
-- **Swappable LLM Provider Layer**: Full support for local **Ollama** models (`qwen2.5-coder`, `mistral`), hosted **OpenAI-compatible** APIs (`gpt-4o-mini`, DeepSeek, Groq), and deterministic offline **Mock** providers.
+- **Swappable LLM Provider Layer**: Native production integration with Groq (`openai/gpt-oss-120b`), hosted **OpenAI-compatible** APIs, local **Ollama** models for offline dev, and deterministic **Mock** providers for unit testing.
 - **Isolated Sandbox Execution**: Swappable local subprocess execution and containerized **Docker** sandbox (`--network none`) backends.
 - **Failure Loop Detection**: Deterministic failure fingerprinting halts stalled repair loops if identical test failures repeat.
 - **Production Dashboard**: Interactive **Streamlit** dashboard displaying live metrics, step-by-step iteration timelines, git diffs, and reviewer assessments.
