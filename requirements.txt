@@ -21,7 +21,8 @@ psycopg2-binary>=2.9.9         # PostgreSQL driver for Render production
 
 # ── Authentication ────────────────────────────────────────────────────────────
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
+passlib>=1.7.4
 
 # ── LangGraph / LangChain (1.x series) ───────────────────────────────────────
 langgraph>=1.2.0

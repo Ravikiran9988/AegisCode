@@ -8,8 +8,8 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 # Secret configuration
 _DEFAULT_SECRET = "aegiscode-production-secret-key-change-in-prod"
@@ -17,22 +17,29 @@ SECRET_KEY = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY") or _DEFAULT_SECR
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain-text password against the stored bcrypt hash."""
+    """Verify a plain-text password against stored bcrypt hash."""
     if not plain_password or not hashed_password:
         return False
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+        )
     except Exception:
-        return False
+        try:
+            from passlib.context import CryptContext
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
 
 
 def get_password_hash(password: str) -> str:
     """Generate a secure bcrypt hash for a plain-text password."""
-    return pwd_context.hash(password)
+    pwd_bytes = password.encode("utf-8")
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
