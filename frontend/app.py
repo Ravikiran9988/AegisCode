@@ -26,6 +26,17 @@ if str(_FRONTEND_DIR) not in sys.path:
     sys.path.insert(0, str(_FRONTEND_DIR))
 
 import streamlit as st  # noqa: E402
+from streamlit.delta_generator import DeltaGenerator
+import textwrap
+
+_orig_markdown = DeltaGenerator.markdown
+
+def _patched_markdown(self, body, unsafe_allow_html=False, *args, **kwargs):
+    if unsafe_allow_html and isinstance(body, str):
+        body = textwrap.dedent(body)
+    return _orig_markdown(self, body, unsafe_allow_html=unsafe_allow_html, *args, **kwargs)
+
+DeltaGenerator.markdown = _patched_markdown
 
 try:
     from frontend.components.agents import render_agents_view
