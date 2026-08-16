@@ -133,11 +133,35 @@ def _safe_get(url: str, timeout: int = 5) -> requests.Response | None:
         return None
 
 
+def _normalize_backend_url(url: str) -> str:
+    """
+    Normalize backend URL by stripping whitespace, trailing slashes,
+    and path suffixes like /health or /api.
+    """
+    u = url.strip().rstrip("/")
+    if u.endswith("/health"):
+        u = u[:-7].rstrip("/")
+    elif u.endswith("/api"):
+        u = u[:-4].rstrip("/")
+    return u
+
+
 def _backend_online(backend_url: str) -> tuple[bool, dict]:
-    """Return (is_online, health_data)."""
-    resp = _safe_get(f"{backend_url}/health", timeout=3)
+    """
+    Check backend connectivity via GET /health endpoint.
+
+    Returns (is_online, health_data) when /health returns HTTP 200 and status is "ok" or "healthy".
+    """
+    base_url = _normalize_backend_url(backend_url)
+    health_url = f"{base_url}/health"
+    resp = _safe_get(health_url, timeout=5)
     if resp is not None and resp.status_code == 200:
-        return True, resp.json()
+        try:
+            data = resp.json()
+            if isinstance(data, dict) and data.get("status") in ("ok", "healthy"):
+                return True, data
+        except Exception:
+            pass
     return False, {}
 
 
@@ -167,10 +191,11 @@ def _duration_str(started_at: str | None, finished_at: str | None) -> str:
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 st.sidebar.title("🛡️ AegisCode Settings")
-backend_url = st.sidebar.text_input("Backend URL (root)", value=API_BASE_URL)
-api_url = backend_url.rstrip("/") + "/api"
+raw_backend_url = st.sidebar.text_input("Backend URL (root or /health)", value=API_BASE_URL)
+base_backend_url = _normalize_backend_url(raw_backend_url)
+api_url = f"{base_backend_url}/api"
 
-online, health_data = _backend_online(backend_url)
+online, health_data = _backend_online(base_backend_url)
 if online:
     llm_prov = health_data.get("llm_provider", "unknown")
     st.sidebar.success(f"✅ Backend Online — LLM: `{llm_prov}`")
