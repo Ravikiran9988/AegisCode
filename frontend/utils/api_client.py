@@ -97,39 +97,43 @@ def _format_http_error(resp: requests.Response, default_msg: str) -> str:
             if isinstance(detail, list):
                 # Pydantic validation errors list
                 msgs = [d.get("msg", str(d)) for d in detail if isinstance(d, dict)]
-                return ", ".join(msgs) if msgs else default_msg
+                return ", ".join(msgs) if msgs else "Please check the email and password fields."
             return str(detail)
     except Exception:
         pass
 
-    if resp.status_code == 400:
-        return "Invalid input data. Please check the fields and try again."
     if resp.status_code == 409:
         return "An account with this email address already exists."
+    if resp.status_code == 422:
+        return "Please check the email and password fields."
+    if resp.status_code == 400:
+        return "Invalid input data. Please check the fields and try again."
     if resp.status_code == 401:
         return "Invalid email or password."
     if resp.status_code == 403:
-        return "Account is deactivated or access is restricted."
+        return "Account access is restricted."
     if resp.status_code == 404:
         return "Authentication service endpoint not found."
     if resp.status_code >= 500:
-        return "A server error occurred. Please try again shortly."
+        return "Something went wrong on the server. Please try again."
     return default_msg
 
 
 def api_register(
     api_url: str,
-    name: str,
+    nickname: str,
     email: str,
     password: str,
     confirm_password: str,
 ) -> tuple[bool, dict | str]:
     """Register a new account on backend API."""
     norm_url = _normalize_backend_url(api_url)
+    clean_email = email.strip().lower()
+    clean_nick = nickname.strip()
     payload = {
-        "full_name": name,
-        "name": name,
-        "email": email,
+        "nickname": clean_nick,
+        "name": clean_nick,
+        "email": clean_email,
         "password": password,
         "confirm_password": confirm_password,
     }
@@ -140,10 +144,8 @@ def api_register(
             return True, resp.json()
         err = _format_http_error(resp, "Registration failed")
         return False, err
-    except requests.exceptions.ConnectionError:
-        return False, "Cannot connect to AegisCode backend. Please verify your backend service."
-    except requests.exceptions.Timeout:
-        return False, "Request timed out connecting to authentication service."
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        return False, "Unable to connect to AegisCode services. Please try again."
     except Exception as exc:
         return False, str(exc)
 
@@ -155,18 +157,17 @@ def api_login(
 ) -> tuple[bool, dict | str]:
     """Authenticate with backend API."""
     norm_url = _normalize_backend_url(api_url)
-    payload = {"email": email, "password": password}
+    clean_email = email.strip().lower()
+    payload = {"email": clean_email, "password": password}
     target_url = f"{norm_url}/api/auth/login"
     try:
         resp = requests.post(target_url, json=payload, timeout=15)
         if resp.status_code == 200:
             return True, resp.json()
-        err = _format_http_error(resp, "Invalid email or password")
+        err = _format_http_error(resp, "Invalid email or password.")
         return False, err
-    except requests.exceptions.ConnectionError:
-        return False, "Cannot connect to AegisCode backend. Please verify your backend service."
-    except requests.exceptions.Timeout:
-        return False, "Request timed out connecting to authentication service."
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        return False, "Unable to connect to AegisCode services. Please try again."
     except Exception as exc:
         return False, str(exc)
 

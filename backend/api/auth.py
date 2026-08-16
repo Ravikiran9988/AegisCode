@@ -30,11 +30,14 @@ auth_router = APIRouter()
 # ────────────────────────────────────────────────────────────────────────────
 
 class UserRegisterRequest(BaseModel):
-    full_name: str | None = Field(
-        default=None, min_length=2, max_length=100, description="User full name"
+    nickname: str | None = Field(
+        default=None, min_length=2, max_length=100, description="User nickname"
     )
     name: str | None = Field(
         default=None, min_length=2, max_length=100, description="User name (alias)"
+    )
+    full_name: str | None = Field(
+        default=None, min_length=2, max_length=100, description="User full name (alias)"
     )
     email: str = Field(..., min_length=5, max_length=255, description="User unique email address")
     password: str = Field(..., min_length=8, max_length=128, description="User password")
@@ -52,8 +55,8 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    full_name: str
     name: str
+    nickname: str
     email: str
     is_active: bool
     is_superuser: bool
@@ -161,12 +164,12 @@ def register_user(
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """Register a new user, validate input, hash password, and issue JWT access token."""
-    # 1. Validate full name
-    display_name = (req.full_name or req.name or "").strip()
+    # 1. Validate nickname / name
+    display_name = (req.nickname or req.name or req.full_name or "").strip()
     if not display_name or len(display_name) < 2:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please provide a valid full name (at least 2 characters)",
+            detail="Please provide a valid nickname (at least 2 characters)",
         )
 
     # 2. Validate email format
@@ -207,7 +210,6 @@ def register_user(
     # 6. Create and persist user
     hashed_pwd = get_password_hash(req.password)
     user = User(
-        full_name=display_name,
         name=display_name,
         email=email_clean,
         hashed_password=hashed_pwd,

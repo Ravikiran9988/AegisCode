@@ -1,6 +1,6 @@
 """
 Authentication & Authorization View Component for AegisCode.
-Enterprise developer-platform SaaS design system for Sign In and Create Account.
+Compact, modern SaaS authentication interface for Sign In and Create Account.
 """
 
 from __future__ import annotations
@@ -16,23 +16,21 @@ except ImportError:
 
 
 def render_auth(api_url: str) -> None:
-    """Render the modern SaaS authentication portal for AegisCode."""
+    """Render the compact SaaS authentication portal for AegisCode."""
     st.markdown(
         """
         <div class="aegis-auth-wrapper">
           <div class="aegis-auth-header">
             <div class="aegis-auth-shield">🛡️</div>
             <h1 class="aegis-auth-brand-name">AegisCode</h1>
-            <div class="aegis-auth-brand-sub">AUTONOMOUS SOFTWARE ENGINEERING</div>
-            <div class="aegis-auth-tagline">Build with confidence.</div>
-            <p class="aegis-auth-subtagline">AI-powered autonomous software engineering.</p>
+            <div class="aegis-auth-brand-sub">AI-powered autonomous software engineering.</div>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    _, col_center, _ = st.columns([1, 1.4, 1])
+    _, col_center, _ = st.columns([1, 1.25, 1])
 
     with col_center:
         tab_signin, tab_signup = st.tabs(["Sign In", "Create Account"])
@@ -44,13 +42,11 @@ def render_auth(api_url: str) -> None:
                     "Email",
                     placeholder="engineer@kiranverse.tech",
                     key="signin_email",
-                    help="Enter your registered account email.",
                 ).strip()
 
-                show_pwd_signin = st.checkbox("Show password", key="chk_show_pwd_signin")
                 signin_pwd = st.text_input(
                     "Password",
-                    type="default" if show_pwd_signin else "password",
+                    type="password",
                     placeholder="••••••••",
                     key="signin_pwd",
                 )
@@ -81,11 +77,11 @@ def render_auth(api_url: str) -> None:
         # ── 2. Create Account Tab ────────────────────────────────────────────
         with tab_signup:
             with st.form("form_signup", clear_on_submit=False):
-                signup_name = st.text_input(
-                    "Full Name",
-                    placeholder="Ada Lovelace",
-                    key="signup_name",
-                    help="Your full human-readable name.",
+                signup_nick = st.text_input(
+                    "Nickname",
+                    placeholder="e.g. ada",
+                    key="signup_nick",
+                    help="Your preferred display nickname (at least 2 characters).",
                 ).strip()
 
                 signup_email = st.text_input(
@@ -95,19 +91,16 @@ def render_auth(api_url: str) -> None:
                     help="Unique email address for your account.",
                 ).strip()
 
-                show_pwd_signup = st.checkbox("Show passwords", key="chk_show_pwd_signup")
-                pwd_type = "default" if show_pwd_signup else "password"
-
                 signup_pwd = st.text_input(
                     "Password",
-                    type=pwd_type,
+                    type="password",
                     placeholder="Min. 8 characters with letters & numbers",
                     key="signup_pwd",
                 )
 
                 signup_confirm = st.text_input(
                     "Confirm Password",
-                    type=pwd_type,
+                    type="password",
                     placeholder="Re-enter your password",
                     key="signup_confirm",
                 )
@@ -119,10 +112,10 @@ def render_auth(api_url: str) -> None:
                 )
 
             if submit_signup:
-                if not signup_name or not signup_email or not signup_pwd or not signup_confirm:
-                    st.error("All fields are required. Please fill in all fields.")
-                elif len(signup_name) < 2:
-                    st.error("Full Name must be at least 2 characters long.")
+                if not signup_nick or not signup_email or not signup_pwd or not signup_confirm:
+                    st.error("All fields are required. Please complete the form.")
+                elif len(signup_nick) < 2:
+                    st.error("Nickname must be at least 2 characters long.")
                 elif "@" not in signup_email or "." not in signup_email:
                     st.error("Please enter a valid email address.")
                 elif signup_pwd != signup_confirm:
@@ -132,10 +125,10 @@ def render_auth(api_url: str) -> None:
                 elif not re.search(r"[A-Za-z]", signup_pwd) or not re.search(r"[0-9]", signup_pwd):
                     st.error("Password must contain both letters and numbers.")
                 else:
-                    with st.spinner("Creating your AegisCode account..."):
+                    with st.spinner("Creating your account..."):
                         success, res = api_register(
                             api_url,
-                            signup_name,
+                            signup_nick,
                             signup_email,
                             signup_pwd,
                             signup_confirm,
@@ -151,10 +144,12 @@ def render_auth(api_url: str) -> None:
                         err_msg = str(res) if res else "Registration failed."
                         st.error(f"Registration failed: {err_msg}")
 
+        # Compact Brand & Support Footer
         st.markdown(
             """
-            <div class="aegis-auth-trust-footer">
-              🛡️ Protected by AegisCode Cryptographic Auth & RBAC Isolation
+            <div class="aegis-auth-footer">
+              <div>Support: <a href="mailto:admin@kiranverse.tech">admin@kiranverse.tech</a></div>
+              <div>© 2026 Kiranverse. All rights reserved.</div>
             </div>
             """,
             unsafe_allow_html=True,
