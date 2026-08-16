@@ -63,6 +63,111 @@ html, body, [class*="css"], .stMarkdown, .stText {
   color: var(--text-primary);
 }
 
+/* Streamlit shell — explicitly target the rendered application, not just HTML. */
+[data-testid="stAppViewContainer"],
+[data-testid="stApp"],
+.stApp {
+  background:
+    radial-gradient(circle at 84% -12%, rgba(99, 102, 241, 0.18), transparent 30rem),
+    radial-gradient(circle at 12% 115%, rgba(14, 165, 233, 0.10), transparent 32rem),
+    var(--bg-app) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-testid="stHeader"] {
+  background: transparent !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent;
+}
+
+[data-testid="stSidebar"] {
+  background: rgba(14, 21, 36, 0.94) !important;
+  border-right: 1px solid var(--border-subtle);
+}
+
+[data-testid="stSidebar"] > div:first-child {
+  background: transparent !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] label,
+.stApp p,
+.stApp span,
+.stApp li {
+  color: var(--text-secondary);
+}
+
+.stApp h1, .stApp h2, .stApp h3,
+.stApp [data-testid="stMarkdownContainer"] h1,
+.stApp [data-testid="stMarkdownContainer"] h2,
+.stApp [data-testid="stMarkdownContainer"] h3 {
+  color: var(--text-primary) !important;
+  letter-spacing: -0.03em;
+}
+
+.stApp hr {
+  border-color: var(--border-subtle) !important;
+}
+
+/* Production-grade native controls */
+.stButton > button,
+.stDownloadButton > button {
+  min-height: 2.6rem;
+  border: 1px solid var(--border-muted);
+  border-radius: 8px;
+  background: var(--bg-panel-elevated);
+  color: var(--text-primary);
+  font-weight: 650;
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+  transform: translateY(-1px);
+  border-color: var(--brand-primary);
+  background: var(--bg-panel-hover);
+  color: #fff;
+}
+
+.stButton > button[kind="primary"] {
+  border-color: transparent;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.28);
+}
+
+.stButton > button[kind="primary"]:hover {
+  background: linear-gradient(135deg, #7578ff, #9c6cff);
+}
+
+[data-testid="stRadio"] label {
+  padding: 7px 8px;
+  border-radius: 7px;
+  transition: background 150ms ease;
+}
+
+[data-testid="stRadio"] label:hover {
+  background: rgba(99, 102, 241, 0.10);
+}
+
+[data-testid="stRadio"] [data-checked="true"] + div {
+  background-color: var(--brand-primary) !important;
+  border-color: var(--brand-primary) !important;
+}
+
+[data-testid="stExpander"] {
+  border-color: var(--border-subtle) !important;
+  background: rgba(19, 27, 46, 0.45);
+  border-radius: var(--radius-md) !important;
+}
+
+[data-testid="stTextInput"] input {
+  background: var(--bg-panel) !important;
+  border-color: var(--border-muted) !important;
+  color: var(--text-primary) !important;
+}
+
 code, pre, .stCodeBlock, [class*="stCode"], kbd {
   font-family: 'JetBrains Mono', Consolas, monospace !important;
   font-size: 0.86rem !important;
