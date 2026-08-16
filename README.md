@@ -249,10 +249,3 @@ Run linting checks:
 ```bash
 python -m ruff check backend/ frontend/ tests/
 ```
-
----
-
-## 🎬 Capstone Demo & Live Application
-
-- **Live Application URL**: [Placeholder — Live Demo Link]
-- **Demo Video (2–3 mins)**: [Placeholder — YouTube / Loom Video Link]
