@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: aegiscode-backend
+    name: aegiscode-vrob
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -37,7 +37,7 @@ services:
     startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
     envVars:
       - key: BACKEND_URL
-        value: https://aegiscode-backend.onrender.com
+        value: https://aegiscode-vrob.onrender.com
 
 databases:
   - name: aegiscode-db
