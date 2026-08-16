@@ -95,7 +95,6 @@ def _format_http_error(resp: requests.Response, default_msg: str) -> str:
         if isinstance(data, dict) and data.get("detail"):
             detail = data["detail"]
             if isinstance(detail, list):
-                # Pydantic validation errors list
                 msgs = [d.get("msg", str(d)) for d in detail if isinstance(d, dict)]
                 return ", ".join(msgs) if msgs else "Please check the email and password fields."
             return str(detail)
@@ -121,7 +120,7 @@ def _format_http_error(resp: requests.Response, default_msg: str) -> str:
 
 def api_register(
     api_url: str,
-    nickname: str,
+    full_name: str,
     email: str,
     password: str,
     confirm_password: str,
@@ -129,10 +128,10 @@ def api_register(
     """Register a new account on backend API."""
     norm_url = _normalize_backend_url(api_url)
     clean_email = email.strip().lower()
-    clean_nick = nickname.strip()
+    clean_name = full_name.strip()
     payload = {
-        "nickname": clean_nick,
-        "name": clean_nick,
+        "full_name": clean_name,
+        "name": clean_name,
         "email": clean_email,
         "password": password,
         "confirm_password": confirm_password,
@@ -241,7 +240,6 @@ def fetch_history_runs(
             return []
         except Exception:
             return []
-    # Fallback to fetch_recent_runs if /history is not deployed yet
     return fetch_recent_runs(api_url, limit=limit)
 
 
