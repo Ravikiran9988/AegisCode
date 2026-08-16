@@ -177,6 +177,23 @@ if not st.session_state["backend_online"]:
 
 # ── Authentication Gate ───────────────────────────────────────────────────────
 
+try:
+    from streamlit_cookies_controller import CookieController
+    cookie_controller = CookieController()
+    cookie_token = cookie_controller.get("aegis_auth_token")
+    if cookie_token and not st.session_state.get("auth_token"):
+        st.session_state["auth_token"] = cookie_token
+        try:
+            import json
+            cookie_user_str = cookie_controller.get("aegis_user")
+            if cookie_user_str:
+                st.session_state["current_user"] = json.loads(cookie_user_str)
+        except Exception:
+            pass
+        st.rerun()
+except ImportError:
+    pass
+
 if not st.session_state.get("auth_token"):
     render_auth(api_url=f"{base_backend_url}/api")
     render_footer()

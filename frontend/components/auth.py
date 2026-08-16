@@ -66,6 +66,14 @@ def render_auth(api_url: str) -> None:
                     if success and isinstance(res, dict):
                         st.session_state["auth_token"] = res["access_token"]
                         st.session_state["current_user"] = res.get("user", {})
+                        try:
+                            from streamlit_cookies_controller import CookieController
+                            import json
+                            cookies = CookieController()
+                            cookies.set("aegis_auth_token", res["access_token"], max_age=60*60*24*7)
+                            cookies.set("aegis_user", json.dumps(res.get("user", {})), max_age=60*60*24*7)
+                        except ImportError:
+                            pass
                         st.session_state["nav_view"] = "◉ Overview"
                         st.success("Authenticated successfully! Redirecting...")
                         st.rerun()
@@ -135,6 +143,14 @@ def render_auth(api_url: str) -> None:
                     if success and isinstance(res, dict):
                         st.session_state["auth_token"] = res["access_token"]
                         st.session_state["current_user"] = res.get("user", {})
+                        try:
+                            from streamlit_cookies_controller import CookieController
+                            import json
+                            cookies = CookieController()
+                            cookies.set("aegis_auth_token", res["access_token"], max_age=60*60*24*7)
+                            cookies.set("aegis_user", json.dumps(res.get("user", {})), max_age=60*60*24*7)
+                        except ImportError:
+                            pass
                         st.session_state["nav_view"] = "◉ Overview"
                         st.success("Account created successfully! Redirecting to Control Center...")
                         st.rerun()

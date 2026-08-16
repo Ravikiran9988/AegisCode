@@ -33,11 +33,11 @@ def render_sidebar(
             unsafe_allow_html=True,
         )
 
-        dark_mode = st.toggle("Dark mode", key="theme_toggle")
-        selected_theme = "dark" if dark_mode else "light"
-        if selected_theme != st.session_state.get("theme_mode"):
-            st.session_state["theme_mode"] = selected_theme
-            st.rerun()
+        def _on_theme_change() -> None:
+            is_dark = st.session_state.get("theme_toggle", True)
+            st.session_state["theme_mode"] = "dark" if is_dark else "light"
+
+        dark_mode = st.toggle("Dark mode", key="theme_toggle", on_change=_on_theme_change)
 
         nav_options = [
             # Control Center
@@ -119,6 +119,13 @@ def render_sidebar(
             if st.button("Sign Out", key="btn_sidebar_logout", use_container_width=True):
                 st.session_state.pop("auth_token", None)
                 st.session_state.pop("current_user", None)
+                try:
+                    from streamlit_cookies_controller import CookieController
+                    cookies = CookieController()
+                    cookies.remove("aegis_auth_token")
+                    cookies.remove("aegis_user")
+                except ImportError:
+                    pass
                 st.rerun()
 
         # Sidebar Footer: Live Engine & Infrastructure Status

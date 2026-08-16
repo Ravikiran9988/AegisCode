@@ -46,3 +46,4 @@ requests>=2.32.0
 # ── Utilities ─────────────────────────────────────────────────────────────────
 tenacity>=9.0.0                # retry logic
 rich>=13.9.0                   # pretty console output / evaluation reports
+streamlit-cookies-controller>=0.0.2
