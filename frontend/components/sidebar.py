@@ -34,7 +34,7 @@ def render_sidebar(
         )
 
         def _on_theme_change() -> None:
-            is_dark = st.session_state.get("theme_toggle", True)
+            is_dark = st.session_state.get("theme_toggle", False)
             st.session_state["theme_mode"] = "dark" if is_dark else "light"
 
         dark_mode = st.toggle("Dark mode", key="theme_toggle", on_change=_on_theme_change)

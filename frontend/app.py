@@ -107,7 +107,7 @@ st.set_page_config(
 # ── Load Design System CSS ────────────────────────────────────────────────────
 
 if "theme_mode" not in st.session_state:
-    st.session_state["theme_mode"] = "dark"
+    st.session_state["theme_mode"] = "light"
 if "theme_toggle" not in st.session_state:
     st.session_state["theme_toggle"] = st.session_state["theme_mode"] == "dark"
 
