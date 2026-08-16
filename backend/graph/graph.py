@@ -31,6 +31,7 @@ from backend.graph.nodes import (
 )
 from backend.graph.state import RepairState
 from backend.llm.base import BaseLLMProvider
+from backend.llm.openai import RateLimitError
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
@@ -204,6 +205,11 @@ def run_repair_workflow(
 
     try:
         final_state = graph.invoke(initial_state)
+    except RateLimitError as exc:
+        logger.warning("Repair graph hit Groq rate limit: %s", exc)
+        final_state = dict(initial_state)
+        final_state["status"] = "error"
+        final_state["termination_reason"] = f"rate_limit_exceeded: {exc}"
     except Exception as exc:
         logger.error("Repair graph execution error: %s", exc)
         final_state = dict(initial_state)

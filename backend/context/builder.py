@@ -1,5 +1,5 @@
 """
-Context Builder — Phase 3.
+Context Builder — Phase 3 / Phase 6 (Token Budget Hardening).
 
 Assembles bounded project context (file tree, file snippets, pytest failure output,
 git diffs) into clean prompts.
@@ -9,6 +9,19 @@ Security & Safety
 All project source code, test stdout, file names, and diffs are wrapped in
 explicit `<untrusted_data>` blocks and tagged so the LLM treats them strictly
 as passive DATA to analyze, NEVER as instructions to execute.
+
+Token Budget (Phase 6)
+-----------------------
+Groq's free tier allows 8000 TPM for openai/gpt-oss-120b.
+Each AegisCode repair iteration makes 3 LLM calls (Architect + Coder + Reviewer).
+Budget targets per call:
+  - Architect   : ~1500 input tokens  → stdout truncated to 1500 chars
+  - Coder        : ~2000 input tokens  → file content budget halved from old value
+  - Reviewer     : ~1000 input tokens  → diff text + test summary only
+
+These budgets are enforced via settings.max_file_context_size (6000 chars).
+Character-to-token ratio for code/logs is roughly 3-4 chars/token, so
+6000 chars ≈ 1500–2000 tokens — comfortably within per-call limits.
 """
 
 from __future__ import annotations
@@ -32,6 +45,8 @@ def build_architect_context(
     - Project structure tree
     - Key test failure details (if available)
     - Untrusted data warning blocks
+
+    Token budget: stdout truncated to 1500 chars, stderr to 800 chars.
     """
     struct = get_project_structure(workspace)
     tree_str = struct.tree if struct.success else "(Tree unavailable)"
@@ -42,8 +57,8 @@ def build_architect_context(
             f"Pytest Exit Code: {test_result.exit_code}\n"
             f"Passed: {test_result.passed}, Failed: {test_result.failed}, "
             f"Errors: {test_result.errors}, Skipped: {test_result.skipped}\n\n"
-            f"--- Captured Stdout Snippet ---\n{_truncate(test_result.stdout, 3000)}\n"
-            f"--- Captured Stderr Snippet ---\n{_truncate(test_result.stderr, 1500)}"
+            f"--- Captured Stdout Snippet ---\n{_truncate(test_result.stdout, 1500)}\n"
+            f"--- Captured Stderr Snippet ---\n{_truncate(test_result.stderr, 800)}"
         )
 
     context_str = f"""
@@ -77,10 +92,14 @@ def build_coder_context(
     - Architecture plan summary & suspected issues
     - Contents of relevant source & test files (within size budget)
     - Exact test failure output
+
+    Token budget: file content budget = max_file_context_size // 3 (was // 2).
+    Stdout truncated to 1200 chars (was 2500).
     """
     files_content_parts: list[str] = []
     total_len = 0
-    budget = settings.max_file_context_size // 2
+    # Tighter file content budget to reduce input tokens per call
+    budget = settings.max_file_context_size // 3
 
     for file_path in relevant_files[: settings.max_files_per_agent]:
         res = read_file(workspace, file_path)
@@ -99,7 +118,7 @@ def build_coder_context(
         test_failure_block = (
             f"Exit code: {test_result.exit_code}\n"
             f"Passed: {test_result.passed}, Failed: {test_result.failed}\n"
-            f"Captured Output:\n{_truncate(test_result.stdout, 2500)}"
+            f"Captured Output:\n{_truncate(test_result.stdout, 1200)}"
         )
 
     context_str = f"""
@@ -134,8 +153,15 @@ def build_reviewer_context(
     - Git diff of changes made by Coder
     - Coder's stated explanation and root cause fix
     - Comparison of initial vs new test results
+
+    Token budget: diff text truncated to max_file_context_size // 2.
     """
-    diff_text = git_diff.diff if git_diff.has_changes else "(No git diff recorded)"
+    diff_budget = settings.max_file_context_size // 2
+    diff_text = (
+        _truncate(git_diff.diff, diff_budget)
+        if git_diff.has_changes
+        else "(No git diff recorded)"
+    )
     changed_files = ", ".join(git_diff.changed_files) or "None"
 
     initial_str = (

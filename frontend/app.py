@@ -357,6 +357,14 @@ with tabs[1]:
     rev_ok = sdata.get("review_approved", False)
     final_summary = sdata.get("final_summary", "")
 
+    is_rate_limit_err = any(
+        k in final_summary.lower()
+        for k in ("rate_limit", "rate limit", "429", "ratelimiterror")
+    )
+
+    if is_rate_limit_err and run_status in ("failed", "error"):
+        icon, label, css_cls = ("⏳", "Groq Rate Limit Reached", "stalled")
+
     extra_lines = ""
     if run_status in ("passed", "already_passing"):
         extra_lines = (
@@ -367,8 +375,17 @@ with tabs[1]:
         )
     elif run_status == "running":
         extra_lines = (
-            f"<p>🔄 Current Node Iteration: {current_iter}/{max_iter} — "
-            "auto-refreshing…</p>"
+            f"<p>🔄 Current Node Iteration: {current_iter}/{max_iter} — auto-refreshing…</p>"
+            "<p><small>ℹ️ Note: If Groq 429 rate limits are hit, AegisCode automatically "
+            "pauses and retries in the background.</small></p>"
+        )
+    elif is_rate_limit_err:
+        extra_lines = (
+            "<p>⚠️ <strong>Groq Free-Tier Rate Limit Reached (8,000 TPM)</strong></p>"
+            "<p>All 4 automatic retries were exhausted while waiting for quota reset.</p>"
+            "<p>💡 <em>Please wait 1–2 minutes for your TPM token bucket to refill, "
+            "then switch to <strong>🚀 Launch Repair Run</strong> to try again.</em></p>"
+            f"<p>Iterations completed: {current_iter}/{max_iter}</p>"
         )
     elif run_status in ("failed", "error"):
         extra_lines = (

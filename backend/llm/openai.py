@@ -1,13 +1,29 @@
 """
-OpenAI-Compatible LLM Provider — Phase 5.
+OpenAI-Compatible LLM Provider — Phase 5 / Phase 6 (Rate-Limit Hardening).
 
 Implements `BaseLLMProvider` for OpenAI and OpenAI-compatible REST endpoints
-(e.g., OpenAI API, DeepSeek, Groq, Together, vLLM, LocalAI).
+(e.g., Groq, Together, vLLM, LocalAI).
+
+Rate-limit handling (Groq 429)
+-------------------------------
+All HTTP calls go through `_call_with_retry()`, which:
+1. Detects HTTP 429 responses before raising.
+2. Parses the `Retry-After` header (seconds) or extracts a wait hint from the
+   Groq JSON error body (e.g. "Please try again in ~26 seconds").
+3. Sleeps the required duration + a small random jitter (±2 s).
+4. Retries up to MAX_RETRIES times with exponential back-off as a floor.
+5. After all retries are exhausted, raises RateLimitError so callers can
+   surface a clear, actionable error rather than a generic "LLM error".
+
+Security note: OPENAI_API_KEY is never logged.
 """
 
 from __future__ import annotations
 
 import json
+import random
+import re
+import time
 from typing import TypeVar
 
 import requests
@@ -21,10 +37,36 @@ logger = get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
+# ── Retry / back-off constants ─────────────────────────────────────────────────
+# Total attempts = 1 initial + MAX_RETRIES retries
+_MAX_RETRIES: int = 4
+# Minimum wait between retries (seconds) when no Retry-After header is present
+_BACKOFF_BASE: float = 5.0
+# Hard cap: never wait more than this many seconds regardless of Retry-After
+_MAX_WAIT_SECONDS: float = 90.0
+# ±jitter added to every wait to avoid thundering-herd on shared rate limits
+_JITTER_SECONDS: float = 2.0
+
+# Regex to extract seconds from Groq's error text
+# e.g. "Please try again in ~26 seconds." or "try again in 10s"
+_RETRY_AFTER_PATTERN = re.compile(
+    r"(?:try again in\s*~?\s*)(\d+(?:\.\d+)?)\s*(?:seconds?|s\b)",
+    re.IGNORECASE,
+)
+
+
+class RateLimitError(LLMProviderError):
+    """
+    Raised when the Groq / OpenAI-compatible API returns HTTP 429 and all
+    retry attempts have been exhausted.
+    """
+
 
 class OpenAICompatibleLLMProvider(BaseLLMProvider):
     """
     LLM provider calling an OpenAI-compatible REST API (/v1/chat/completions).
+
+    Production target: openai/gpt-oss-120b via https://api.groq.com/openai/v1
     """
 
     def __init__(
@@ -47,6 +89,88 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
     def model_name(self) -> str:
         return self.model
 
+    # ── Internal: rate-limit-aware HTTP POST ───────────────────────────────────
+
+    def _call_with_retry(
+        self,
+        url: str,
+        headers: dict,
+        payload: dict,
+    ) -> requests.Response:
+        """
+        POST to *url* with automatic 429 retry + exponential back-off.
+
+        Retry logic
+        -----------
+        * On HTTP 429: parse Retry-After header or body hint; sleep; retry.
+        * Back-off floor: max(parsed_wait, backoff_base * 2^attempt).
+        * Hard cap: _MAX_WAIT_SECONDS.
+        * Jitter: ±_JITTER_SECONDS.
+        * After _MAX_RETRIES retries: raise RateLimitError.
+
+        Never logs the Authorization header value.
+        """
+        last_exc: Exception | None = None
+
+        for attempt in range(_MAX_RETRIES + 1):  # attempt 0 = first try
+            try:
+                resp = requests.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout,
+                )
+            except requests.exceptions.Timeout as exc:
+                # Network-level timeout — not a rate-limit; re-raise immediately
+                raise LLMProviderError(
+                    f"OpenAI API request timed out after {self.timeout}s"
+                ) from exc
+            except requests.exceptions.RequestException as exc:
+                raise LLMProviderError(
+                    f"OpenAI API network error: {exc}"
+                ) from exc
+
+            if resp.status_code != 429:
+                # Success or a non-rate-limit error — return as-is
+                return resp
+
+            # ── HTTP 429 handling ─────────────────────────────────────────────
+            if attempt >= _MAX_RETRIES:
+                # All retries exhausted
+                try:
+                    err_body = resp.json()
+                    err_msg = (
+                        err_body.get("error", {}).get("message", "")
+                        or str(err_body)[:200]
+                    )
+                except Exception:
+                    err_msg = resp.text[:200]
+
+                raise RateLimitError(
+                    f"Groq rate limit (HTTP 429) exhausted after {_MAX_RETRIES} retries. "
+                    f"Error: {err_msg}. "
+                    "Please wait a minute and try again."
+                )
+
+            wait = _parse_retry_wait(resp, attempt)
+            logger.warning(
+                "Groq API rate limit hit (attempt %d/%d). "
+                "Waiting %.1f s before retry. Model: %s",
+                attempt + 1,
+                _MAX_RETRIES,
+                wait,
+                self.model,
+            )
+            last_exc = None  # reset — we'll retry
+            time.sleep(wait)
+
+        # Should not reach here but satisfy mypy
+        raise RateLimitError(
+            f"Rate limit retries exhausted ({last_exc})"
+        )
+
+    # ── Public API ─────────────────────────────────────────────────────────────
+
     def generate(
         self,
         prompt: str,
@@ -55,6 +179,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         max_tokens: int | None = None,
     ) -> str:
         url = f"{self.base_url}/chat/completions"
+        # Never log the raw Authorization header value
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
@@ -73,10 +198,12 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         }
 
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
+            resp = self._call_with_retry(url, headers, payload)
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"]
+        except RateLimitError:
+            raise  # preserve specific type
         except requests.exceptions.HTTPError as exc:
             body_err = ""
             try:
@@ -84,7 +211,11 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             except Exception:
                 pass
             logger.error("OpenAI API HTTP error: %s%s", exc, body_err)
-            raise LLMProviderError(f"OpenAI API request failed: {exc}{body_err}") from exc
+            raise LLMProviderError(
+                f"OpenAI API request failed: {exc}{body_err}"
+            ) from exc
+        except LLMProviderError:
+            raise
         except Exception as exc:
             logger.error("OpenAI API call failed: %s", exc)
             raise LLMProviderError(f"OpenAI API request failed: {exc}") from exc
@@ -135,3 +266,45 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             return False, f"OpenAI API returned status {resp.status_code}"
         except Exception as exc:
             return False, f"OpenAI API connection failed: {exc}"
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _parse_retry_wait(resp: requests.Response, attempt: int) -> float:
+    """
+    Determine how long to wait after receiving a 429 response.
+
+    Priority order:
+    1. ``Retry-After`` HTTP header (standard, in seconds).
+    2. Groq JSON error body text (e.g. "try again in ~26 seconds").
+    3. Exponential back-off floor: ``_BACKOFF_BASE * 2^attempt``.
+
+    The result is clamped to [_BACKOFF_BASE, _MAX_WAIT_SECONDS] and
+    a random jitter of ±_JITTER_SECONDS is added.
+    """
+    wait: float | None = None
+
+    # 1. Standard Retry-After header
+    retry_after_hdr = resp.headers.get("Retry-After", "").strip()
+    if retry_after_hdr.isdigit():
+        wait = float(retry_after_hdr)
+
+    # 2. Groq JSON body hint
+    if wait is None:
+        try:
+            body = resp.json()
+            err_msg = body.get("error", {}).get("message", "") or ""
+            m = _RETRY_AFTER_PATTERN.search(err_msg)
+            if m:
+                wait = float(m.group(1))
+        except Exception:
+            pass
+
+    # 3. Exponential back-off floor
+    backoff_floor = _BACKOFF_BASE * (2 ** attempt)
+    effective = max(wait or 0.0, backoff_floor)
+    effective = min(effective, _MAX_WAIT_SECONDS)
+
+    # Add jitter
+    jitter = random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS)
+    return max(0.0, effective + jitter)
