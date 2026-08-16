@@ -3,10 +3,10 @@ AegisCode — Enterprise Autonomous Self-Healing Multi-Agent Engineering Platfor
 
 Top-tier production dashboard integrating:
 - Modular component hierarchy
-- Custom dark developer-tool design system & theme CSS
+- Custom developer-tool design system & theme CSS
 - Live connectivity polling with cold-start tolerance
-- Comprehensive multi-agent observability (Architect, Coder, Test, Reviewer)
-- Real-time telemetry, authoritative Pytest test output & syntax-highlighted diffs
+- Comprehensive multi-agent observability
+- Real-time telemetry, authoritative Pytest output and syntax-highlighted diffs
 - Verified project ZIP streaming
 """
 
@@ -16,7 +16,7 @@ import os
 import sys
 from pathlib import Path
 
-# Inject project root and frontend directories into sys.path before any local imports
+# Inject project root and frontend directories into sys.path before local imports.
 _ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(_ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(_ROOT_DIR))
@@ -26,19 +26,6 @@ if str(_FRONTEND_DIR) not in sys.path:
     sys.path.insert(0, str(_FRONTEND_DIR))
 
 import streamlit as st  # noqa: E402
-from streamlit.delta_generator import DeltaGenerator
-import textwrap
-
-_orig_markdown = DeltaGenerator.markdown
-
-def _patched_markdown(self, body, unsafe_allow_html=False, *args, **kwargs):
-    if unsafe_allow_html and isinstance(body, str):
-        # Remove all leading whitespace to prevent Markdown from ever parsing 
-        # indented HTML lines as code blocks, even if there are blank lines.
-        body = "\n".join(line.lstrip() for line in body.splitlines())
-    return _orig_markdown(self, body, unsafe_allow_html=unsafe_allow_html, *args, **kwargs)
-
-DeltaGenerator.markdown = _patched_markdown
 
 try:
     from frontend.components.agents import render_agents_view
@@ -97,7 +84,6 @@ except ImportError:
         _parse_api_error,
     )
 
-# Export helper functions for test suite compatibility
 __all__ = [
     "_normalize_backend_url",
     "_check_backend_once",
@@ -116,8 +102,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# ── Load Design System CSS ────────────────────────────────────────────────────
 
 if "theme_mode" not in st.session_state:
     st.session_state["theme_mode"] = "light"
@@ -161,13 +145,9 @@ if st.session_state["theme_mode"] == "light":
         unsafe_allow_html=True,
     )
 
-# ── Configuration & Defaults ──────────────────────────────────────────────────
-
 DEFAULT_BACKEND = os.environ.get(
     "BACKEND_URL", "https://aegiscode-vrob.onrender.com"
 )
-
-# ── Session State Initialization ──────────────────────────────────────────────
 
 if "backend_online" not in st.session_state:
     st.session_state["backend_online"] = False
@@ -178,8 +158,6 @@ if "backend_error" not in st.session_state:
 if "nav_view" not in st.session_state:
     st.session_state["nav_view"] = "◉ Overview"
 
-# ── Initial Connectivity Check ────────────────────────────────────────────────
-
 base_backend_url = _normalize_backend_url(DEFAULT_BACKEND)
 
 if not st.session_state["backend_online"]:
@@ -188,21 +166,20 @@ if not st.session_state["backend_online"]:
     st.session_state["health_data"] = h_data
     st.session_state["backend_error"] = err_msg
 
-# ── Authentication Gate ───────────────────────────────────────────────────────
-
 try:
     from streamlit_cookies_controller import CookieController
+    import json
+
     cookie_controller = CookieController()
     cookie_token = cookie_controller.get("aegis_auth_token")
     if cookie_token and not st.session_state.get("auth_token"):
         st.session_state["auth_token"] = cookie_token
-        try:
-            import json
-            cookie_user_str = cookie_controller.get("aegis_user")
-            if cookie_user_str:
+        cookie_user_str = cookie_controller.get("aegis_user")
+        if cookie_user_str:
+            try:
                 st.session_state["current_user"] = json.loads(cookie_user_str)
-        except Exception:
-            pass
+            except (TypeError, json.JSONDecodeError):
+                pass
         st.rerun()
 except ImportError:
     pass
@@ -211,8 +188,6 @@ if not st.session_state.get("auth_token"):
     render_auth(api_url=f"{base_backend_url}/api")
     render_footer()
     st.stop()
-
-# ── Render Application Shell (Sidebar + Topbar) ───────────────────────────────
 
 selected_nav, raw_backend = render_sidebar(
     default_backend=DEFAULT_BACKEND,
@@ -223,10 +198,8 @@ selected_nav, raw_backend = render_sidebar(
 
 normalized_backend = _normalize_backend_url(raw_backend)
 api_url = f"{normalized_backend}/api"
-
 active_run_id = st.session_state.get("active_run_id")
 
-# Breadcrumbs Map
 breadcrumb_map = {
     "◉ Overview": ["Control Center", "Overview"],
     "🚀 New Repair": ["Control Center", "New Repair"],
@@ -241,51 +214,37 @@ breadcrumb_map = {
 }
 
 breadcrumbs = breadcrumb_map.get(selected_nav, ["AegisCode", "Overview"])
-
 render_topbar(
     breadcrumbs=breadcrumbs,
     backend_online=st.session_state["backend_online"],
     active_run_id=active_run_id,
 )
 
-# ── Main View Routing (All 10 Dedicated Views) ────────────────────────────────
-
 if selected_nav == "◉ Overview":
     render_dashboard(api_url=api_url, health_data=st.session_state["health_data"])
-
 elif selected_nav == "🚀 New Repair":
     render_upload(api_url=api_url)
-
 elif selected_nav == "🤖 Active Repairs":
     render_live_repair(api_url=api_url)
-
 elif selected_nav == "📊 Repair History":
     render_history(api_url=api_url)
-
 elif selected_nav == "🏛️ Agents":
     render_agents_view(api_url=api_url)
-
 elif selected_nav == "🔀 Code Changes":
     render_code_changes_view(api_url=api_url)
-
 elif selected_nav == "🧪 Test Runs":
     render_test_runs_view(api_url=api_url)
-
 elif selected_nav == "❤️ System Health":
     render_system_health(
         backend_url=normalized_backend,
         initial_health_data=st.session_state["health_data"],
     )
-
 elif selected_nav == "⚙ Settings":
     render_settings(
         backend_url=normalized_backend,
         health_data=st.session_state["health_data"],
     )
-
 elif selected_nav == "📖 Documentation":
     render_docs()
-
-# ── Global Footer ─────────────────────────────────────────────────────────────
 
 render_footer()
