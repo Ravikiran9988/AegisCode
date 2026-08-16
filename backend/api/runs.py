@@ -629,6 +629,56 @@ def get_run_status(
     }
 
 
+def _format_run_summary(r: Run) -> dict:
+    """Format a Run database model into a summary dictionary."""
+    dur = None
+    if r.started_at and r.finished_at:
+        dur = round((r.finished_at - r.started_at).total_seconds(), 2)
+    elif r.iterations:
+        iter_durs = [it.duration_seconds for it in r.iterations if it.duration_seconds is not None]
+        if iter_durs:
+            dur = round(sum(iter_durs), 2)
+
+    # Find latest iteration metrics
+    t_passed = None
+    t_failed = None
+    r_approved = None
+    if r.iterations:
+        sorted_its = sorted(r.iterations, key=lambda it: it.iteration_number)
+        latest = sorted_its[-1]
+        t_passed = latest.tests_passed
+        t_failed = latest.tests_failed
+        if t_passed is None and latest.test_results:
+            t_passed = latest.test_results.get("passed")
+            t_failed = latest.test_results.get("failed")
+        if latest.review_result:
+            r_approved = latest.review_result.get("approved")
+        elif latest.approved is not None:
+            r_approved = latest.approved
+
+    if r.status in ("passed", "already_passing") and r_approved is None:
+        r_approved = True
+
+    p_name = r.project.name if r.project else "unknown"
+
+    return {
+        "run_id": r.id,
+        "project_id": r.project_id,
+        "project_name": p_name,
+        "status": r.status,
+        "current_iteration": r.current_iteration,
+        "max_iterations": r.max_iterations,
+        "tests_passed": t_passed,
+        "tests_failed": t_failed,
+        "reviewer_approved": r_approved,
+        "duration": dur,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "started_at": r.started_at.isoformat() if r.started_at else None,
+        "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+        "final_summary": r.final_summary,
+    }
+
+
 @router.get(
     "",
     summary="List historical repair runs",
@@ -648,48 +698,53 @@ def list_runs(
         .limit(min(limit, 100))
         .all()
     )
+    return [_format_run_summary(r) for r in runs]
 
-    results = []
-    for r in runs:
-        dur = None
-        if r.started_at and r.finished_at:
-            dur = (r.finished_at - r.started_at).total_seconds()
 
-        # Find latest iteration metrics
-        t_passed = None
-        t_failed = None
-        r_approved = None
-        if r.iterations:
-            sorted_its = sorted(r.iterations, key=lambda it: it.iteration_number)
-            latest = sorted_its[-1]
-            t_passed = latest.tests_passed
-            t_failed = latest.tests_failed
-            if latest.review_result:
-                r_approved = latest.review_result.get("approved")
+@router.get(
+    "/active",
+    summary="List currently active / running repair runs",
+)
+def list_active_runs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """
+    List currently active (running or pending) repair runs.
+    """
+    runs = (
+        db.query(Run)
+        .filter(Run.status.in_(("running", "pending")))
+        .order_by(Run.created_at.desc())
+        .limit(min(limit, 100))
+        .all()
+    )
+    return [_format_run_summary(r) for r in runs]
 
-        if r.status in ("passed", "already_passing") and r_approved is None:
-            r_approved = True
 
-        p_name = r.project.name if r.project else "unknown"
-
-        results.append({
-            "run_id": r.id,
-            "project_id": r.project_id,
-            "project_name": p_name,
-            "status": r.status,
-            "current_iteration": r.current_iteration,
-            "max_iterations": r.max_iterations,
-            "tests_passed": t_passed,
-            "tests_failed": t_failed,
-            "reviewer_approved": r_approved,
-            "duration": dur,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "started_at": r.started_at.isoformat() if r.started_at else None,
-            "finished_at": r.finished_at.isoformat() if r.finished_at else None,
-            "final_summary": r.final_summary,
-        })
-
-    return results
+@router.get(
+    "/history",
+    summary="List completed / historical repair runs",
+)
+def list_history_runs(
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """
+    List historical repair runs with optional status filtering.
+    """
+    query = db.query(Run)
+    if status:
+        query = query.filter(Run.status == status)
+    runs = (
+        query.order_by(Run.created_at.desc())
+        .offset(offset)
+        .limit(min(limit, 100))
+        .all()
+    )
+    return [_format_run_summary(r) for r in runs]
 
 
 @router.get(

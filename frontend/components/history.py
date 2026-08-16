@@ -171,6 +171,7 @@ def render_history(api_url: str) -> None:
             if st.button("Inspect →", key=f"hist_open_{rid}", use_container_width=True):
                 st.session_state["active_run_id"] = rid
                 st.session_state["nav_view"] = "🤖 Active Repairs"
+                st.session_state["app_navigation_radio"] = "🤖 Active Repairs"
                 st.rerun()
 
         st.markdown(

@@ -78,10 +78,55 @@ def fetch_recent_runs(api_url: str, limit: int = 50) -> list[dict]:
     res = _safe_get(f"{api_url}/runs?limit={limit}", timeout=10)
     if res and res.status_code == 200:
         try:
-            return res.json().get("runs", [])
+            data = res.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return data.get("runs", data.get("items", []))
+            return []
         except Exception:
             return []
     return []
+
+
+def fetch_active_runs(api_url: str, limit: int = 50) -> list[dict]:
+    """Fetch currently active / running repair runs from backend API."""
+    res = _safe_get(f"{api_url}/runs/active?limit={limit}", timeout=10)
+    if res and res.status_code == 200:
+        try:
+            data = res.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return data.get("runs", data.get("items", []))
+            return []
+        except Exception:
+            return []
+    return []
+
+
+def fetch_history_runs(
+    api_url: str,
+    limit: int = 50,
+    status: str | None = None,
+) -> list[dict]:
+    """Fetch completed / historical repair runs with optional status filter."""
+    url = f"{api_url}/runs/history?limit={limit}"
+    if status:
+        url += f"&status={status}"
+    res = _safe_get(url, timeout=10)
+    if res and res.status_code == 200:
+        try:
+            data = res.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return data.get("runs", data.get("items", []))
+            return []
+        except Exception:
+            return []
+    # Fallback to fetch_recent_runs if /history is not deployed yet
+    return fetch_recent_runs(api_url, limit=limit)
 
 
 def fetch_run_status(api_url: str, run_id: str) -> dict | None:

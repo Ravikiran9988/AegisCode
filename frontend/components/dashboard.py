@@ -45,6 +45,7 @@ def render_dashboard(api_url: str, health_data: dict) -> None:
             key="dash_btn_new_repair",
         ):
             st.session_state["nav_view"] = "🚀 New Repair"
+            st.session_state["app_navigation_radio"] = "🚀 New Repair"
             st.rerun()
 
     # ── Fetch real runs from database ─────────────────────────────────────────
@@ -336,6 +337,7 @@ def render_dashboard(api_url: str, health_data: dict) -> None:
                 if st.button("Console →", key=f"btn_dash_open_{rid}", use_container_width=True):
                     st.session_state["active_run_id"] = rid
                     st.session_state["nav_view"] = "🤖 Active Repairs"
+                    st.session_state["app_navigation_radio"] = "🤖 Active Repairs"
                     st.rerun()
 
             st.markdown(

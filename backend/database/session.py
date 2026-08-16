@@ -31,11 +31,13 @@ logger = get_logger(__name__)
 
 def _normalise_db_url(url: str) -> str:
     """
-    Render.com provides DATABASE_URL as 'postgresql://...' (no driver prefix).
-    SQLAlchemy 2.x requires an explicit driver.  We use psycopg2-binary, so
-    rewrite bare 'postgresql://' to 'postgresql+psycopg2://'.
+    Render.com / cloud hosts provide DATABASE_URL as 'postgres://' or 'postgresql://'.
+    SQLAlchemy 2.x requires an explicit driver. We use psycopg2-binary, so
+    rewrite bare 'postgresql://' or 'postgres://' to 'postgresql+psycopg2://'.
     Leave sqlite:// and already-qualified URLs untouched.
     """
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
     if url.startswith("postgresql://"):
         return url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return url
