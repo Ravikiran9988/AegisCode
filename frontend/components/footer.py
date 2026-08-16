@@ -13,7 +13,7 @@ def render_footer() -> None:
     st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True)
     st.markdown(
         """
-        <footer class="aegis-global-footer">
+        <div class="aegis-global-footer">
           <div class="aegis-footer-inner">
             <div class="aegis-footer-brand">
               <span class="aegis-footer-logo">🛡️ AegisCode</span>
@@ -28,7 +28,7 @@ def render_footer() -> None:
               <span class="aegis-footer-copy">© 2026 Kiranverse. All rights reserved.</span>
             </div>
           </div>
-        </footer>
+        </div>
         """,
         unsafe_allow_html=True,
     )
