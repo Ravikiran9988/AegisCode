@@ -189,9 +189,25 @@ if not st.session_state.get("auth_token"):
     st.markdown(
         """
         <style>
+        /* Hide sidebar container and all sidebar UI when unauthenticated. */
         [data-testid="stSidebar"],
-        [data-testid="stSidebarCollapsedControl"],
-        [data-testid="collapsedControl"] {
+        [data-testid="stSidebarContent"],
+        [data-testid="stSidebarHeader"],
+        [data-testid="stSidebarCollapseButton"] {
+          display: none !important;
+          visibility: hidden !important;
+        }
+
+        /* Hide toolbar-level sidebar expand control shown in newer Streamlit builds. */
+        [data-testid="stExpandSidebarButton"],
+        [data-testid="stToolbar"] {
+          display: none !important;
+          visibility: hidden !important;
+        }
+
+        /* Defensive fallbacks for variant implementations. */
+        button[aria-label="Collapse sidebar"],
+        button[aria-label="Expand sidebar"] {
           display: none !important;
           visibility: hidden !important;
         }
