@@ -186,6 +186,19 @@ except ImportError:
     pass
 
 if not st.session_state.get("auth_token"):
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="collapsedControl"] {
+          display: none !important;
+          visibility: hidden !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     render_auth(api_url=f"{base_backend_url}/api")
     render_footer()
     st.stop()
