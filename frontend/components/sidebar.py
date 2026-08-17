@@ -92,7 +92,7 @@ def render_sidebar(
             )
         backend_to_use = raw_backend if "raw_backend" in locals() else default_backend
 
-        # User Account & Logout section
+        # User Account & Guest / Logout section
         current_user = st.session_state.get("current_user")
         if current_user:
             u_name = (
@@ -119,13 +119,39 @@ def render_sidebar(
             if st.button("Sign Out", key="btn_sidebar_logout", use_container_width=True):
                 st.session_state.pop("auth_token", None)
                 st.session_state.pop("current_user", None)
+                st.session_state["guest_mode"] = False
+                st.session_state["guest_name"] = ""
+                st.session_state["auth_flow_step"] = "public_dashboard"
+                st.session_state["nav_view"] = "◉ Overview"
                 try:
                     from streamlit_cookies_controller import CookieController
                     cookies = CookieController()
                     cookies.remove("aegis_auth_token")
                     cookies.remove("aegis_user")
-                except ImportError:
+                except Exception:
                     pass
+                st.rerun()
+        elif st.session_state.get("guest_mode"):
+            g_name = st.session_state.get("guest_name", "Guest")
+            st.markdown(
+                f"""
+                <div style="background: rgba(245, 158, 11, 0.08);
+                border: 1px solid rgba(245, 158, 11, 0.28); border-radius: var(--radius-md);
+                padding: 10px 12px; margin-top: 14px; margin-bottom: 8px;">
+                  <div style="font-weight: 700; font-size: 0.84rem; color: var(--text-primary);">
+                    👤 Welcome, {g_name} 👋
+                  </div>
+                  <div style="font-size: 0.72rem; color: #fbbf24; margin-top: 2px;">
+                    Guest Mode (Session Active)
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if st.button("Sign In / Create Account", key="btn_sidebar_guest_auth", use_container_width=True):
+                st.session_state["guest_mode"] = False
+                st.session_state["guest_name"] = ""
+                st.session_state["auth_flow_step"] = "auth_choice"
                 st.rerun()
 
         # Sidebar Footer: Live Engine & Infrastructure Status

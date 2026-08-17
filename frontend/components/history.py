@@ -1,6 +1,7 @@
 """
 Repair History & Run Browser Component for AegisCode.
 Presents filterable, searchable historical runs with status, test pass rates, and drill-down.
+Includes Guest Mode access restriction prompt.
 """
 
 from __future__ import annotations
@@ -8,17 +9,58 @@ from __future__ import annotations
 import streamlit as st
 
 try:
+    from frontend.components.auth import render_auth_tabs
     from frontend.components.states import render_empty_state
     from frontend.utils.api_client import fetch_recent_runs
     from frontend.utils.helpers import format_timestamp
 except ImportError:
+    from components.auth import render_auth_tabs
     from components.states import render_empty_state
     from utils.api_client import fetch_recent_runs
     from utils.helpers import format_timestamp
 
 
 def render_history(api_url: str) -> None:
-    """Render the searchable repair run history browser."""
+    """Render the searchable repair run history browser or guest restriction card."""
+    if st.session_state.get("guest_mode"):
+        st.markdown(
+            """
+            <div class="aegis-page-header">
+              <h1 class="aegis-page-title">Repair Run History</h1>
+              <p class="aegis-page-desc">
+                Search, inspect, and analyze past autonomous self-healing execution runs.
+              </p>
+            </div>
+            <div style="max-width: 520px; margin: 28px auto 16px auto; text-align: center; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 32px 24px;">
+              <div style="font-size: 2.2rem; margin-bottom: 12px;">🔒</div>
+              <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">
+                Sign in to save and access your repair history.
+              </h2>
+              <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5;">
+                Guest sessions are temporary and do not store persistent execution history. Sign in or create a free account to automatically save all future repairs.
+              </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        _, col_center, _ = st.columns([1, 1.3, 1])
+        with col_center:
+            tab_signin, tab_signup = st.tabs(["Sign In", "Create Account"])
+            with tab_signin:
+                render_auth_tabs(
+                    api_url=api_url,
+                    active_tab="signin",
+                    target_nav="📊 Repair History",
+                )
+            with tab_signup:
+                render_auth_tabs(
+                    api_url=api_url,
+                    active_tab="signup",
+                    target_nav="📊 Repair History",
+                )
+        return
+
     st.markdown(
         """
         <div class="aegis-page-header">
