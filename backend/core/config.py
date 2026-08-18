@@ -22,32 +22,24 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ------------------------------------------------------------------ #
     # Application
-    # ------------------------------------------------------------------ #
     app_name: str = "AegisCode"
     app_version: str = "0.1.0"
     debug: bool = False
     log_level: str = "INFO"
 
-    # ------------------------------------------------------------------ #
     # API server
-    # ------------------------------------------------------------------ #
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_prefix: str = "/api"
 
-    # ------------------------------------------------------------------ #
     # Database
-    # ------------------------------------------------------------------ #
     database_url: str = Field(
         default="sqlite:///./aegiscode.db",
         description="SQLAlchemy database URL (sqlite:///... or postgresql+psycopg://...)",
     )
 
-    # ------------------------------------------------------------------ #
     # LLM provider
-    # ------------------------------------------------------------------ #
     llm_provider: str = Field(
         default="openai_compatible",
         description="LLM provider: 'openai_compatible', 'ollama', or 'mock'",
@@ -75,9 +67,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-3-5-sonnet-20241022"
 
-    # ------------------------------------------------------------------ #
-    # Security & Network
-    # ------------------------------------------------------------------ #
+    # Security & network
     cors_origins: str = Field(
         default="http://localhost:8501,http://localhost:3000,http://127.0.0.1:8501",
         description="Comma-separated list of allowed CORS origin URLs",
@@ -85,17 +75,14 @@ class Settings(BaseSettings):
 
     # LLM context & output bounds
     max_agent_iterations: int = 5
-    # Structured JSON responses include model reasoning plus the final object.
-    # 1024 was too small for GPT-OSS repair responses and could truncate JSON.
+    # 6144 remains the safe completion ceiling after earlier GPT-OSS truncation failures.
     max_llm_output_tokens: int = 6144
-    # Smaller context = fewer input tokens per Groq API call.
-    max_file_context_size: int = 6000
-    max_files_per_agent: int = 5
+    # Tighter input context reduces Groq latency while retaining enough repair context.
+    max_file_context_size: int = 5000
+    max_files_per_agent: int = 3
     llm_timeout_seconds: int = 60
 
-    # ------------------------------------------------------------------ #
     # Execution / Sandbox
-    # ------------------------------------------------------------------ #
     workspace_base_dir: str = "./workspaces"
     max_iterations: int = 5
     execution_timeout_seconds: int = 120
@@ -104,17 +91,12 @@ class Settings(BaseSettings):
     docker_image: str = "python:3.11-slim"
     execution_backend: Literal["local", "docker"] = "local"
 
-    # ------------------------------------------------------------------ #
     # Upload / File limits
-    # ------------------------------------------------------------------ #
     max_upload_size_mb: int = 50
     max_file_size_mb: int = 5
     max_output_size_mb: int = 10
     max_workspace_files: int = 500
 
-    # ------------------------------------------------------------------ #
-    # Derived helpers
-    # ------------------------------------------------------------------ #
     @property
     def workspace_path(self) -> Path:
         return Path(self.workspace_base_dir).resolve()
@@ -124,15 +106,7 @@ class Settings(BaseSettings):
         return self.debug
 
     def validate_production_llm_config(self) -> None:
-        """
-        Enforces strict production configuration rules for AegisCode:
-        - LLM_PROVIDER must be 'openai_compatible'.
-        - OPENAI_BASE_URL must be exactly 'https://api.groq.com/openai/v1'.
-        - OPENAI_MODEL must be exactly 'openai/gpt-oss-120b'.
-        - OPENAI_API_KEY must be configured and non-placeholder.
-
-        Raises ValueError if any configuration rule is violated.
-        """
+        """Validate the required production Groq configuration."""
         errors = []
         provider_clean = self.llm_provider.lower()
         if provider_clean not in ("openai_compatible", "openai", "hosted"):
@@ -163,9 +137,7 @@ class Settings(BaseSettings):
 
         if errors:
             err_str = "\n".join(f" - {e}" for e in errors)
-            msg = f"Production LLM Configuration Errors:\n{err_str}"
-            raise ValueError(msg)
+            raise ValueError(f"Production LLM Configuration Errors:\n{err_str}")
 
 
-# Module-level singleton — import this everywhere
 settings = Settings()
