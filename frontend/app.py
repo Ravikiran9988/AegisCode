@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 
 # Inject project root and frontend directories into sys.path before local imports.
@@ -106,9 +107,9 @@ __all__ = [
 ]
 
 # Authentication/guest entry can request a one-time sidebar reset. Streamlit
-# normally remembers the user's collapsed state, so use a two-step transition
-# to guarantee the sidebar is expanded after entering the workspace without
-# forcing it open again after the user manually collapses it.
+# normally remembers the user's collapsed state on the browser, so use a two-step
+# transition (collapsed -> expanded) to guarantee the sidebar is expanded after entering
+# the workspace without forcing it open again after the user manually collapses it.
 _sidebar_transition = st.session_state.get("sidebar_open_transition")
 if _sidebar_transition == "collapse_then_expand":
     st.session_state["sidebar_open_transition"] = "expand"
@@ -127,6 +128,7 @@ st.set_page_config(
 )
 
 if _sidebar_transition == "collapse_then_expand":
+    time.sleep(0.15)
     st.rerun()
 
 if "theme_mode" not in st.session_state:
@@ -180,36 +182,46 @@ st.markdown(
     }
     [data-testid="stExpandSidebarButton"] button,
     [data-testid="stSidebarCollapsedControl"] button,
-    [data-testid="collapsedControl"] button {
+    [data-testid="collapsedControl"] button,
+    button[aria-label="Expand sidebar"],
+    button[aria-label="Open sidebar"],
+    button[title="Expand sidebar"] {
       width: 44px !important;
       height: 44px !important;
       min-width: 44px !important;
       min-height: 44px !important;
+      margin: 8px !important;
       border-radius: 10px !important;
-      background: var(--bg-panel-elevated) !important;
-      border: 1px solid var(--border-muted) !important;
-      color: var(--text-primary) !important;
+      background: var(--bg-panel-elevated, #ffffff) !important;
+      border: 1px solid var(--border-muted, rgba(15,23,42,.16)) !important;
+      color: var(--text-primary, #172033) !important;
       box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16) !important;
     }
     [data-testid="stExpandSidebarButton"] button svg,
     [data-testid="stSidebarCollapsedControl"] button svg,
-    [data-testid="collapsedControl"] button svg {
+    [data-testid="collapsedControl"] button svg,
+    button[aria-label="Expand sidebar"] svg,
+    button[aria-label="Open sidebar"] svg {
       display: none !important;
     }
     [data-testid="stExpandSidebarButton"] button::after,
     [data-testid="stSidebarCollapsedControl"] button::after,
-    [data-testid="collapsedControl"] button::after {
+    [data-testid="collapsedControl"] button::after,
+    button[aria-label="Expand sidebar"]::after,
+    button[aria-label="Open sidebar"]::after {
       content: "☰" !important;
       font-size: 1.35rem !important;
       font-weight: 800 !important;
       line-height: 1 !important;
-      color: var(--text-primary) !important;
+      color: var(--text-primary, #172033) !important;
     }
     [data-testid="stExpandSidebarButton"] button:hover,
     [data-testid="stSidebarCollapsedControl"] button:hover,
-    [data-testid="collapsedControl"] button:hover {
-      border-color: var(--brand-primary) !important;
-      background: var(--bg-panel-hover) !important;
+    [data-testid="collapsedControl"] button:hover,
+    button[aria-label="Expand sidebar"]:hover,
+    button[aria-label="Open sidebar"]:hover {
+      border-color: var(--brand-primary, #6366f1) !important;
+      background: var(--bg-panel-hover, #eef2ff) !important;
     }
 
     /* Keep the close control equally easy to hit on touch devices. */
@@ -261,7 +273,9 @@ st.markdown(
       const expandSelectors = [
         '[data-testid="stExpandSidebarButton"] button',
         '[data-testid="stSidebarCollapsedControl"] button',
-        '[data-testid="collapsedControl"] button'
+        '[data-testid="collapsedControl"] button',
+        'button[aria-label="Expand sidebar"]',
+        'button[aria-label="Open sidebar"]'
       ];
       for (const selector of expandSelectors) {
         const expandBtn = document.querySelector(selector);
@@ -383,7 +397,8 @@ if not st.session_state.get("auth_token") and not st.session_state.get("guest_mo
         [data-testid="collapsedControl"],
         [data-testid="stToolbar"],
         button[aria-label="Collapse sidebar"],
-        button[aria-label="Expand sidebar"] {
+        button[aria-label="Expand sidebar"],
+        button[aria-label="Open sidebar"] {
           display: none !important;
           visibility: hidden !important;
         }
