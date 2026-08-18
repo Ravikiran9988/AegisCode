@@ -105,12 +105,29 @@ __all__ = [
     "_duration_str",
 ]
 
+# Authentication/guest entry can request a one-time sidebar reset. Streamlit
+# normally remembers the user's collapsed state, so use a two-step transition
+# to guarantee the sidebar is expanded after entering the workspace without
+# forcing it open again after the user manually collapses it.
+_sidebar_transition = st.session_state.get("sidebar_open_transition")
+if _sidebar_transition == "collapse_then_expand":
+    st.session_state["sidebar_open_transition"] = "expand"
+    _initial_sidebar_state = "collapsed"
+elif _sidebar_transition == "expand":
+    st.session_state.pop("sidebar_open_transition", None)
+    _initial_sidebar_state = "expanded"
+else:
+    _initial_sidebar_state = "expanded"
+
 st.set_page_config(
     page_title="AegisCode — Autonomous Engineering Platform",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state=_initial_sidebar_state,
 )
+
+if _sidebar_transition == "collapse_then_expand":
+    st.rerun()
 
 if "theme_mode" not in st.session_state:
     st.session_state["theme_mode"] = "light"
@@ -122,14 +139,136 @@ if _CSS_PATH.exists():
     with open(_CSS_PATH, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
+# UX overrides kept here so the public landing and native Streamlit controls
+# remain readable even when the base theme changes between light/dark modes.
+st.markdown(
+    """
+    <style>
+    /* Landing hero: compact, readable and visually balanced. */
+    .aegis-hero {
+      padding-top: 0 !important;
+      padding-bottom: 8px !important;
+      margin-top: -34px !important;
+    }
+    .aegis-hero-title {
+      background: none !important;
+      color: var(--text-primary) !important;
+      -webkit-text-fill-color: var(--text-primary) !important;
+      text-shadow: none !important;
+    }
+    .aegis-hero-subtitle {
+      color: var(--text-secondary) !important;
+    }
+
+    /* Reduce excessive vertical whitespace around application pages. */
+    section[data-testid="stMain"] > div[data-testid="stMainBlockContainer"] {
+      padding-top: 0.35rem !important;
+    }
+    .aegis-topbar {
+      margin-bottom: 12px !important;
+    }
+    .aegis-page-header {
+      margin-top: 0 !important;
+      margin-bottom: 18px !important;
+    }
+
+    /* Obvious, accessible sidebar open control across Streamlit DOM versions. */
+    [data-testid="stExpandSidebarButton"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+      z-index: 999990 !important;
+    }
+    [data-testid="stExpandSidebarButton"] button,
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button {
+      width: 44px !important;
+      height: 44px !important;
+      min-width: 44px !important;
+      min-height: 44px !important;
+      border-radius: 10px !important;
+      background: var(--bg-panel-elevated) !important;
+      border: 1px solid var(--border-muted) !important;
+      color: var(--text-primary) !important;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16) !important;
+    }
+    [data-testid="stExpandSidebarButton"] button svg,
+    [data-testid="stSidebarCollapsedControl"] button svg,
+    [data-testid="collapsedControl"] button svg {
+      display: none !important;
+    }
+    [data-testid="stExpandSidebarButton"] button::after,
+    [data-testid="stSidebarCollapsedControl"] button::after,
+    [data-testid="collapsedControl"] button::after {
+      content: "☰" !important;
+      font-size: 1.35rem !important;
+      font-weight: 800 !important;
+      line-height: 1 !important;
+      color: var(--text-primary) !important;
+    }
+    [data-testid="stExpandSidebarButton"] button:hover,
+    [data-testid="stSidebarCollapsedControl"] button:hover,
+    [data-testid="collapsedControl"] button:hover {
+      border-color: var(--brand-primary) !important;
+      background: var(--bg-panel-hover) !important;
+    }
+
+    /* Keep the close control equally easy to hit on touch devices. */
+    [data-testid="stSidebarCollapseButton"] button {
+      width: 44px !important;
+      height: 44px !important;
+      min-width: 44px !important;
+      min-height: 44px !important;
+      border-radius: 10px !important;
+    }
+
+    @media (max-width: 768px) {
+      .aegis-hero {
+        padding: 0 8px 6px 8px !important;
+        margin-top: -18px !important;
+      }
+      .aegis-hero-title {
+        font-size: clamp(1.85rem, 8vw, 2.35rem) !important;
+        line-height: 1.08 !important;
+        margin-bottom: 8px !important;
+      }
+      .aegis-hero-subtitle {
+        font-size: 0.92rem !important;
+        line-height: 1.42 !important;
+        margin-bottom: 10px !important;
+      }
+      .aegis-hero-badge {
+        margin-bottom: 7px !important;
+      }
+      .aegis-topbar {
+        margin-bottom: 8px !important;
+      }
+      .aegis-page-header {
+        margin-bottom: 14px !important;
+      }
+      .topbar-pill {
+        white-space: nowrap;
+      }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.markdown(
     """
     <script>
     (function updateNavAccessibility() {
-      const expandBtn = document.querySelector('[data-testid="stExpandSidebarButton"] button');
-      if (expandBtn) {
-        expandBtn.setAttribute('title', 'Open navigation');
-        expandBtn.setAttribute('aria-label', 'Open navigation');
+      const expandSelectors = [
+        '[data-testid="stExpandSidebarButton"] button',
+        '[data-testid="stSidebarCollapsedControl"] button',
+        '[data-testid="collapsedControl"] button'
+      ];
+      for (const selector of expandSelectors) {
+        const expandBtn = document.querySelector(selector);
+        if (expandBtn) {
+          expandBtn.setAttribute('title', 'Open navigation');
+          expandBtn.setAttribute('aria-label', 'Open navigation');
+        }
       }
       const collapseBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
       if (collapseBtn) {
@@ -220,6 +359,15 @@ try:
 except ImportError:
     pass
 
+# Detect a fresh workspace entry (real account or guest) and request a one-time
+# sidebar expansion. Reset the marker whenever the user returns to public auth.
+if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
+    st.session_state["workspace_entry_initialized"] = False
+elif not st.session_state.get("workspace_entry_initialized", False):
+    st.session_state["workspace_entry_initialized"] = True
+    st.session_state["sidebar_open_transition"] = "collapse_then_expand"
+    st.rerun()
+
 # Unauthenticated & Non-Guest Entry Flow Router
 if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
     st.markdown(
@@ -231,6 +379,8 @@ if not st.session_state.get("auth_token") and not st.session_state.get("guest_mo
         [data-testid="stSidebarHeader"],
         [data-testid="stSidebarCollapseButton"],
         [data-testid="stExpandSidebarButton"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="collapsedControl"],
         [data-testid="stToolbar"],
         button[aria-label="Collapse sidebar"],
         button[aria-label="Expand sidebar"] {
