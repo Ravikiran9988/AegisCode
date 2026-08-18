@@ -14,7 +14,7 @@ from backend.core.logging import get_logger
 from backend.llm.base import BaseLLMProvider
 from backend.llm.mock import MockLLMProvider
 from backend.llm.ollama import OllamaLLMProvider
-from backend.llm.openai import OpenAICompatibleLLMProvider
+from backend.llm.openai_strict import StrictGroqLLMProvider
 
 logger = get_logger(__name__)
 
@@ -24,50 +24,38 @@ def get_llm_provider(
     provider_type: str | None = None,
     override_instance: BaseLLMProvider | None = None,
 ) -> BaseLLMProvider:
-    """
-    Factory function returning the configured LLM provider instance.
-
-    Parameters
-    ----------
-    provider_name / provider_type:
-        Override configured provider ('ollama', 'openai_compatible', 'mock', etc.)
-    override_instance:
-        Directly supply a provider instance (useful in unit tests).
-    """
+    """Return the configured LLM provider instance."""
     if override_instance:
         return override_instance
 
     pname = provider_name or provider_type or settings.llm_provider
-    name = (pname).lower()
+    name = pname.lower()
 
     if name == "mock":
         logger.info("Using Mock LLM Provider")
         return MockLLMProvider()
-    elif name == "ollama":
+    if name == "ollama":
         logger.info(
             "Using Ollama LLM Provider (url=%s, model=%s)",
-            settings.ollama_base_url, settings.ollama_model,
+            settings.ollama_base_url,
+            settings.ollama_model,
         )
         return OllamaLLMProvider()
-    elif name in ("openai", "openai_compatible", "hosted"):
+    if name in ("openai", "openai_compatible", "hosted"):
         logger.info(
-            "Using OpenAICompatibleLLMProvider (url=%s, model=%s)",
-            settings.openai_base_url, settings.openai_model,
+            "Using StrictGroqLLMProvider (url=%s, model=%s)",
+            settings.openai_base_url,
+            settings.openai_model,
         )
-        return OpenAICompatibleLLMProvider()
-    else:
-        raise ValueError(
-            f"Unsupported LLM provider {name!r}. Production AegisCode requires "
-            f"'openai_compatible' with Groq model 'openai/gpt-oss-120b'."
-        )
+        return StrictGroqLLMProvider()
+    raise ValueError(
+        f"Unsupported LLM provider {name!r}. Production AegisCode requires "
+        f"'openai_compatible' with Groq model 'openai/gpt-oss-120b'."
+    )
 
 
 def check_llm_health(provider_name: str | None = None) -> dict[str, str | bool]:
-    """
-    Check availability of the configured LLM provider.
-
-    Returns structured status dictionary.
-    """
+    """Check availability of the configured LLM provider."""
     provider = get_llm_provider(provider_name)
     available, msg = provider.is_available()
     return {
