@@ -254,7 +254,7 @@ def render_public_landing() -> None:
 
         st.markdown(
             "<div style='text-align: center; margin-top: 8px; font-size: 0.8rem; color: var(--text-muted);'>"
-            "Instant guest access available &bull; No credit card required"
+            "Instant guest access &bull; No signup required"
             "</div>",
             unsafe_allow_html=True,
         )
