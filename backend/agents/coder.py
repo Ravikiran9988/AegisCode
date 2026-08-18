@@ -25,7 +25,7 @@ from backend.core.logging import get_logger
 from backend.database.models import Event
 from backend.execution.workspace import WorkspaceManager
 from backend.llm.base import BaseLLMProvider
-from backend.tools.filesystem import _clean_patch, apply_patch, write_file
+from backend.tools.filesystem import _clean_patch, apply_patch, read_file, write_file
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
@@ -56,7 +56,6 @@ class CoderAgent:
             run_id, workspace.workspace_id, plan.relevant_files,
         )
 
-        # Step 1: Build context & generate CodeChange proposal from LLM
         context = build_coder_context(
             workspace=workspace,
             architecture_summary=plan.summary,
@@ -76,7 +75,6 @@ class CoderAgent:
             logger.error("CoderAgent LLM error: %s", exc)
             raise
 
-        # If no change is proposed, finish early
         if change.change_type == "none" or not change.file_path:
             logger.info("CoderAgent proposed no changes.")
             _emit_agent_event(
@@ -85,7 +83,6 @@ class CoderAgent:
             )
             return change
 
-        # Step 2: Security Policy Check BEFORE applying tool call
         try:
             check_file_modification_policy(
                 relative_path=change.file_path,
@@ -99,7 +96,6 @@ class CoderAgent:
             logger.warning("CoderAgent security policy violation blocked: %s", exc)
             raise
 
-        # Step 3: Execute tool modification
         logger.info(
             "[PATCH START] run_id=%s file=%s type=%s",
             run_id, change.file_path, change.change_type,
@@ -124,8 +120,72 @@ class CoderAgent:
                 {"tool": "apply_patch", "path": change.file_path}
             )
             patch_res = apply_patch(workspace, change.file_path, change.patch)
+
+            # GPT-OSS/Groq can occasionally return a patch-shaped response without
+            # valid unified-diff hunks. Give the Coder one deterministic recovery
+            # opportunity: re-read the exact target file and request a complete
+            # replacement. This prevents a malformed patch from consuming the
+            # whole repair iteration and ending in repeated_failure.
+            if not patch_res.success and "No hunks found in patch" in (patch_res.error or ""):
+                source_res = read_file(workspace, change.file_path)
+                if source_res.success and source_res.content:
+                    recovery_prompt = f"""
+The previous patch for `{change.file_path}` could not be applied because it contained
+no valid unified-diff hunk headers.
+
+Return a NEW CodeChange for the same file using change_type=`write`.
+The `patch` field MUST contain the complete corrected file contents, not a diff,
+not markdown, and not an explanation.
+Do not modify tests.
+
+[CURRENT FILE]
+<untrusted_source_code>
+{source_res.content}
+</untrusted_source_code>
+
+[ORIGINAL REPAIR EXPLANATION]
+{change.explanation}
+
+[ROOT CAUSE]
+{change.root_cause}
+
+[PATCH ERROR]
+{patch_res.error}
+
+Produce only the CodeChange object required by the schema.
+""".strip()
+                    try:
+                        recovered = self.llm.generate_structured(
+                            schema=CodeChange,
+                            prompt=recovery_prompt,
+                            system_prompt=SYSTEM_PROMPT,
+                        )
+                        if (
+                            recovered.file_path == change.file_path
+                            and recovered.change_type == "write"
+                            and recovered.patch.strip()
+                        ):
+                            write_res = write_file(
+                                workspace, recovered.file_path, recovered.patch
+                            )
+                            if write_res.success:
+                                logger.info(
+                                    "[PATCH RECOVERY] run_id=%s recovered malformed patch by writing %s",
+                                    run_id, recovered.file_path,
+                                )
+                                change = recovered
+                                patch_res = patch_res.model_copy(
+                                    update={"success": True, "error": None}
+                                )
+                    except Exception as recovery_exc:
+                        logger.warning(
+                            "[PATCH RECOVERY FAILED] run_id=%s file=%s: %s",
+                            run_id, change.file_path, recovery_exc,
+                        )
+
             if not patch_res.success:
-                # Robust fallback: if patch has no hunks but is valid complete Python code
+                # Last local fallback: if the patch text itself is complete valid
+                # Python source, safely treat it as a full-file write.
                 clean_p = _clean_patch(change.patch)
                 if "No hunks found in patch" in (patch_res.error or ""):
                     try:
