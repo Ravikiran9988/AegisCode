@@ -53,16 +53,29 @@ def check_backend_with_retry(
     backend_url: str,
     retry_delays: list[int] = _COLD_START_RETRY_DELAYS,
 ) -> tuple[bool, dict, str]:
-    """Check backend health with automatic retry delays to accommodate cold starts."""
+    """Check backend health only when the user is entering the workspace.
+
+    Public landing/auth screens should render immediately and must not block on a
+    Render cold start. Authenticated and guest workspace sessions still perform the
+    full health check, including the existing cold-start retries, before rendering
+    workspace controls that depend on the backend.
+    """
+    # Defer the expensive/cold-start-sensitive request while the user is still on
+    # the public landing/auth flow. The app calls this function before its router,
+    # so this guard removes the blocking wait from the initial page render.
+    if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
+        return False, {}, "Backend check deferred until workspace entry"
+
     last_err = ""
-    for idx, delay in enumerate(retry_delays):
-        if delay > 0:
-            time.sleep(delay)
-        timeout = 10 if idx == 0 else 15
-        online, data, err_msg = _check_backend_once(backend_url, timeout=timeout)
-        if online:
-            return True, data, ""
-        last_err = err_msg
+    with st.spinner("Connecting to AegisCode backend…"):
+        for idx, delay in enumerate(retry_delays):
+            if delay > 0:
+                time.sleep(delay)
+            timeout = 10 if idx == 0 else 15
+            online, data, err_msg = _check_backend_once(backend_url, timeout=timeout)
+            if online:
+                return True, data, ""
+            last_err = err_msg
     return False, {}, last_err
 
 
