@@ -58,7 +58,6 @@ class StrictGroqLLMProvider(OpenAICompatibleLLMProvider):
                 },
             },
             reasoning_format="hidden",
-            reasoning_effort="low",
         )
         try:
             return schema.model_validate(json.loads(raw_text.strip()))
