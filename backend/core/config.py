@@ -85,9 +85,10 @@ class Settings(BaseSettings):
 
     # LLM context & output bounds
     max_agent_iterations: int = 5
-    # Structured JSON answers are compact; 1024 is sufficient and saves TPM budget
-    max_llm_output_tokens: int = 1024
-    # Smaller context = fewer input tokens per Groq API call (8000 TPM free tier)
+    # Structured JSON responses include model reasoning plus the final object.
+    # 1024 was too small for GPT-OSS repair responses and could truncate JSON.
+    max_llm_output_tokens: int = 6144
+    # Smaller context = fewer input tokens per Groq API call.
     max_file_context_size: int = 6000
     max_files_per_agent: int = 5
     llm_timeout_seconds: int = 60
@@ -168,4 +169,3 @@ class Settings(BaseSettings):
 
 # Module-level singleton — import this everywhere
 settings = Settings()
-
