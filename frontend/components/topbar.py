@@ -1,6 +1,6 @@
 """
 Top Bar & Header Component for AegisCode.
-Enterprise SaaS navigation header with live breadcrumbs, operational status, and active run badge.
+Enterprise SaaS navigation header with live breadcrumbs, operational status, active run badge, and user/guest indicators.
 """
 
 from __future__ import annotations
@@ -15,12 +15,7 @@ def render_topbar(
     backend_online: bool = True,
     active_run_id: str | None = None,
 ) -> None:
-    """Render a professional top navigation bar with live breadcrumbs and status.
-
-    Use Streamlit's native ``st.html`` renderer instead of ``st.markdown`` so the
-    header is always treated as HTML rather than accidentally being rendered as a
-    Markdown code block when whitespace or empty optional fragments are present.
-    """
+    """Render a professional top navigation bar with live breadcrumbs and status."""
     status_class = "online" if backend_online else "offline"
     status_text = "Operational" if backend_online else "Backend Offline"
 
@@ -46,12 +41,18 @@ def render_topbar(
         current_user.get("name")
         or current_user.get("full_name")
     ):
-        # Full name is the canonical account field; nickname is intentionally not used.
         raw_name = current_user.get("name") or current_user.get("full_name") or "User"
         user_name_short = html.escape(str(raw_name).split()[0])
         user_html = (
             "<div class='topbar-pill user-pill'>"
             f"<span>👤</span> <span>{user_name_short}</span>"
+            "</div>"
+        )
+    elif st.session_state.get("guest_mode"):
+        guest_name_short = html.escape(str(st.session_state.get("guest_name", "Guest")).split()[0])
+        user_html = (
+            "<div class='topbar-pill user-pill' style='border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;'>"
+            f"<span>👤</span> <span>{guest_name_short} (Guest)</span>"
             "</div>"
         )
 
@@ -83,7 +84,4 @@ def render_topbar(
 </header>
 """
 
-    # st.html is purpose-built for HTML fragments and avoids Markdown parsing
-    # entirely. Keep this component self-contained and compatible with the
-    # existing theme.css selectors.
     st.html(header_html)

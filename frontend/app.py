@@ -8,6 +8,7 @@ Top-tier production dashboard integrating:
 - Comprehensive multi-agent observability
 - Real-time telemetry, authoritative Pytest output and syntax-highlighted diffs
 - Verified project ZIP streaming
+- Unauthenticated Public Landing & Personalised Guest Entry Flow
 """
 
 from __future__ import annotations
@@ -36,6 +37,11 @@ try:
     from frontend.components.footer import render_footer
     from frontend.components.health import render_system_health
     from frontend.components.history import render_history
+    from frontend.components.landing import (
+        render_auth_choice,
+        render_guest_name_input,
+        render_public_landing,
+    )
     from frontend.components.live_repair import render_live_repair
     from frontend.components.settings import render_settings
     from frontend.components.sidebar import render_sidebar
@@ -64,6 +70,11 @@ except ImportError:
     from components.footer import render_footer
     from components.health import render_system_health
     from components.history import render_history
+    from components.landing import (
+        render_auth_choice,
+        render_guest_name_input,
+        render_public_landing,
+    )
     from components.live_repair import render_live_repair
     from components.settings import render_settings
     from components.sidebar import render_sidebar
@@ -157,6 +168,12 @@ if "backend_error" not in st.session_state:
     st.session_state["backend_error"] = ""
 if "nav_view" not in st.session_state:
     st.session_state["nav_view"] = "◉ Overview"
+if "guest_mode" not in st.session_state:
+    st.session_state["guest_mode"] = False
+if "guest_name" not in st.session_state:
+    st.session_state["guest_name"] = ""
+if "auth_flow_step" not in st.session_state:
+    st.session_state["auth_flow_step"] = "public_dashboard"
 
 base_backend_url = _normalize_backend_url(DEFAULT_BACKEND)
 
@@ -185,27 +202,18 @@ try:
 except ImportError:
     pass
 
-if not st.session_state.get("auth_token"):
+# Unauthenticated & Non-Guest Entry Flow Router
+if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
     st.markdown(
         """
         <style>
-        /* Hide sidebar container and all sidebar UI when unauthenticated. */
+        /* Hide sidebar container and all sidebar UI when unauthenticated & not guest. */
         [data-testid="stSidebar"],
         [data-testid="stSidebarContent"],
         [data-testid="stSidebarHeader"],
-        [data-testid="stSidebarCollapseButton"] {
-          display: none !important;
-          visibility: hidden !important;
-        }
-
-        /* Hide toolbar-level sidebar expand control shown in newer Streamlit builds. */
+        [data-testid="stSidebarCollapseButton"],
         [data-testid="stExpandSidebarButton"],
-        [data-testid="stToolbar"] {
-          display: none !important;
-          visibility: hidden !important;
-        }
-
-        /* Defensive fallbacks for variant implementations. */
+        [data-testid="stToolbar"],
         button[aria-label="Collapse sidebar"],
         button[aria-label="Expand sidebar"] {
           display: none !important;
@@ -215,7 +223,17 @@ if not st.session_state.get("auth_token"):
         """,
         unsafe_allow_html=True,
     )
-    render_auth(api_url=f"{base_backend_url}/api")
+
+    flow_step = st.session_state.get("auth_flow_step", "public_dashboard")
+    api_url = f"{base_backend_url}/api"
+
+    if flow_step == "auth_choice":
+        render_auth_choice(api_url=api_url)
+    elif flow_step == "guest_name_input":
+        render_guest_name_input()
+    else:
+        render_public_landing()
+
     render_footer()
     st.stop()
 
