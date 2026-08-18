@@ -9,18 +9,16 @@ from typing import Any, TypeVar
 from pydantic import BaseModel
 
 from backend.core.config import settings
+from backend.core.logging import get_logger
 from backend.llm.base import LLMProviderError
 from backend.llm.openai import OpenAICompatibleLLMProvider
 
+logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
 class StrictGroqLLMProvider(OpenAICompatibleLLMProvider):
     """OpenAI-compatible provider using Groq strict JSON Schema mode."""
-
-    def generate(self, *args, **kwargs):
-        """Use Groq's current max_completion_tokens parameter."""
-        return super().generate(*args, **kwargs)
 
     def _call_with_retry(self, url, headers, payload):
         """Translate deprecated max_tokens to Groq's current parameter."""
@@ -65,6 +63,7 @@ class StrictGroqLLMProvider(OpenAICompatibleLLMProvider):
         try:
             return schema.model_validate(json.loads(raw_text.strip()))
         except Exception as exc:
+            logger.error("Strict Groq structured response validation failed: %s", exc)
             raise LLMProviderError(f"Invalid JSON returned by LLM: {exc}") from exc
 
 
@@ -78,6 +77,7 @@ def _strict_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
     def visit(node: Any) -> None:
         if isinstance(node, dict):
+            node.pop("default", None)
             if node.get("type") == "object" and "properties" in node:
                 node["required"] = list(node["properties"].keys())
                 node["additionalProperties"] = False
