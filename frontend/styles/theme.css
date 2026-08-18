@@ -849,3 +849,108 @@ code, pre, .stCodeBlock, [class*="stCode"], kbd {
 .aegis-auth-footer a:hover {
   text-decoration: underline;
 }
+
+/* ── Sidebar Toggle & Navigation Button Improvements ───────────────────────── */
+[data-testid="stExpandSidebarButton"] {
+  position: fixed !important;
+  top: 12px !important;
+  left: 12px !important;
+  z-index: 999990 !important;
+}
+
+[data-testid="stExpandSidebarButton"] button {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 10px !important;
+  background: var(--bg-panel-elevated) !important;
+  border: 1px solid var(--border-muted) !important;
+  color: var(--text-primary) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+  cursor: pointer !important;
+  transition: all 180ms ease !important;
+  padding: 0 !important;
+}
+
+[data-testid="stExpandSidebarButton"] button:hover {
+  background: var(--bg-panel-hover) !important;
+  border-color: var(--brand-primary) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.4) !important;
+}
+
+[data-testid="stExpandSidebarButton"] button:active {
+  transform: scale(0.96) !important;
+}
+
+[data-testid="stExpandSidebarButton"] button svg {
+  display: none !important;
+}
+
+[data-testid="stExpandSidebarButton"] button::after {
+  content: "☰" !important;
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: var(--text-primary) !important;
+}
+
+[data-testid="stExpandSidebarButton"] button:hover::after {
+  color: #ffffff !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-secondary) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 150ms ease !important;
+  cursor: pointer !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button:hover {
+  background: rgba(99, 102, 241, 0.15) !important;
+  border-color: var(--brand-primary) !important;
+  color: #ffffff !important;
+}
+
+/* ── Responsive Viewport Breakpoint Adjustments ───────────────────────────── */
+@media (max-width: 768px) {
+  .aegis-topbar {
+    padding-left: 56px !important;
+    gap: 8px;
+  }
+  .aegis-breadcrumbs {
+    font-size: 0.76rem;
+  }
+  .topbar-pill {
+    padding: 3px 8px;
+    font-size: 0.72rem;
+  }
+  .main .block-container {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .aegis-topbar-brand-mark {
+    display: none !important;
+  }
+  .aegis-topbar-right {
+    gap: 4px;
+  }
+}
+

@@ -148,7 +148,11 @@ def render_sidebar(
                 """,
                 unsafe_allow_html=True,
             )
-            if st.button("Sign In / Create Account", key="btn_sidebar_guest_auth", use_container_width=True):
+            if st.button(
+                "Sign In / Create Account",
+                key="btn_sidebar_guest_auth",
+                use_container_width=True,
+            ):
                 st.session_state["guest_mode"] = False
                 st.session_state["guest_name"] = ""
                 st.session_state["auth_flow_step"] = "auth_choice"
