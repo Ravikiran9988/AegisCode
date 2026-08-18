@@ -10,6 +10,7 @@ from __future__ import annotations
 from sqlalchemy import inspect, text
 
 from backend.core.logging import get_logger
+from backend.database.guest import Guest  # noqa: F401 - registers the ORM table
 from backend.database.models import Base
 from backend.database.session import engine
 
