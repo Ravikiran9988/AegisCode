@@ -31,13 +31,18 @@ def render_history(api_url: str) -> None:
                 Search, inspect, and analyze past autonomous self-healing execution runs.
               </p>
             </div>
-            <div style="max-width: 520px; margin: 28px auto 16px auto; text-align: center; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 32px 24px;">
+            <div style="max-width: 520px; margin: 28px auto 16px auto; text-align: center; "
+            "background: var(--bg-panel); border: 1px solid var(--border-subtle); "
+            "border-radius: var(--radius-lg); padding: 32px 24px;">
               <div style="font-size: 2.2rem; margin-bottom: 12px;">🔒</div>
-              <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">
+              <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); "
+              "margin-bottom: 8px;">
                 Sign in to save and access your repair history.
               </h2>
-              <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5;">
-                Guest sessions are temporary and do not store persistent execution history. Sign in or create a free account to automatically save all future repairs.
+              <p style="font-size: 0.88rem; color: var(--text-secondary); "
+              "margin-bottom: 24px; line-height: 1.5;">
+                Guest sessions are temporary and do not store persistent execution history. "
+                "Sign in or create a free account to automatically save all future repairs.
               </p>
             </div>
             """,

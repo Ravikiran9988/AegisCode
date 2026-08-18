@@ -3,7 +3,8 @@ Public Landing Page & Unauthenticated Auth Flow Components for AegisCode.
 
 Provides:
 - Public AegisCode landing page explaining features and multi-agent workflow
-- Clean auth choice modal ("Start with AegisCode": Sign In / Create Account / Continue as Guest)
+- Compact, balanced hero section fitting within the initial viewport
+- Clean auth choice modal ("Start with AegisCode": Sign In / Create Account / Guest)
 - Guest name prompt ("What should we call you?")
 """
 
@@ -24,8 +25,8 @@ def render_public_landing() -> None:
         <style>
         .aegis-hero {
           text-align: center;
-          padding: 38px 20px 28px 20px;
-          max-width: 900px;
+          padding: 18px 16px 12px 16px;
+          max-width: 860px;
           margin: 0 auto;
         }
 
@@ -35,43 +36,45 @@ def render_public_landing() -> None:
           gap: 8px;
           background: rgba(99, 102, 241, 0.12);
           border: 1px solid rgba(99, 102, 241, 0.3);
-          padding: 6px 16px;
+          padding: 5px 14px;
           border-radius: 9999px;
-          font-size: 0.82rem;
+          font-size: 0.8rem;
           font-weight: 650;
-          color: var(--brand-primary);
-          margin-bottom: 20px;
+          color: #a5b4fc;
+          margin-bottom: 10px;
         }
 
         .aegis-hero-title {
-          font-size: 2.85rem;
+          font-size: 2.35rem;
           font-weight: 850;
           letter-spacing: -0.04em;
           line-height: 1.15;
-          margin-bottom: 16px;
-          color: var(--text-primary) !important;
+          margin-bottom: 10px;
+          background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 70%, #818cf8 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
 
         .aegis-hero-subtitle {
-          font-size: 1.12rem;
-          line-height: 1.6;
+          font-size: 1.02rem;
+          line-height: 1.5;
           color: var(--text-secondary);
-          max-width: 720px;
-          margin: 0 auto 28px auto;
+          max-width: 680px;
+          margin: 0 auto 16px auto;
         }
 
         .aegis-features-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-          gap: 18px;
-          margin: 36px 0;
+          gap: 16px;
+          margin: 24px 0 16px 0;
         }
 
         .aegis-feature-card {
           background: linear-gradient(145deg, var(--bg-panel), var(--bg-panel-elevated));
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-lg);
-          padding: 22px;
+          padding: 20px 18px;
           transition: transform 0.15s ease, border-color 0.15s ease;
         }
 
@@ -81,60 +84,60 @@ def render_public_landing() -> None:
         }
 
         .aegis-feature-icon {
-          font-size: 1.8rem;
-          margin-bottom: 12px;
+          font-size: 1.7rem;
+          margin-bottom: 10px;
           display: inline-block;
         }
 
         .aegis-feature-title {
-          font-size: 1.05rem;
+          font-size: 1.02rem;
           font-weight: 750;
           color: var(--text-primary);
           margin-bottom: 6px;
         }
 
         .aegis-feature-desc {
-          font-size: 0.86rem;
+          font-size: 0.85rem;
           color: var(--text-secondary);
-          line-height: 1.5;
+          line-height: 1.48;
         }
 
         .aegis-workflow-section {
           background: var(--bg-panel);
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-lg);
-          padding: 30px 24px;
-          margin: 36px 0;
+          padding: 24px 20px;
+          margin: 24px 0;
         }
 
         .aegis-workflow-header {
           text-align: center;
-          margin-bottom: 26px;
+          margin-bottom: 20px;
         }
 
         .aegis-workflow-header h2 {
-          font-size: 1.6rem;
+          font-size: 1.45rem;
           font-weight: 800;
           color: var(--text-primary);
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
 
         .aegis-workflow-header p {
-          font-size: 0.9rem;
+          font-size: 0.88rem;
           color: var(--text-secondary);
         }
 
         .aegis-workflow-steps {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 16px;
+          grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          gap: 14px;
         }
 
         .aegis-workflow-step {
           background: var(--bg-panel-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-md);
-          padding: 18px 16px;
+          padding: 16px 14px;
           text-align: center;
           position: relative;
         }
@@ -143,76 +146,53 @@ def render_public_landing() -> None:
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
+          width: 26px;
+          height: 26px;
           border-radius: 50%;
           background: var(--brand-primary);
           color: #fff;
-          font-size: 0.78rem;
+          font-size: 0.76rem;
           font-weight: 700;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
 
         .aegis-step-title {
           font-weight: 700;
-          font-size: 0.95rem;
+          font-size: 0.92rem;
           color: var(--text-primary);
           margin-bottom: 4px;
         }
 
         .aegis-step-desc {
-          font-size: 0.8rem;
+          font-size: 0.78rem;
           color: var(--text-secondary);
           line-height: 1.4;
         }
 
-        .aegis-download-hero-text h3 {
-          color: #ffffff !important;
-        }
-
-        .aegis-download-hero-text p {
-          color: #c7d2fe !important;
-        }
-
         @media (max-width: 768px) {
           .aegis-hero {
-            padding: 28px 12px 22px 12px;
+            padding: 12px 10px 8px 10px;
           }
-
-          .aegis-hero-badge {
-            font-size: 0.74rem;
-            padding: 5px 12px;
-          }
-
           .aegis-hero-title {
-            font-size: 2rem;
-            line-height: 1.18;
+            font-size: 1.75rem;
+            margin-bottom: 8px;
           }
-
           .aegis-hero-subtitle {
-            font-size: 0.95rem;
-            line-height: 1.5;
-            margin-bottom: 22px;
+            font-size: 0.92rem;
+            margin-bottom: 12px;
           }
-
-          .aegis-workflow-section {
-            padding: 22px 14px;
-            margin: 28px 0;
+          .aegis-hero-badge {
+            font-size: 0.76rem;
+            padding: 4px 10px;
+            margin-bottom: 8px;
           }
-
-          .aegis-workflow-steps,
           .aegis-features-grid {
             grid-template-columns: 1fr;
             gap: 12px;
           }
-
-          .aegis-workflow-step,
-          .aegis-feature-card {
-            padding: 18px;
-          }
-
-          .aegis-download-hero {
-            padding: 20px 16px;
+          .aegis-workflow-steps {
+            grid-template-columns: 1fr;
+            gap: 10px;
           }
         }
         </style>
@@ -231,8 +211,9 @@ def render_public_landing() -> None:
             Autonomous Self-Healing Software Platform
           </h1>
           <p class="aegis-hero-subtitle">
-            Upload buggy Python codebases, let specialized AI agents diagnose failing test suites,
-            synthesize clean code patches, verify via Pytest, and deliver production-ready diffs automatically.
+            Upload buggy Python codebases, let specialized AI agents diagnose failing
+            test suites, synthesize clean code patches, verify via Pytest, and deliver
+            production-ready diffs automatically.
           </p>
         </div>
         """,
@@ -253,13 +234,14 @@ def render_public_landing() -> None:
             st.rerun()
 
         st.markdown(
-            "<div style='text-align: center; margin-top: 8px; font-size: 0.8rem; color: var(--text-muted);'>"
-            "Instant guest access available &bull; No credit card required"
+            "<div style='text-align: center; margin-top: 6px; font-size: 0.8rem; "
+            "color: var(--text-muted);'>"
+            "Instant guest access available &bull; No account required"
             "</div>",
             unsafe_allow_html=True,
         )
 
-    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     # Multi-Agent Workflow Pipeline Section
     st.markdown(
@@ -267,14 +249,15 @@ def render_public_landing() -> None:
         <div class="aegis-workflow-section">
           <div class="aegis-workflow-header">
             <h2>Autonomous Repair Pipeline</h2>
-            <p>Our four-stage agentic workflow powered by LangGraph & Groq open-source LLMs</p>
+            <p>Our four-stage agentic workflow powered by LangGraph & LLMs</p>
           </div>
           <div class="aegis-workflow-steps">
             <div class="aegis-workflow-step">
               <div class="aegis-step-num">1</div>
               <div class="aegis-step-title">🏛️ Architect Agent</div>
               <div class="aegis-step-desc">
-                Analyzes repository context & Pytest failure tracebacks to pinpoint bug root cause.
+                Analyzes repository context & Pytest failure tracebacks to pinpoint
+                bug root cause.
               </div>
             </div>
             <div class="aegis-workflow-step">
@@ -307,8 +290,8 @@ def render_public_landing() -> None:
     # Key Features Grid
     st.markdown(
         """
-        <div style="text-align: center; margin: 32px 0 16px 0;">
-          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">
+        <div style="text-align: center; margin: 24px 0 12px 0;">
+          <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">
             Built for Modern Engineering Teams
           </h2>
         </div>
@@ -330,7 +313,7 @@ def render_public_landing() -> None:
             <div class="aegis-feature-icon">🏛️</div>
             <div class="aegis-feature-title">Multi-Agent Workflow</div>
             <div class="aegis-feature-desc">
-              Specialized Architect, Coder, and Reviewer agents collaborating via LangGraph stateful graph.
+              Specialized Architect, Coder, and Reviewer agents collaborating via LangGraph.
             </div>
           </div>
           <div class="aegis-feature-card">
@@ -344,21 +327,21 @@ def render_public_landing() -> None:
             <div class="aegis-feature-icon">🔀</div>
             <div class="aegis-feature-title">Synthesized Code Diffs</div>
             <div class="aegis-feature-desc">
-              Interactive GitHub-style diff viewer highlighting unified file modifications and line changes.
+              Interactive GitHub-style diff viewer highlighting unified file line modifications.
             </div>
           </div>
           <div class="aegis-feature-card">
             <div class="aegis-feature-icon">📊</div>
             <div class="aegis-feature-title">Agent Observability</div>
             <div class="aegis-feature-desc">
-              Real-time telemetry, agent reasoning logs, step execution trees, and iteration tracking.
+              Real-time telemetry, agent reasoning logs, step trees, and iteration tracking.
             </div>
           </div>
           <div class="aegis-feature-card">
             <div class="aegis-feature-icon">🛡️</div>
             <div class="aegis-feature-title">Security Controls</div>
             <div class="aegis-feature-desc">
-              Zip Slip path traversal prevention, sandboxed execution, and read-only test suite integrity guards.
+              Zip Slip path traversal prevention, sandboxed execution, and integrity guards.
             </div>
           </div>
         </div>
@@ -369,10 +352,10 @@ def render_public_landing() -> None:
     # Bottom Call To Action Banner
     st.markdown(
         """
-        <div class="aegis-download-hero" style="margin-top: 32px; text-align: center;">
+        <div class="aegis-download-hero" style="margin-top: 24px; text-align: center;">
           <div class="aegis-download-hero-text" style="width: 100%;">
             <h3>Ready to auto-heal your codebase?</h3>
-            <p>Upload a Python project ZIP and watch AegisCode diagnose and repair bugs in real time.</p>
+            <p>Upload a Python project ZIP and watch AegisCode diagnose and repair bugs.</p>
           </div>
         </div>
         """,
@@ -381,7 +364,13 @@ def render_public_landing() -> None:
 
     col_b1, col_b2, col_b3 = st.columns([1, 1.2, 1])
     with col_b2:
-        if st.button("🚀 Start Repair", key="landing_bottom_cta", use_container_width=True, type="primary"):
+        btn_bottom = st.button(
+            "🚀 Start Repair",
+            key="landing_bottom_cta",
+            use_container_width=True,
+            type="primary",
+        )
+        if btn_bottom:
             st.session_state["auth_flow_step"] = "auth_choice"
             st.rerun()
 
@@ -390,12 +379,13 @@ def render_auth_choice(api_url: str) -> None:
     """Render clean authentication choice card ('Start with AegisCode')."""
     st.markdown(
         """
-        <div style="max-width: 480px; margin: 30px auto 0 auto; text-align: center;">
-          <div style="font-size: 2.2rem; margin-bottom: 8px;">🛡️</div>
-          <h2 style="font-size: 1.65rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;">
+        <div style="max-width: 480px; margin: 20px auto 0 auto; text-align: center;">
+          <div style="font-size: 2.2rem; margin-bottom: 6px;">🛡️</div>
+          <h2 style="font-size: 1.6rem; font-weight: 800; "
+          "color: var(--text-primary); margin-bottom: 4px;">
             Start with AegisCode
           </h2>
-          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 20px;">
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">
             Sign in, create an account, or continue as a guest to begin your repair.
           </p>
         </div>
@@ -411,20 +401,30 @@ def render_auth_choice(api_url: str) -> None:
         )
 
         with tab_signin:
-            render_auth_tabs(api_url=api_url, active_tab="signin", target_nav="🚀 New Repair")
+            render_auth_tabs(
+                api_url=api_url,
+                active_tab="signin",
+                target_nav="🚀 New Repair",
+            )
 
         with tab_signup:
-            render_auth_tabs(api_url=api_url, active_tab="signup", target_nav="🚀 New Repair")
+            render_auth_tabs(
+                api_url=api_url,
+                active_tab="signup",
+                target_nav="🚀 New Repair",
+            )
 
         with tab_guest:
             st.markdown(
                 """
-                <div style="padding: 16px 8px 12px 8px; text-align: center;">
-                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">
+                <div style="padding: 14px 6px 10px 6px; text-align: center;">
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);"
+                  " margin-bottom: 6px;">
                     ⚡ Instant Guest Access
                   </div>
-                  <div style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.45;">
-                    No email or password needed. Try out full repair features immediately during your session.
+                  <div style="font-size: 0.84rem; color: var(--text-secondary); "
+                  "margin-bottom: 16px; line-height: 1.45;">
+                    No email or password needed. Try out full repair features immediately.
                   </div>
                 </div>
                 """,
@@ -439,8 +439,12 @@ def render_auth_choice(api_url: str) -> None:
                 st.session_state["auth_flow_step"] = "guest_name_input"
                 st.rerun()
 
-        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
-        if st.button("← Back to Public Dashboard", key="btn_back_to_dashboard", use_container_width=True):
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+        if st.button(
+            "← Back to Public Dashboard",
+            key="btn_back_to_dashboard",
+            use_container_width=True,
+        ):
             st.session_state["auth_flow_step"] = "public_dashboard"
             st.rerun()
 
@@ -449,12 +453,13 @@ def render_guest_name_input() -> None:
     """Render single prompt asking: 'What should we call you?'."""
     st.markdown(
         """
-        <div style="max-width: 440px; margin: 40px auto 0 auto; text-align: center;">
-          <div style="font-size: 2.2rem; margin-bottom: 8px;">👋</div>
-          <h2 style="font-size: 1.65rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;">
+        <div style="max-width: 440px; margin: 30px auto 0 auto; text-align: center;">
+          <div style="font-size: 2.2rem; margin-bottom: 6px;">👋</div>
+          <h2 style="font-size: 1.6rem; font-weight: 800; "
+          "color: var(--text-primary); margin-bottom: 4px;">
             What should we call you?
           </h2>
-          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 22px;">
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 18px;">
             Enter your preferred name to personalize your guest repair session.
           </p>
         </div>
@@ -489,7 +494,7 @@ def render_guest_name_input() -> None:
                 st.session_state["auth_flow_step"] = "public_dashboard"
                 st.rerun()
 
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         if st.button("← Back", key="btn_back_to_auth_choice", use_container_width=True):
             st.session_state["auth_flow_step"] = "auth_choice"
             st.rerun()

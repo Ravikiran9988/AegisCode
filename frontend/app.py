@@ -30,7 +30,6 @@ import streamlit as st  # noqa: E402
 
 try:
     from frontend.components.agents import render_agents_view
-    from frontend.components.auth import render_auth
     from frontend.components.code_diff import render_code_changes_view
     from frontend.components.dashboard import render_dashboard
     from frontend.components.docs import render_docs
@@ -63,7 +62,6 @@ try:
     )
 except ImportError:
     from components.agents import render_agents_view
-    from components.auth import render_auth
     from components.code_diff import render_code_changes_view
     from components.dashboard import render_dashboard
     from components.docs import render_docs
@@ -123,6 +121,26 @@ _CSS_PATH = Path(__file__).parent / "styles" / "theme.css"
 if _CSS_PATH.exists():
     with open(_CSS_PATH, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+st.markdown(
+    """
+    <script>
+    (function updateNavAccessibility() {
+      const expandBtn = document.querySelector('[data-testid="stExpandSidebarButton"] button');
+      if (expandBtn) {
+        expandBtn.setAttribute('title', 'Open navigation');
+        expandBtn.setAttribute('aria-label', 'Open navigation');
+      }
+      const collapseBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
+      if (collapseBtn) {
+        collapseBtn.setAttribute('title', 'Close navigation');
+        collapseBtn.setAttribute('aria-label', 'Close navigation');
+      }
+    })();
+    </script>
+    """,
+    unsafe_allow_html=True,
+)
 
 if st.session_state["theme_mode"] == "light":
     st.markdown(

@@ -1,6 +1,7 @@
 """
 Top Bar & Header Component for AegisCode.
-Enterprise SaaS navigation header with live breadcrumbs, operational status, active run badge, and user/guest indicators.
+Enterprise SaaS navigation header with live breadcrumbs, operational status, active run badge,
+and user/guest indicators.
 """
 
 from __future__ import annotations
@@ -49,9 +50,11 @@ def render_topbar(
             "</div>"
         )
     elif st.session_state.get("guest_mode"):
-        guest_name_short = html.escape(str(st.session_state.get("guest_name", "Guest")).split()[0])
+        raw_g_name = str(st.session_state.get("guest_name", "Guest")).split()[0]
+        guest_name_short = html.escape(raw_g_name)
         user_html = (
-            "<div class='topbar-pill user-pill' style='border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;'>"
+            "<div class='topbar-pill user-pill' "
+            "style='border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;'>"
             f"<span>👤</span> <span>{guest_name_short} (Guest)</span>"
             "</div>"
         )
