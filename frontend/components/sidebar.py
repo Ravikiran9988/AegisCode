@@ -5,7 +5,52 @@ Structured into Control Center, Engineering, and System navigation groups.
 
 from __future__ import annotations
 
+import json
+
 import streamlit as st
+
+
+def _restore_current_user(default_backend: str, backend_online: bool) -> dict | None:
+    """Restore the authenticated user before rendering workspace identity UI.
+
+    The auth token is persisted in a browser cookie, while ``current_user`` lives
+    in Streamlit session state. A fresh browser session can therefore have a valid
+    token but no user object yet. Prefer the backend's authoritative /auth/me
+    response and fall back to the cached user cookie when necessary.
+    """
+    current_user = st.session_state.get("current_user")
+    token = st.session_state.get("auth_token")
+    if current_user or not token:
+        return current_user
+
+    if backend_online:
+        try:
+            from frontend.utils.api_client import api_get_current_user
+        except ImportError:
+            from utils.api_client import api_get_current_user
+
+        restored_user = api_get_current_user(default_backend, token)
+        if isinstance(restored_user, dict) and restored_user:
+            st.session_state["current_user"] = restored_user
+            return restored_user
+
+    # Fallback for a valid session when the backend is temporarily unavailable.
+    try:
+        from streamlit_cookies_controller import CookieController
+
+        cookie_user = CookieController().get("aegis_user")
+        if cookie_user:
+            if isinstance(cookie_user, dict):
+                current_user = cookie_user
+            else:
+                current_user = json.loads(cookie_user)
+            if isinstance(current_user, dict):
+                st.session_state["current_user"] = current_user
+                return current_user
+    except (TypeError, ValueError, json.JSONDecodeError, Exception):
+        pass
+
+    return None
 
 
 def render_sidebar(
@@ -16,6 +61,9 @@ def render_sidebar(
 ) -> tuple[str, str]:
     """Render the left navigation sidebar and return the selected view and backend URL."""
     health_data = health_data or {}
+
+    # Restore identity before any sidebar/topbar workspace components consume it.
+    current_user = _restore_current_user(default_backend, backend_online)
 
     with st.sidebar:
         # Brand Header
@@ -93,7 +141,6 @@ def render_sidebar(
         backend_to_use = raw_backend if "raw_backend" in locals() else default_backend
 
         # User Account & Guest / Logout section
-        current_user = st.session_state.get("current_user")
         if current_user:
             u_name = (
                 current_user.get("nickname")
