@@ -1,0 +1,14 @@
+target-version = "py312"
+line-length = 100
+exclude = ["tests/fixtures"]
+
+[lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008", "UP017"]
+
+[lint.per-file-ignores]
+"frontend/app.py" = ["F401"]
+"frontend/components/history.py" = ["E501"]
+"frontend/components/landing.py" = ["E501"]
+"frontend/components/sidebar.py" = ["E501"]
+"frontend/components/topbar.py" = ["E501"]
