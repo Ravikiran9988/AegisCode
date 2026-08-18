@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 
 # Inject project root and frontend directories into sys.path before local imports.
@@ -105,12 +106,31 @@ __all__ = [
     "_duration_str",
 ]
 
+# Streamlit keeps the user's sidebar choice on the browser. On a fresh
+# workspace entry we intentionally perform a collapsed -> expanded transition
+# so the authenticated workspace opens with navigation visible even when the
+# user had previously collapsed it. A short pause lets the browser commit the
+# first state before the second rerun (the reliable Streamlit workaround).
+_sidebar_transition = st.session_state.get("sidebar_open_transition")
+if _sidebar_transition == "collapse_then_expand":
+    st.session_state["sidebar_open_transition"] = "expand"
+    _initial_sidebar_state = "collapsed"
+elif _sidebar_transition == "expand":
+    st.session_state.pop("sidebar_open_transition", None)
+    _initial_sidebar_state = "expanded"
+else:
+    _initial_sidebar_state = "expanded"
+
 st.set_page_config(
     page_title="AegisCode — Autonomous Engineering Platform",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state=_initial_sidebar_state,
 )
+
+if _sidebar_transition == "collapse_then_expand":
+    time.sleep(0.15)
+    st.rerun()
 
 if "theme_mode" not in st.session_state:
     st.session_state["theme_mode"] = "light"
@@ -122,14 +142,87 @@ if _CSS_PATH.exists():
     with open(_CSS_PATH, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
+# Keep the native Streamlit sidebar control obvious on desktop and mobile.
+st.markdown(
+    """
+    <style>
+    [data-testid="stExpandSidebarButton"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+      z-index: 999990 !important;
+    }
+    [data-testid="stExpandSidebarButton"] button,
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button,
+    button[aria-label="Expand sidebar"],
+    button[aria-label="Open sidebar"],
+    button[title="Expand sidebar"] {
+      width: 44px !important;
+      height: 44px !important;
+      min-width: 44px !important;
+      min-height: 44px !important;
+      margin: 8px !important;
+      border-radius: 10px !important;
+      background: var(--bg-panel-elevated, #ffffff) !important;
+      border: 1px solid var(--border-muted, rgba(15,23,42,.16)) !important;
+      color: var(--text-primary, #172033) !important;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16) !important;
+    }
+    [data-testid="stExpandSidebarButton"] button svg,
+    [data-testid="stSidebarCollapsedControl"] button svg,
+    [data-testid="collapsedControl"] button svg,
+    button[aria-label="Expand sidebar"] svg,
+    button[aria-label="Open sidebar"] svg {
+      display: none !important;
+    }
+    [data-testid="stExpandSidebarButton"] button::after,
+    [data-testid="stSidebarCollapsedControl"] button::after,
+    [data-testid="collapsedControl"] button::after,
+    button[aria-label="Expand sidebar"]::after,
+    button[aria-label="Open sidebar"]::after {
+      content: "☰" !important;
+      font-size: 1.35rem !important;
+      font-weight: 800 !important;
+      line-height: 1 !important;
+      color: var(--text-primary, #172033) !important;
+    }
+    [data-testid="stExpandSidebarButton"] button:hover,
+    [data-testid="stSidebarCollapsedControl"] button:hover,
+    [data-testid="collapsedControl"] button:hover,
+    button[aria-label="Expand sidebar"]:hover,
+    button[aria-label="Open sidebar"]:hover {
+      border-color: var(--brand-primary, #6366f1) !important;
+      background: var(--bg-panel-hover, #eef2ff) !important;
+    }
+    [data-testid="stSidebarCollapseButton"] button {
+      width: 44px !important;
+      height: 44px !important;
+      min-width: 44px !important;
+      min-height: 44px !important;
+      border-radius: 10px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.markdown(
     """
     <script>
     (function updateNavAccessibility() {
-      const expandBtn = document.querySelector('[data-testid="stExpandSidebarButton"] button');
-      if (expandBtn) {
-        expandBtn.setAttribute('title', 'Open navigation');
-        expandBtn.setAttribute('aria-label', 'Open navigation');
+      const expandSelectors = [
+        '[data-testid="stExpandSidebarButton"] button',
+        '[data-testid="stSidebarCollapsedControl"] button',
+        '[data-testid="collapsedControl"] button',
+        'button[aria-label="Expand sidebar"]',
+        'button[aria-label="Open sidebar"]'
+      ];
+      for (const selector of expandSelectors) {
+        const expandBtn = document.querySelector(selector);
+        if (expandBtn) {
+          expandBtn.setAttribute('title', 'Open navigation');
+          expandBtn.setAttribute('aria-label', 'Open navigation');
+        }
       }
       const collapseBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
       if (collapseBtn) {
@@ -220,6 +313,15 @@ try:
 except ImportError:
     pass
 
+# Reset the workspace-entry marker whenever the user returns to public auth.
+# A new authenticated/guest session then gets one forced sidebar expansion.
+if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
+    st.session_state["workspace_entry_initialized"] = False
+elif not st.session_state.get("workspace_entry_initialized", False):
+    st.session_state["workspace_entry_initialized"] = True
+    st.session_state["sidebar_open_transition"] = "collapse_then_expand"
+    st.rerun()
+
 # Unauthenticated & Non-Guest Entry Flow Router
 if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
     st.markdown(
@@ -231,9 +333,12 @@ if not st.session_state.get("auth_token") and not st.session_state.get("guest_mo
         [data-testid="stSidebarHeader"],
         [data-testid="stSidebarCollapseButton"],
         [data-testid="stExpandSidebarButton"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="collapsedControl"],
         [data-testid="stToolbar"],
         button[aria-label="Collapse sidebar"],
-        button[aria-label="Expand sidebar"] {
+        button[aria-label="Expand sidebar"],
+        button[aria-label="Open sidebar"] {
           display: none !important;
           visibility: hidden !important;
         }
