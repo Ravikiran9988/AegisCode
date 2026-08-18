@@ -106,11 +106,10 @@ __all__ = [
     "_duration_str",
 ]
 
-# Streamlit keeps the user's sidebar choice on the browser. On a fresh
-# workspace entry we intentionally perform a collapsed -> expanded transition
-# so the authenticated workspace opens with navigation visible even when the
-# user had previously collapsed it. A short pause lets the browser commit the
-# first state before the second rerun (the reliable Streamlit workaround).
+# Authentication/guest entry can request a one-time sidebar reset. Streamlit
+# normally remembers the user's collapsed state on the browser, so use a two-step
+# transition (collapsed -> expanded) to guarantee the sidebar is expanded after entering
+# the workspace without forcing it open again after the user manually collapses it.
 _sidebar_transition = st.session_state.get("sidebar_open_transition")
 if _sidebar_transition == "collapse_then_expand":
     st.session_state["sidebar_open_transition"] = "expand"
@@ -142,10 +141,40 @@ if _CSS_PATH.exists():
     with open(_CSS_PATH, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Keep the native Streamlit sidebar control obvious on desktop and mobile.
+# UX overrides kept here so the public landing and native Streamlit controls
+# remain readable even when the base theme changes between light/dark modes.
 st.markdown(
     """
     <style>
+    /* Landing hero: compact, readable and visually balanced. */
+    .aegis-hero {
+      padding-top: 0 !important;
+      padding-bottom: 8px !important;
+      margin-top: -34px !important;
+    }
+    .aegis-hero-title {
+      background: none !important;
+      color: var(--text-primary) !important;
+      -webkit-text-fill-color: var(--text-primary) !important;
+      text-shadow: none !important;
+    }
+    .aegis-hero-subtitle {
+      color: var(--text-secondary) !important;
+    }
+
+    /* Reduce excessive vertical whitespace around application pages. */
+    section[data-testid="stMain"] > div[data-testid="stMainBlockContainer"] {
+      padding-top: 0.35rem !important;
+    }
+    .aegis-topbar {
+      margin-bottom: 12px !important;
+    }
+    .aegis-page-header {
+      margin-top: 0 !important;
+      margin-bottom: 18px !important;
+    }
+
+    /* Obvious, accessible sidebar open control across Streamlit DOM versions. */
     [data-testid="stExpandSidebarButton"],
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"] {
@@ -194,12 +223,43 @@ st.markdown(
       border-color: var(--brand-primary, #6366f1) !important;
       background: var(--bg-panel-hover, #eef2ff) !important;
     }
+
+    /* Keep the close control equally easy to hit on touch devices. */
     [data-testid="stSidebarCollapseButton"] button {
       width: 44px !important;
       height: 44px !important;
       min-width: 44px !important;
       min-height: 44px !important;
       border-radius: 10px !important;
+    }
+
+    @media (max-width: 768px) {
+      .aegis-hero {
+        padding: 0 8px 6px 8px !important;
+        margin-top: -18px !important;
+      }
+      .aegis-hero-title {
+        font-size: clamp(1.85rem, 8vw, 2.35rem) !important;
+        line-height: 1.08 !important;
+        margin-bottom: 8px !important;
+      }
+      .aegis-hero-subtitle {
+        font-size: 0.92rem !important;
+        line-height: 1.42 !important;
+        margin-bottom: 10px !important;
+      }
+      .aegis-hero-badge {
+        margin-bottom: 7px !important;
+      }
+      .aegis-topbar {
+        margin-bottom: 8px !important;
+      }
+      .aegis-page-header {
+        margin-bottom: 14px !important;
+      }
+      .topbar-pill {
+        white-space: nowrap;
+      }
     }
     </style>
     """,
@@ -313,8 +373,8 @@ try:
 except ImportError:
     pass
 
-# Reset the workspace-entry marker whenever the user returns to public auth.
-# A new authenticated/guest session then gets one forced sidebar expansion.
+# Detect a fresh workspace entry (real account or guest) and request a one-time
+# sidebar expansion. Reset the marker whenever the user returns to public auth.
 if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
     st.session_state["workspace_entry_initialized"] = False
 elif not st.session_state.get("workspace_entry_initialized", False):
