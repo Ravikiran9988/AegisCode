@@ -2,12 +2,9 @@ name: CI Test & Quality Suite
 
 on:
   push:
-    branches: [ main, master, dev, fix/guest-access-copy ]
+    branches: [ main, master, dev ]
   pull_request:
     branches: [ main, master ]
-
-permissions:
-  contents: write
 
 jobs:
   test:
@@ -42,24 +39,3 @@ jobs:
           EXECUTION_BACKEND: local
           DATABASE_URL: sqlite:///./test_ci.db
         run: python -m pytest -v --cov=backend --cov-report=term-missing
-
-      - name: Apply guest access copy fix
-        if: matrix.python-version == '3.10'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path("frontend/components/landing.py")
-          text = p.read_text(encoding="utf-8")
-          old = "Instant guest access available &bull; No credit card required"
-          new = "Instant guest access &bull; No signup required"
-          if old in text:
-              p.write_text(text.replace(old, new, 1), encoding="utf-8")
-          PY
-          if git diff --quiet -- frontend/components/landing.py; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add frontend/components/landing.py
-          git commit -m "fix: clarify guest access copy"
-          git push
