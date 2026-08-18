@@ -39,7 +39,7 @@ def render_public_landing() -> None:
           border-radius: 9999px;
           font-size: 0.82rem;
           font-weight: 650;
-          color: #a5b4fc;
+          color: var(--brand-primary);
           margin-bottom: 20px;
         }
 
@@ -49,9 +49,7 @@ def render_public_landing() -> None:
           letter-spacing: -0.04em;
           line-height: 1.15;
           margin-bottom: 16px;
-          background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 70%, #818cf8 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+          color: var(--text-primary) !important;
         }
 
         .aegis-hero-subtitle {
@@ -166,6 +164,56 @@ def render_public_landing() -> None:
           font-size: 0.8rem;
           color: var(--text-secondary);
           line-height: 1.4;
+        }
+
+        .aegis-download-hero-text h3 {
+          color: #ffffff !important;
+        }
+
+        .aegis-download-hero-text p {
+          color: #c7d2fe !important;
+        }
+
+        @media (max-width: 768px) {
+          .aegis-hero {
+            padding: 28px 12px 22px 12px;
+          }
+
+          .aegis-hero-badge {
+            font-size: 0.74rem;
+            padding: 5px 12px;
+          }
+
+          .aegis-hero-title {
+            font-size: 2rem;
+            line-height: 1.18;
+          }
+
+          .aegis-hero-subtitle {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 22px;
+          }
+
+          .aegis-workflow-section {
+            padding: 22px 14px;
+            margin: 28px 0;
+          }
+
+          .aegis-workflow-steps,
+          .aegis-features-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .aegis-workflow-step,
+          .aegis-feature-card {
+            padding: 18px;
+          }
+
+          .aegis-download-hero {
+            padding: 20px 16px;
+          }
         }
         </style>
         """,
