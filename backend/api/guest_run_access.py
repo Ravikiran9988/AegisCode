@@ -51,7 +51,9 @@ class GuestRunAccessMiddleware:
             )(scope, receive, send)
             return
 
-        db = SessionLocal()
+        app = scope.get("app")
+        session_factory = getattr(getattr(app, "state", None), "db_session_factory", SessionLocal)
+        db = session_factory()
         try:
             guest = db.query(Guest).filter(Guest.session_id == guest_session_id).first()
             if guest is None:
