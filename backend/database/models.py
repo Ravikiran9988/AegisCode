@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, event, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -75,6 +75,18 @@ class Run(Base):
     project: Mapped[Project] = relationship("Project", back_populates="runs")
     iterations: Mapped[list[Iteration]] = relationship("Iteration", back_populates="run", cascade="all, delete-orphan")
     events: Mapped[list[Event]] = relationship("Event", back_populates="run", cascade="all, delete-orphan")
+
+
+@event.listens_for(Run, "before_insert")
+def _inherit_project_guest_ownership(_mapper, connection, target: Run) -> None:
+    """Ensure a run inherits the guest owner of its project."""
+    if target.guest_id is not None or target.user_id is not None:
+        return
+    guest_id = connection.execute(
+        select(Project.guest_id).where(Project.id == target.project_id)
+    ).scalar_one_or_none()
+    if guest_id is not None:
+        target.guest_id = guest_id
 
 
 class Iteration(Base):
