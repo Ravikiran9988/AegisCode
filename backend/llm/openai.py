@@ -1,21 +1,8 @@
 """
-OpenAI-Compatible LLM Provider — Phase 5 / Phase 6 (Rate-Limit Hardening).
+OpenAI-Compatible LLM Provider — Phase 5 / Phase 6.
 
 Implements `BaseLLMProvider` for OpenAI and OpenAI-compatible REST endpoints
 (e.g., Groq, Together, vLLM, LocalAI).
-
-Rate-limit handling (Groq 429)
--------------------------------
-All HTTP calls go through `_call_with_retry()`, which:
-1. Detects HTTP 429 responses before raising.
-2. Parses the `Retry-After` header (seconds) or extracts a wait hint from the
-   Groq JSON error body (e.g. "Please try again in ~26 seconds").
-3. Sleeps the required duration + a small random jitter (±2 s).
-4. Retries up to MAX_RETRIES times with exponential back-off as a floor.
-5. After all retries are exhausted, raises RateLimitError so callers can
-   surface a clear, actionable error rather than a generic "LLM error".
-
-Security note: OPENAI_API_KEY is never logged.
 """
 
 from __future__ import annotations
@@ -34,14 +21,12 @@ from backend.core.logging import get_logger
 from backend.llm.base import BaseLLMProvider, LLMProviderError
 
 logger = get_logger(__name__)
-
 T = TypeVar("T", bound=BaseModel)
 
-_MAX_RETRIES: int = 4
-_BACKOFF_BASE: float = 5.0
-_MAX_WAIT_SECONDS: float = 90.0
-_JITTER_SECONDS: float = 2.0
-
+_MAX_RETRIES = 4
+_BACKOFF_BASE = 5.0
+_MAX_WAIT_SECONDS = 90.0
+_JITTER_SECONDS = 2.0
 _RETRY_AFTER_PATTERN = re.compile(
     r"(?:try again in\s*~?\s*)(\d+(?:\.\d+)?)\s*(?:seconds?|s\b)",
     re.IGNORECASE,
@@ -75,15 +60,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
     def model_name(self) -> str:
         return self.model
 
-    def _call_with_retry(
-        self,
-        url: str,
-        headers: dict,
-        payload: dict,
-    ) -> requests.Response:
-        """POST with production-safe 429 retry and exponential backoff."""
-        last_exc: Exception | None = None
-
+    def _call_with_retry(self, url: str, headers: dict, payload: dict) -> requests.Response:
         for attempt in range(_MAX_RETRIES + 1):
             try:
                 resp = requests.post(
@@ -97,9 +74,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
                     f"OpenAI API request timed out after {self.timeout}s"
                 ) from exc
             except requests.exceptions.RequestException as exc:
-                raise LLMProviderError(
-                    f"OpenAI API network error: {exc}"
-                ) from exc
+                raise LLMProviderError(f"OpenAI API network error: {exc}") from exc
 
             if resp.status_code != 429:
                 return resp
@@ -107,13 +82,9 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             if attempt >= _MAX_RETRIES:
                 try:
                     err_body = resp.json()
-                    err_msg = (
-                        err_body.get("error", {}).get("message", "")
-                        or str(err_body)[:200]
-                    )
+                    err_msg = err_body.get("error", {}).get("message", "") or str(err_body)[:200]
                 except Exception:
                     err_msg = resp.text[:200]
-
                 raise RateLimitError(
                     f"Groq rate limit (HTTP 429) exhausted after {_MAX_RETRIES} retries. "
                     f"Error: {err_msg}. Please wait a minute and try again."
@@ -121,16 +92,15 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
 
             wait = _parse_retry_wait(resp, attempt)
             logger.warning(
-                "Groq API rate limit hit (attempt %d/%d). Waiting %.1f s before retry. Model: %s",
+                "Groq API rate limit hit (attempt %d/%d). Waiting %.1f s. Model: %s",
                 attempt + 1,
                 _MAX_RETRIES,
                 wait,
                 self.model,
             )
-            last_exc = None
             time.sleep(wait)
 
-        raise RateLimitError(f"Rate limit retries exhausted ({last_exc})")
+        raise RateLimitError("Rate limit retries exhausted")
 
     def generate(
         self,
@@ -141,13 +111,17 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         response_format: dict | None = None,
         reasoning_format: str | None = None,
     ) -> str:
-        """Generate text, optionally enforcing an API response format."""
+        """Generate text, optionally enforcing an API response format.
+
+        `reasoning_format` is retained as a backwards-compatible argument but
+        is intentionally not forwarded to Groq. GPT-OSS does not support the
+        OpenAI-compatible `reasoning_format` request field.
+        """
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
-
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -161,8 +135,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         }
         if response_format is not None:
             payload["response_format"] = response_format
-        if reasoning_format is not None:
-            payload["reasoning_format"] = reasoning_format
+        # Do not send reasoning_format to Groq GPT-OSS models.
 
         try:
             resp = self._call_with_retry(url, headers, payload)
@@ -178,9 +151,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             except Exception:
                 pass
             logger.error("OpenAI API HTTP error: %s%s", exc, body_err)
-            raise LLMProviderError(
-                f"OpenAI API request failed: {exc}{body_err}"
-            ) from exc
+            raise LLMProviderError(f"OpenAI API request failed: {exc}{body_err}") from exc
         except LLMProviderError:
             raise
         except Exception as exc:
@@ -194,13 +165,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         system_prompt: str | None = None,
         temperature: float = 0.1,
     ) -> T:
-        """
-        Generate a Pydantic-validated object.
-
-        Groq/OpenAI-compatible JSON Object Mode is enabled for this path so
-        model reasoning cannot leak into the JSON payload and malformed JSON
-        such as unterminated strings is rejected by the provider itself.
-        """
+        """Generate a Pydantic-validated object using JSON object mode."""
         schema_json = json.dumps(schema.model_json_schema(), indent=2)
         format_instruction = (
             "\n\nCRITICAL OUTPUT MANDATE:\n"
@@ -208,14 +173,11 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             f"{schema_json}\n"
             "Do NOT include markdown, code fences, reasoning, or commentary outside JSON."
         )
-
-        full_prompt = f"{prompt}{format_instruction}"
         raw_text = self.generate(
-            prompt=full_prompt,
+            prompt=f"{prompt}{format_instruction}",
             system_prompt=system_prompt,
             temperature=temperature,
             response_format={"type": "json_object"},
-            reasoning_format="hidden",
         )
 
         cleaned = raw_text.strip()
@@ -223,13 +185,9 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
         try:
-            parsed = json.loads(cleaned)
-            return schema.model_validate(parsed)
+            return schema.model_validate(json.loads(cleaned))
         except Exception as exc:
-            logger.error(
-                "Failed to parse structured JSON from OpenAI-compatible output: %s",
-                exc,
-            )
+            logger.error("Failed to parse structured JSON from OpenAI-compatible output: %s", exc)
             raise LLMProviderError(f"Invalid JSON returned by LLM: {exc}") from exc
 
     def is_available(self) -> tuple[bool, str]:
@@ -249,7 +207,6 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
 def _parse_retry_wait(resp: requests.Response, attempt: int) -> float:
     """Determine a safe wait duration after a 429 response."""
     wait: float | None = None
-
     retry_after_hdr = resp.headers.get("Retry-After", "").strip()
     if retry_after_hdr.isdigit():
         wait = float(retry_after_hdr)
@@ -258,14 +215,12 @@ def _parse_retry_wait(resp: requests.Response, attempt: int) -> float:
         try:
             body = resp.json()
             err_msg = body.get("error", {}).get("message", "") or ""
-            m = _RETRY_AFTER_PATTERN.search(err_msg)
-            if m:
-                wait = float(m.group(1))
+            match = _RETRY_AFTER_PATTERN.search(err_msg)
+            if match:
+                wait = float(match.group(1))
         except Exception:
             pass
 
     backoff_floor = _BACKOFF_BASE * (2 ** attempt)
-    effective = max(wait or 0.0, backoff_floor)
-    effective = min(effective, _MAX_WAIT_SECONDS)
-    jitter = random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS)
-    return max(0.0, effective + jitter)
+    effective = min(max(wait or 0.0, backoff_floor), _MAX_WAIT_SECONDS)
+    return max(0.0, effective + random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS))
