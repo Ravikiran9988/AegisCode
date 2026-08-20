@@ -1,6 +1,7 @@
 """Robust HTTP API Client for the AegisCode frontend."""
 from __future__ import annotations
 import time
+import uuid
 import requests
 import streamlit as st
 try:
@@ -11,18 +12,23 @@ _COLD_START_RETRY_DELAYS = [0, 2, 4, 8, 12]
 
 def _get_auth_headers() -> dict[str, str]:
     headers: dict[str, str] = {}
-    token = st.session_state.get("auth_token") if hasattr(st, "session_state") else None
-    if token: headers["Authorization"] = f"Bearer {token}"
-    guest_session_id = st.session_state.get("guest_session_id") if hasattr(st, "session_state") else None
-    if guest_session_id and st.session_state.get("guest_mode") and not token: headers["X-Guest-Session-ID"] = guest_session_id
+    token = st.session_state.get("auth_token")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    elif st.session_state.get("guest_mode"):
+        session_id = st.session_state.get("guest_session_id")
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            st.session_state["guest_session_id"] = session_id
+        headers["X-Guest-Session-ID"] = session_id
     return headers
 
 def _check_backend_once(backend_url: str, timeout: int = 10) -> tuple[bool, dict, str]:
-    normalized_url = _normalize_backend_url(backend_url)
     try:
-        resp = requests.get(f"{normalized_url}/health", timeout=timeout)
+        resp = requests.get(f"{_normalize_backend_url(backend_url)}/health", timeout=timeout)
         if resp.status_code == 200:
-            try: return True, resp.json() if isinstance(resp.json(), dict) else {}, ""
+            try:
+                data = resp.json(); return True, data if isinstance(data, dict) else {}, ""
             except Exception: return True, {}, ""
         return False, {}, f"Backend returned HTTP {resp.status_code}"
     except requests.exceptions.ConnectionError: return False, {}, "Cannot connect to backend (Connection Refused)"
@@ -42,22 +48,19 @@ def check_backend_with_retry(backend_url: str, retry_delays: list[int] = _COLD_S
     return False, {}, last_err
 
 def _safe_get(url: str, timeout: int = 30, **kwargs) -> requests.Response | None:
-    headers = _get_auth_headers()
-    if "headers" in kwargs: headers.update(kwargs.pop("headers"))
+    headers = _get_auth_headers(); headers.update(kwargs.pop("headers", {}))
     try: return requests.get(url, timeout=timeout, headers=headers, **kwargs)
     except Exception: return None
 
 def _safe_post(url: str, timeout: int = 30, **kwargs) -> requests.Response | None:
-    headers = _get_auth_headers()
-    if "headers" in kwargs: headers.update(kwargs.pop("headers"))
+    headers = _get_auth_headers(); headers.update(kwargs.pop("headers", {}))
     try: return requests.post(url, timeout=timeout, headers=headers, **kwargs)
     except Exception: return None
 
 def _format_http_error(resp: requests.Response, default_msg: str) -> str:
     try:
-        data = resp.json()
-        if isinstance(data, dict) and data.get("detail"):
-            detail = data["detail"]
+        data = resp.json(); detail = data.get("detail") if isinstance(data, dict) else None
+        if detail:
             if isinstance(detail, list): return ", ".join(d.get("msg", str(d)) for d in detail if isinstance(d, dict)) or default_msg
             return str(detail)
     except Exception: pass
@@ -71,9 +74,9 @@ def _format_http_error(resp: requests.Response, default_msg: str) -> str:
     return default_msg
 
 def api_register(api_url: str, full_name: str, email: str, password: str, confirm_password: str) -> tuple[bool, dict | str]:
-    norm_url = _normalize_backend_url(api_url); clean_name, clean_email = full_name.strip(), email.strip().lower()
     try:
-        resp = requests.post(f"{norm_url}/api/auth/register", json={"full_name": clean_name, "name": clean_name, "email": clean_email, "password": password, "confirm_password": confirm_password}, timeout=15)
+        name, clean_email = full_name.strip(), email.strip().lower()
+        resp = requests.post(f"{_normalize_backend_url(api_url)}/api/auth/register", json={"full_name": name, "name": name, "email": clean_email, "password": password, "confirm_password": confirm_password}, timeout=15)
         if resp.status_code == 201: return True, resp.json()
         return False, _format_http_error(resp, "Registration failed")
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout): return False, "Unable to connect to AegisCode services. Please try again."
