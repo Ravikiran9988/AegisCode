@@ -7,14 +7,14 @@ cross-guest access to run data.
 from __future__ import annotations
 
 import json
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs
 
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backend.database.guest import Guest
-from backend.database.session import SessionLocal
 from backend.database.models import Project, Run
+from backend.database.session import SessionLocal
 
 
 class GuestRunAccessMiddleware:
@@ -120,7 +120,9 @@ class GuestRunAccessMiddleware:
             if method == "GET" and path.rstrip("/") in {"/api/runs", "/api/runs/active", "/api/runs/history"}:
                 from backend.api.runs import _format_run_summary
 
-                query_params = parse_qs(urlsplit(scope.get("raw_path", b"").decode("latin-1")).query)
+                query_params = parse_qs(
+                    scope.get("query_string", b"").decode("latin-1")
+                )
                 try:
                     limit = max(1, min(int(query_params.get("limit", ["50"])[0]), 100))
                     offset = max(0, int(query_params.get("offset", ["0"])[0]))
