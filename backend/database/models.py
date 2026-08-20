@@ -1,31 +1,12 @@
 """
 SQLAlchemy ORM models for AegisCode.
-
-Tables
-------
-- users       : registered user accounts for authentication and workspace isolation
-- projects    : uploaded codebases under repair
-- runs        : autonomous repair execution records
-- iterations  : per-iteration agent logs, patches, and test results
-- events      : append-only telemetry and agent activity stream
 """
-
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-    func,
-)
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -37,15 +18,8 @@ class Base(DeclarativeBase):
     pass
 
 
-# ────────────────────────────────────────────────────────────────────────────
-# User
-# ────────────────────────────────────────────────────────────────────────────
-
 class User(Base):
-    """Registered user account for authentication and user-specific repair tracking."""
-
     __tablename__ = "users"
-
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -53,21 +27,12 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=True, default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
-    )
-
-    # Relationships
-    projects: Mapped[list[Project]] = relationship(
-        "Project", back_populates="user", cascade="all, delete-orphan"
-    )
-    runs: Mapped[list[Run]] = relationship(
-        "Run", back_populates="user", cascade="all, delete-orphan"
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    projects: Mapped[list[Project]] = relationship("Project", back_populates="user", cascade="all, delete-orphan")
+    runs: Mapped[list[Run]] = relationship("Run", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def nickname(self) -> str:
-        """Alias for name/full_name."""
         return self.name or self.full_name or ""
 
     @nickname.setter
@@ -75,144 +40,68 @@ class User(Base):
         self.name = value
         self.full_name = value
 
-    def __repr__(self) -> str:
-        return f"<User id={self.id} email={self.email!r}>"
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Project
-# ────────────────────────────────────────────────────────────────────────────
 
 class Project(Base):
-    """An uploaded user codebase under repair."""
-
     __tablename__ = "projects"
-
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
-    user_id: Mapped[str | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id", ondelete="SET NULL"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     workspace_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     file_count: Mapped[int] = mapped_column(Integer, default=0)
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
-    uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
-    )
-
-    # Relationships
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     user: Mapped[User | None] = relationship("User", back_populates="projects")
-    runs: Mapped[list[Run]] = relationship(
-        "Run", back_populates="project", cascade="all, delete-orphan"
-    )
+    guest: Mapped[Guest | None] = relationship("Guest", back_populates="projects")
+    runs: Mapped[list[Run]] = relationship("Run", back_populates="project", cascade="all, delete-orphan")
 
-    def __repr__(self) -> str:
-        return f"<Project id={self.id} name={self.name!r}>"
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Run
-# ────────────────────────────────────────────────────────────────────────────
 
 class Run(Base):
-    """A single execution of the autonomous repair graph."""
-
     __tablename__ = "runs"
-
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
-    user_id: Mapped[str | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id", ondelete="SET NULL"), nullable=True, index=True)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(50), default="pending"
-    )  # pending | running | passed | failed | error
+    status: Mapped[str] = mapped_column(String(50), default="pending")
     max_iterations: Mapped[int] = mapped_column(Integer, default=5)
     current_iteration: Mapped[int] = mapped_column(Integer, default=0)
     final_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-    # Relationships
     user: Mapped[User | None] = relationship("User", back_populates="runs")
+    guest: Mapped[Guest | None] = relationship("Guest", back_populates="runs")
     project: Mapped[Project] = relationship("Project", back_populates="runs")
-    iterations: Mapped[list[Iteration]] = relationship(
-        "Iteration", back_populates="run", cascade="all, delete-orphan"
-    )
-    events: Mapped[list[Event]] = relationship(
-        "Event", back_populates="run", cascade="all, delete-orphan"
-    )
+    iterations: Mapped[list[Iteration]] = relationship("Iteration", back_populates="run", cascade="all, delete-orphan")
+    events: Mapped[list[Event]] = relationship("Event", back_populates="run", cascade="all, delete-orphan")
 
-    def __repr__(self) -> str:
-        return f"<Run id={self.id} status={self.status!r}>"
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Iteration
-# ────────────────────────────────────────────────────────────────────────────
 
 class Iteration(Base):
-    """Detailed record of a single repair cycle within a run."""
-
     __tablename__ = "iterations"
-
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), nullable=False)
     iteration_number: Mapped[int] = mapped_column(Integer, nullable=False)
-
-    # Agent outputs stored as JSON blobs
     architecture_plan: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     code_changes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     test_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     review_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-
-    # Quick-access fields
     tests_passed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tests_failed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     approved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
-    )
-
-    # Relationships
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     run: Mapped[Run] = relationship("Run", back_populates="iterations")
 
-    def __repr__(self) -> str:
-        return f"<Iteration run={self.run_id} #={self.iteration_number}>"
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Event  (append-only log)
-# ────────────────────────────────────────────────────────────────────────────
 
 class Event(Base):
-    """Event log stream for real-time telemetry."""
-
     __tablename__ = "events"
-
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), nullable=False)
     iteration_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     agent: Mapped[str] = mapped_column(String(100), nullable=False)
-    event_type: Mapped[str] = mapped_column(
-        String(100), nullable=False
-    )  # e.g. tool_call | agent_output | error | status_change
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
-    )
-
-    # Relationships
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     run: Mapped[Run] = relationship("Run", back_populates="events")
-
-    def __repr__(self) -> str:
-        return f"<Event run={self.run_id} agent={self.agent!r} type={self.event_type!r}>"
