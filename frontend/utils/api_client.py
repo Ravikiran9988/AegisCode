@@ -1,7 +1,6 @@
 """Robust HTTP API Client for the AegisCode frontend."""
 from __future__ import annotations
-import time
-import uuid
+import time, uuid
 import requests
 import streamlit as st
 try:
@@ -18,17 +17,17 @@ def _get_auth_headers() -> dict[str, str]:
     elif st.session_state.get("guest_mode"):
         session_id = st.session_state.get("guest_session_id")
         if not session_id:
-            session_id = str(uuid.uuid4())
-            st.session_state["guest_session_id"] = session_id
+            session_id = str(uuid.uuid4()); st.session_state["guest_session_id"] = session_id
         headers["X-Guest-Session-ID"] = session_id
+        name = str(st.session_state.get("guest_name", "Guest")).strip()
+        if name: headers["X-Guest-Name"] = name
     return headers
 
 def _check_backend_once(backend_url: str, timeout: int = 10) -> tuple[bool, dict, str]:
     try:
         resp = requests.get(f"{_normalize_backend_url(backend_url)}/health", timeout=timeout)
         if resp.status_code == 200:
-            try:
-                data = resp.json(); return True, data if isinstance(data, dict) else {}, ""
+            try: data = resp.json(); return True, data if isinstance(data, dict) else {}, ""
             except Exception: return True, {}, ""
         return False, {}, f"Backend returned HTTP {resp.status_code}"
     except requests.exceptions.ConnectionError: return False, {}, "Cannot connect to backend (Connection Refused)"
@@ -36,8 +35,7 @@ def _check_backend_once(backend_url: str, timeout: int = 10) -> tuple[bool, dict
     except Exception as exc: return False, {}, f"Backend error: {str(exc)}"
 
 def check_backend_with_retry(backend_url: str, retry_delays: list[int] = _COLD_START_RETRY_DELAYS) -> tuple[bool, dict, str]:
-    if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"):
-        return False, {}, "Backend check deferred until workspace entry"
+    if not st.session_state.get("auth_token") and not st.session_state.get("guest_mode"): return False, {}, "Backend check deferred until workspace entry"
     last_err = ""
     with st.spinner("Connecting to AegisCode backend…"):
         for idx, delay in enumerate(retry_delays):
