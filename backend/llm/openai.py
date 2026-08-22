@@ -11,7 +11,7 @@ import json
 import random
 import re
 import time
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import requests
 from pydantic import BaseModel
@@ -110,6 +110,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         max_tokens: int | None = None,
         response_format: dict | None = None,
         reasoning_format: str | None = None,
+        **kwargs: Any,
     ) -> str:
         """Generate text, optionally enforcing an API response format.
 
@@ -160,24 +161,50 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
 
     def generate_structured(
         self,
-        prompt: str,
-        schema: type[T],
+        schema: Any,
+        prompt: Any = "",
         system_prompt: str | None = None,
         temperature: float = 0.1,
-    ) -> T:
-        """Generate a Pydantic-validated object using JSON object mode."""
-        schema_json = json.dumps(schema.model_json_schema(), indent=2)
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """
+        Generate a Pydantic-validated object.
+
+        Groq/OpenAI-compatible JSON Object Mode is enabled for this path so
+        model reasoning cannot leak into the JSON payload. Handles argument
+        ordering flexibly and enforces sufficient token budget.
+        """
+        # Flexible argument ordering guard
+        if isinstance(schema, str) and isinstance(prompt, type) and issubclass(prompt, BaseModel):
+            target_schema: type[BaseModel] = prompt
+            actual_prompt: str = schema
+        elif isinstance(schema, type) and issubclass(schema, BaseModel):
+            target_schema = schema
+            actual_prompt = str(prompt)
+        else:
+            target_schema = schema
+            actual_prompt = str(prompt)
+
+        schema_json = json.dumps(target_schema.model_json_schema(), indent=2)
         format_instruction = (
             "\n\nCRITICAL OUTPUT MANDATE:\n"
             "You MUST respond ONLY with one valid JSON object matching this schema:\n"
             f"{schema_json}\n"
             "Do NOT include markdown, code fences, reasoning, or commentary outside JSON."
         )
+
+        full_prompt = f"{actual_prompt}{format_instruction}"
+        effective_max_tokens = max_tokens or max(settings.max_llm_output_tokens, 2048)
+
         raw_text = self.generate(
-            prompt=f"{prompt}{format_instruction}",
+            prompt=full_prompt,
             system_prompt=system_prompt,
             temperature=temperature,
+            max_tokens=effective_max_tokens,
             response_format={"type": "json_object"},
+            reasoning_format="hidden",
+            **kwargs,
         )
 
         cleaned = raw_text.strip()
@@ -185,7 +212,8 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
         try:
-            return schema.model_validate(json.loads(cleaned))
+            parsed = json.loads(cleaned)
+            return target_schema.model_validate(parsed)
         except Exception as exc:
             logger.error("Failed to parse structured JSON from OpenAI-compatible output: %s", exc)
             raise LLMProviderError(f"Invalid JSON returned by LLM: {exc}") from exc

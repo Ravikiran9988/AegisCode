@@ -1,8 +1,12 @@
 """Robust HTTP API Client for the AegisCode frontend."""
 from __future__ import annotations
-import time, uuid
+
+import time
+import uuid
+
 import requests
 import streamlit as st
+
 try:
     from frontend.utils.helpers import _normalize_backend_url
 except ImportError:

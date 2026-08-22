@@ -21,11 +21,12 @@ from backend.agents.schemas import ArchitecturePlan, CodeChange, ReviewResult
 from backend.core.logging import get_logger
 from backend.database.models import Event, Run
 from backend.database.persistence import upsert_iteration
+from backend.execution import get_execution_backend
 from backend.execution.workspace import WorkspaceManager
 from backend.graph.state import RepairState
 from backend.llm.base import BaseLLMProvider
 from backend.tools.git_tools import get_git_diff
-from backend.tools.pytest_runner import TestResult, run_pytest
+from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
 
@@ -58,7 +59,7 @@ def initial_test_node(
         run_id, workspace_id, project_path,
     )
 
-    res: TestResult = run_pytest(project_path)
+    res: TestResult = get_execution_backend().run_pytest(project_path)
     res_dict = res.model_dump()
 
     _emit_event(
@@ -391,7 +392,7 @@ def test_node(
     )
     logger.info("[TEST START] run_id=%s iteration=%d", run_id, iteration)
 
-    res: TestResult = run_pytest(project_path)
+    res: TestResult = get_execution_backend().run_pytest(project_path)
     res_dict = res.model_dump()
 
     _emit_event(
@@ -433,6 +434,11 @@ def test_node(
         "test_result": res_dict,
         "final_failed_count": res.failed,
     }
+
+
+# Prevent pytest from auto-collecting LangGraph node functions as test cases
+test_node.__test__ = False
+initial_test_node.__test__ = False
 
 
 def reviewer_node(

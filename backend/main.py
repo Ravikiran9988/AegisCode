@@ -1,10 +1,14 @@
 """FastAPI application factory."""
 from __future__ import annotations
-import logging, os
+
+import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from backend.api.auth import auth_router
 from backend.api.guest_run_access import GuestRunAccessMiddleware
 from backend.api.guests import router as guests_router
@@ -14,6 +18,7 @@ from backend.api.runs import router as runs_router
 from backend.core.config import settings
 from backend.core.logging import setup_logging
 from backend.database.init_db import init_db
+
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager

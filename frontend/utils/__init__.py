@@ -14,7 +14,6 @@ import uuid
 import requests
 import streamlit as st
 
-
 _original_rerun = st.rerun
 
 

@@ -6,7 +6,7 @@ Provides deterministic responses without requiring an Ollama daemon.
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -68,7 +68,12 @@ class MockLLMProvider(BaseLLMProvider):
             return False, "Mock provider forced failure mode"
         return True, "Mock provider online (offline mode)"
 
-    def generate(self, prompt: str, system_prompt: str | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> str:
         self.last_prompt = prompt
         self.last_system_prompt = system_prompt
         if self.should_fail:
@@ -77,26 +82,37 @@ class MockLLMProvider(BaseLLMProvider):
 
     def generate_structured(
         self,
-        schema: type[T],
-        prompt: str,
+        schema: Any,
+        prompt: Any = "",
         system_prompt: str | None = None,
-    ) -> T:
-        self.last_prompt = prompt
+        **kwargs: Any,
+    ) -> Any:
+        if isinstance(schema, str) and isinstance(prompt, type) and issubclass(prompt, BaseModel):
+            target_schema: type[BaseModel] = prompt
+            actual_prompt: str = schema
+        elif isinstance(schema, type) and issubclass(schema, BaseModel):
+            target_schema = schema
+            actual_prompt = str(prompt)
+        else:
+            target_schema = schema
+            actual_prompt = str(prompt)
+
+        self.last_prompt = actual_prompt
         self.last_system_prompt = system_prompt
 
         if self.should_fail:
             raise LLMProviderError("Mock provider simulated failure")
 
-        if schema == ArchitecturePlan:
+        if target_schema == ArchitecturePlan:
             return self.mock_plan  # type: ignore[return-value]
-        elif schema == CodeChange:
+        elif target_schema == CodeChange:
             return self.mock_change  # type: ignore[return-value]
-        elif schema == ReviewResult:
+        elif target_schema == ReviewResult:
             return self.mock_review  # type: ignore[return-value]
 
         # Generic fallback
         try:
-            return schema()  # type: ignore[call-arg]
+            return target_schema()  # type: ignore[call-arg]
         except Exception as exc:
-            msg = f"Mock provider cannot construct schema {schema}: {exc}"
+            msg = f"Mock provider cannot construct schema {target_schema}: {exc}"
             raise LLMProviderError(msg) from exc

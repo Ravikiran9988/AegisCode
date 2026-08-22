@@ -8,7 +8,7 @@ Configured via `OLLAMA_BASE_URL` and `OLLAMA_MODEL`.
 from __future__ import annotations
 
 import json
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -54,7 +54,12 @@ class OllamaLLMProvider(BaseLLMProvider):
         except Exception as exc:
             return False, f"Ollama unreachable at {self.base_url}: {exc}"
 
-    def generate(self, prompt: str, system_prompt: str | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> str:
         url = f"{self.base_url}/api/generate"
         payload = {
             "model": self.model,
@@ -75,16 +80,27 @@ class OllamaLLMProvider(BaseLLMProvider):
 
     def generate_structured(
         self,
-        schema: type[T],
-        prompt: str,
+        schema: Any,
+        prompt: Any = "",
         system_prompt: str | None = None,
-    ) -> T:
+        **kwargs: Any,
+    ) -> Any:
         """
         Request JSON format output from Ollama and validate against Pydantic schema.
         """
+        if isinstance(schema, str) and isinstance(prompt, type) and issubclass(prompt, BaseModel):
+            target_schema: type[BaseModel] = prompt
+            actual_prompt: str = schema
+        elif isinstance(schema, type) and issubclass(schema, BaseModel):
+            target_schema = schema
+            actual_prompt = str(prompt)
+        else:
+            target_schema = schema
+            actual_prompt = str(prompt)
+
         json_schema_prompt = (
             f"You MUST return valid JSON conforming to this JSON schema:\n"
-            f"{json.dumps(schema.model_json_schema(), indent=2)}\n\n"
+            f"{json.dumps(target_schema.model_json_schema(), indent=2)}\n\n"
             f"Do not include markdown code block formatting in your JSON output if possible."
         )
 
@@ -93,7 +109,7 @@ class OllamaLLMProvider(BaseLLMProvider):
         url = f"{self.base_url}/api/generate"
         payload = {
             "model": self.model,
-            "prompt": prompt,
+            "prompt": actual_prompt,
             "system": full_system,
             "format": "json",  # Enforce JSON mode in Ollama API
             "stream": False,
@@ -107,7 +123,7 @@ class OllamaLLMProvider(BaseLLMProvider):
             # Clean potential markdown wrapping
             cleaned = _clean_json_str(raw_text)
             parsed_data = json.loads(cleaned)
-            return schema.model_validate(parsed_data)
+            return target_schema.model_validate(parsed_data)
 
         except json.JSONDecodeError as exc:
             logger.warning("Ollama returned invalid JSON: %s", exc)

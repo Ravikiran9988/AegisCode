@@ -105,7 +105,7 @@ class WorkspaceManager:
         self._project_path = self._workspace_root / "project"
 
     @classmethod
-    def create(cls, base_dir: Path | None = None) -> "WorkspaceManager":
+    def create(cls, base_dir: Path | None = None) -> WorkspaceManager:
         workspace_id = str(uuid.uuid4())
         wm = cls(workspace_id, base_dir)
         wm._workspace_root.mkdir(parents=True, exist_ok=True)
@@ -116,7 +116,7 @@ class WorkspaceManager:
     @classmethod
     def from_id(
         cls, workspace_id: str, base_dir: Path | str | None = None
-    ) -> "WorkspaceManager":
+    ) -> WorkspaceManager:
         base = Path(base_dir or settings.workspace_path).resolve()
         target = base / f"run_{workspace_id}"
         if not target.exists() or not _is_within(target, base):
@@ -126,7 +126,7 @@ class WorkspaceManager:
         return wm
 
     @classmethod
-    def from_project_path(cls, project_path: Path | str) -> "WorkspaceManager":
+    def from_project_path(cls, project_path: Path | str) -> WorkspaceManager:
         p = Path(project_path).resolve()
         ws_root = p.parent if p.name == "project" else p
         ws_id = ws_root.name.replace("run_", "", 1)
@@ -212,7 +212,7 @@ class WorkspaceManager:
             return entries[0]
         return extracted_dir
 
-    def __enter__(self) -> "WorkspaceManager":
+    def __enter__(self) -> WorkspaceManager:
         return self
 
     def __exit__(self, *_: object) -> None:

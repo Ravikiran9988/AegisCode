@@ -8,7 +8,7 @@ All concrete providers (Ollama, OpenAI, Mock) implement this base class.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -35,7 +35,12 @@ class BaseLLMProvider(ABC):
         ...
 
     @abstractmethod
-    def generate(self, prompt: str, system_prompt: str | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> str:
         """
         Generate raw text response given prompt and optional system prompt.
         """
@@ -47,6 +52,7 @@ class BaseLLMProvider(ABC):
         schema: type[T],
         prompt: str,
         system_prompt: str | None = None,
+        **kwargs: Any,
     ) -> T:
         """
         Generate structured output conforming to the Pydantic `schema`.

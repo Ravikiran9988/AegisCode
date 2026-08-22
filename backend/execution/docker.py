@@ -130,12 +130,15 @@ class DockerExecutionBackend(ExecutionBackend):
             "--cpu-quota", str(self._cpu_quota),       # CPU cap
             "--read-only",                             # immutable root FS
             "--tmpfs", "/tmp:size=64m",                # writable tmp
+            "-e", "PYTHONDONTWRITEBYTECODE=1",
+            "-e", "PYTHONUNBUFFERED=1",
             "--user", "nobody",                        # non-root
-            "--volume", f"{project_path.resolve()}:/project:ro",  # read-only mount
+            "--volume", f"{project_path.resolve()}:/project:ro",  # read-only project mount
             "--workdir", "/project",
             "--stop-timeout", str(effective_timeout),
             self._image,
             "python", "-m", "pytest",
+            "-o", "cache_dir=/tmp/.pytest_cache",
             "--tb=short", "-v", "--no-header",
         ]
 
@@ -204,22 +207,10 @@ class DockerExecutionBackend(ExecutionBackend):
         return result
 
 
-# ── Factory helper ────────────────────────────────────────────────────────────
+# ── Factory re-export ─────────────────────────────────────────────────────────
 
-def get_execution_backend() -> ExecutionBackend:  # type: ignore[name-defined]
-    """
-    Return the configured execution backend.
+def get_execution_backend() -> ExecutionBackend:
+    """Re-export get_execution_backend for backward compatibility."""
+    from backend.execution.factory import get_execution_backend as _get_backend
+    return _get_backend()
 
-    Reads ``settings.execution_backend``:
-      * ``"local"``  → LocalExecutionBackend
-      * ``"docker"`` → DockerExecutionBackend (raises if Docker unavailable)
-    """
-    from backend.execution.local import LocalExecutionBackend
-
-    backend = settings.execution_backend
-    if backend == "docker":
-        logger.info("Using Docker execution backend (image=%s)", settings.docker_image)
-        return DockerExecutionBackend()
-    else:
-        logger.info("Using local execution backend")
-        return LocalExecutionBackend()

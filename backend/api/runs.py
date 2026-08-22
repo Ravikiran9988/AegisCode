@@ -29,7 +29,7 @@ from backend.core.logging import get_logger
 from backend.database.models import Event, Iteration, Project, Run, User
 from backend.database.persistence import upsert_iteration
 from backend.database.session import get_db
-from backend.execution.local import LocalExecutionBackend
+from backend.execution import get_execution_backend
 from backend.execution.workspace import WorkspaceError, WorkspaceManager
 from backend.graph.graph import run_repair_workflow
 from backend.llm.factory import get_llm_provider
@@ -266,7 +266,7 @@ def create_run(
     # ── Execute initial pytest ────────────────────────────────────────────────
     _emit_event(db, run.id, "tester", "tool_call", {"tool": "run_pytest"}, iteration=1)
 
-    backend = LocalExecutionBackend()
+    backend = get_execution_backend()
     result: TestResult = backend.run_pytest(project_path)
 
     # ── Persist iteration ─────────────────────────────────────────────────────

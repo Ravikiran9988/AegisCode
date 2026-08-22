@@ -1,9 +1,12 @@
 """Project upload API with authenticated-user and guest-session ownership."""
 from __future__ import annotations
+
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
 from backend.api.auth import get_optional_current_user
 from backend.core.config import settings
 from backend.database.guest import Guest
@@ -11,6 +14,7 @@ from backend.database.models import Project, User
 from backend.database.session import get_db
 from backend.execution.workspace import WorkspaceError, WorkspaceManager, ZipValidationError
 from backend.tools.git_tools import init_repo
+
 router = APIRouter(prefix=f"{settings.api_prefix}/projects", tags=["projects"])
 class ProjectUploadResponse(BaseModel):
     project_id: str
