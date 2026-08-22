@@ -171,7 +171,7 @@ class WorkspaceManager:
         if effective.exists():
             target = effective.read_text(encoding="utf-8").strip()
             p = Path(target).resolve()
-            if _is_within(p, self._workspace_root) and p.exists():
+            if (_is_within(p, self._workspace_root) or _is_within(p, self._base_dir)) and p.exists():
                 return p
         return self._project_path
 

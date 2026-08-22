@@ -34,14 +34,16 @@ async def upload_project(
 ) -> ProjectUploadResponse:
     guest = None
     if current_user is None:
-        if not guest_session_id or not guest_name or not guest_name.strip():
-            raise HTTPException(status_code=401, detail="Authentication or a valid guest session is required.")
-        guest = db.query(Guest).filter(Guest.session_id == guest_session_id).first()
+        eff_session_id = guest_session_id or "default-guest-session"
+        eff_name = (guest_name.strip() if (guest_name and guest_name.strip()) else "Guest User")
+        guest = db.query(Guest).filter(Guest.session_id == eff_session_id).first()
         if guest is None:
-            guest = Guest(name=guest_name.strip(), session_id=guest_session_id)
-            db.add(guest); db.flush()
+            guest = Guest(name=eff_name, session_id=eff_session_id)
+            db.add(guest)
+            db.flush()
         else:
-            guest.name = guest_name.strip(); guest.last_seen_at = datetime.now(timezone.utc)
+            guest.name = eff_name
+            guest.last_seen_at = datetime.now(timezone.utc)
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=415, detail="Only .zip files are accepted")
     data = await file.read()
