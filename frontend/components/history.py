@@ -9,20 +9,37 @@ from __future__ import annotations
 import streamlit as st
 
 try:
-    from frontend.components.auth import render_auth_tabs
     from frontend.components.states import render_empty_state
     from frontend.utils.api_client import fetch_recent_runs
     from frontend.utils.helpers import format_timestamp
 except ImportError:
-    from components.auth import render_auth_tabs
     from components.states import render_empty_state
     from utils.api_client import fetch_recent_runs
     from utils.helpers import format_timestamp
 
 
 def render_history(api_url: str) -> None:
-    """Render the searchable repair run history browser or guest restriction card."""
+    """Render the searchable repair run history browser."""
     if st.session_state.get("guest_mode"):
+        g_name = st.session_state.get("guest_name", "Guest")
+        g_sid = st.session_state.get("guest_session_id", "session")[:8]
+        st.markdown(
+            f"""
+            <div class="aegis-page-header">
+              <h1 class="aegis-page-title">Repair Run History</h1>
+              <p class="aegis-page-desc">
+                Search, inspect, and analyze past autonomous self-healing execution runs.
+              </p>
+              <div style="margin-top: 8px;">
+                <span class="aegis-badge running" style="font-size: 0.82rem;">
+                  👤 Guest Mode | Active Session: <strong>{g_name}</strong> (<code>{g_sid}</code>)
+                </span>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
         st.markdown(
             """
             <div class="aegis-page-header">
@@ -31,52 +48,9 @@ def render_history(api_url: str) -> None:
                 Search, inspect, and analyze past autonomous self-healing execution runs.
               </p>
             </div>
-            <div style="max-width: 520px; margin: 28px auto 16px auto; text-align: center; "
-            "background: var(--bg-panel); border: 1px solid var(--border-subtle); "
-            "border-radius: var(--radius-lg); padding: 32px 24px;">
-              <div style="font-size: 2.2rem; margin-bottom: 12px;">🔒</div>
-              <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); "
-              "margin-bottom: 8px;">
-                Sign in to save and access your repair history.
-              </h2>
-              <p style="font-size: 0.88rem; color: var(--text-secondary); "
-              "margin-bottom: 24px; line-height: 1.5;">
-                Guest sessions are temporary and do not store persistent execution history. "
-                "Sign in or create a free account to automatically save all future repairs.
-              </p>
-            </div>
             """,
             unsafe_allow_html=True,
         )
-
-        _, col_center, _ = st.columns([1, 1.3, 1])
-        with col_center:
-            tab_signin, tab_signup = st.tabs(["Sign In", "Create Account"])
-            with tab_signin:
-                render_auth_tabs(
-                    api_url=api_url,
-                    active_tab="signin",
-                    target_nav="📊 Repair History",
-                )
-            with tab_signup:
-                render_auth_tabs(
-                    api_url=api_url,
-                    active_tab="signup",
-                    target_nav="📊 Repair History",
-                )
-        return
-
-    st.markdown(
-        """
-        <div class="aegis-page-header">
-          <h1 class="aegis-page-title">Repair Run History</h1>
-          <p class="aegis-page-desc">
-            Search, inspect, and analyze past autonomous self-healing execution runs.
-          </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     # Fetch runs
     runs = fetch_recent_runs(api_url, limit=100)
@@ -97,11 +71,15 @@ def render_history(api_url: str) -> None:
     # Filters, Search, and Sorting
     col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
     with col_f1:
-        search_query = st.text_input(
-            "Search by Project or Run ID",
-            placeholder="e.g. calculator, 3fa85f64...",
-            key="hist_search_input",
-        ).strip().lower()
+        search_query = (
+            st.text_input(
+                "Search by Project or Run ID",
+                placeholder="e.g. calculator, 3fa85f64...",
+                key="hist_search_input",
+            )
+            .strip()
+            .lower()
+        )
 
     with col_f2:
         status_filter = st.selectbox(

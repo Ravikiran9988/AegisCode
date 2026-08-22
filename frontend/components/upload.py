@@ -25,6 +25,7 @@ except ImportError:
     from utils.helpers import _parse_api_error, format_file_size
 
 
+
 def render_upload(api_url: str) -> None:
     """Render the project upload, configuration, and autonomous repair lifecycle."""
     st.markdown(
@@ -182,9 +183,7 @@ def render_upload(api_url: str) -> None:
                                     "project_id": pid,
                                     "max_iterations": max_iters,
                                 }
-                                create_res = _safe_post(
-                                    f"{api_url}/runs", json=payload, timeout=30
-                                )
+                                create_res = _safe_post(f"{api_url}/runs", json=payload, timeout=30)
                                 if create_res is None:
                                     st.session_state["repair_status"] = "error"
                                     st.session_state["repair_error"] = (
@@ -201,9 +200,9 @@ def render_upload(api_url: str) -> None:
                                     repair_res = _safe_post(
                                         f"{api_url}/runs/{run_id}/repair", timeout=15
                                     )
-                                    if (
-                                        repair_res is None
-                                        or repair_res.status_code not in (200, 202)
+                                    if repair_res is None or repair_res.status_code not in (
+                                        200,
+                                        202,
                                     ):
                                         st.session_state["repair_status"] = "error"
                                         st.session_state["repair_error"] = (
@@ -213,9 +212,7 @@ def render_upload(api_url: str) -> None:
                                         )
                                     else:
                                         # Navigate to Active Repairs
-                                        st.session_state["nav_view"] = (
-                                            "🤖 Active Repairs"
-                                        )
+                                        st.session_state["nav_view"] = "🤖 Active Repairs"
                                 else:
                                     st.session_state["repair_status"] = "error"
                                     st.session_state["repair_error"] = _parse_api_error(create_res)
@@ -363,4 +360,3 @@ def render_upload(api_url: str) -> None:
             st.session_state.pop("repair_status", None)
             st.session_state.pop("repair_run_id", None)
             st.session_state.pop("repair_error", None)
-

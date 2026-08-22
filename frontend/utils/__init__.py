@@ -33,9 +33,7 @@ def _persist_guest_before_rerun() -> None:
         session_id = str(uuid.uuid4())
         st.session_state["guest_session_id"] = session_id
 
-    backend_url = os.environ.get(
-        "BACKEND_URL", "https://aegiscode-vrob.onrender.com"
-    ).rstrip("/")
+    backend_url = os.environ.get("BACKEND_URL", "https://aegiscode-vrob.onrender.com").rstrip("/")
     try:
         response = requests.post(
             f"{backend_url}/api/guests",

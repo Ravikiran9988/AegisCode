@@ -172,6 +172,7 @@ def render_sidebar(
                 st.session_state["nav_view"] = "◉ Overview"
                 try:
                     from streamlit_cookies_controller import CookieController
+
                     cookies = CookieController()
                     cookies.remove("aegis_auth_token")
                     cookies.remove("aegis_user")

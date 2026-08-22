@@ -38,9 +38,7 @@ def _parse_api_error(resp: requests.Response) -> str:
     return f"HTTP {resp.status_code}: {text}"
 
 
-def _extract_filename_from_content_disposition(
-    resp: requests.Response, run_id: str
-) -> str:
+def _extract_filename_from_content_disposition(resp: requests.Response, run_id: str) -> str:
     """
     Parse filename from Content-Disposition header.
     Falls back to aegiscode-repaired-{run_id}.zip.
@@ -57,6 +55,7 @@ def _duration_str(started_at: str | None, finished_at: str | None) -> str:
     if not started_at or not finished_at:
         return "—"
     try:
+
         def _parse(s: str) -> datetime | None:
             for f in (
                 "%Y-%m-%dT%H:%M:%S.%f%z",

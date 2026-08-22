@@ -327,9 +327,7 @@ if st.session_state["theme_mode"] == "light":
         unsafe_allow_html=True,
     )
 
-DEFAULT_BACKEND = os.environ.get(
-    "BACKEND_URL", "https://aegiscode-vrob.onrender.com"
-)
+DEFAULT_BACKEND = os.environ.get("BACKEND_URL", "https://aegiscode-vrob.onrender.com")
 
 if "backend_online" not in st.session_state:
     st.session_state["backend_online"] = False

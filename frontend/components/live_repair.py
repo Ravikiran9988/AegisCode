@@ -20,16 +20,17 @@ try:
     from frontend.components.code_diff import render_code_diff_viewer
     from frontend.components.states import (
         render_empty_state,
-        render_error_alert,
+        render_http_error_state,
         render_rate_limit_alert,
+        render_stalled_state,
         render_warning_alert,
     )
     from frontend.components.timeline import render_timeline
     from frontend.utils.api_client import (
         _safe_get,
         fetch_recent_runs,
-        fetch_run_results,
-        fetch_run_status,
+        fetch_run_results_detail,
+        fetch_run_status_detail,
     )
     from frontend.utils.helpers import (
         _detect_rate_limit_error,
@@ -46,16 +47,17 @@ except ImportError:
     from components.code_diff import render_code_diff_viewer
     from components.states import (
         render_empty_state,
-        render_error_alert,
+        render_http_error_state,
         render_rate_limit_alert,
+        render_stalled_state,
         render_warning_alert,
     )
     from components.timeline import render_timeline
     from utils.api_client import (
         _safe_get,
         fetch_recent_runs,
-        fetch_run_results,
-        fetch_run_status,
+        fetch_run_results_detail,
+        fetch_run_status_detail,
     )
     from utils.helpers import (
         _detect_rate_limit_error,
@@ -116,15 +118,14 @@ def render_live_repair(api_url: str) -> None:
         )
         return
 
-    # Fetch status & results
-    sdata = fetch_run_status(api_url, active_run_id)
-    rdata = fetch_run_results(api_url, active_run_id)
+    # Fetch status & results with HTTP status code details
+    sdata, s_code, s_err = fetch_run_status_detail(api_url, active_run_id)
+    rdata, r_code, r_err = fetch_run_results_detail(api_url, active_run_id)
 
     if sdata is None or rdata is None:
-        render_error_alert(
-            "Run Not Found or Unreachable",
-            f"Could not retrieve execution data for Run ID <code>{active_run_id}</code>.",
-        )
+        err_code = s_code if s_code != 200 else (r_code if r_code != 200 else 0)
+        err_msg = s_err or r_err or f"Could not retrieve execution data for Run ID {active_run_id}."
+        render_http_error_state(err_code, message=err_msg)
         return
 
     run_status: str = sdata.get("status", "unknown")
@@ -260,7 +261,7 @@ def render_live_repair(api_url: str) -> None:
             },
             {
                 "node": "reviewer",
-                "name": "Reviewer Gate",
+                "name": "Reviewer Audit Gate",
                 "agent": "Reviewer Agent",
                 "status": "pending",
             },
@@ -338,7 +339,8 @@ def render_live_repair(api_url: str) -> None:
         file_badge_html = (
             f"<div style='margin-top: 8px; font-size: 0.8rem; color: #94a3b8;'>"
             f"Target: <code style='color: #38bdf8;'>{action_file}</code></div>"
-            if action_file else ""
+            if action_file
+            else ""
         )
 
         st.html(
@@ -369,9 +371,14 @@ def render_live_repair(api_url: str) -> None:
 
     t_pass = tests_info.get("passed", 0)
     t_fail = tests_info.get("failed", 0)
-    t_total = tests_info.get("total", t_pass + t_fail)
-    t_exec = tests_info.get("executed", t_pass + t_fail)
-    t_cov = tests_info.get("coverage_percent", 0.0)
+    t_err = tests_info.get("errors", 0)
+    t_skip = tests_info.get("skipped", 0)
+    t_total = tests_info.get("total", t_pass + t_fail + t_err + t_skip)
+    t_exec = tests_info.get("executed", t_pass + t_fail + t_err + t_skip)
+    if t_total > 0:
+        t_cov = round((t_pass / t_total) * 100, 1)
+    else:
+        t_cov = tests_info.get("coverage_percent", 0.0)
     f_changed = files_info.get("changed", 0)
 
     st.html(
@@ -390,8 +397,9 @@ def render_live_repair(api_url: str) -> None:
               {t_exec} <small style='font-size: 0.85rem; color: #94a3b8;'>/ {t_total} found</small>
             </div>
             <div class="aegis-metric-sub">
-              <span style="color: #34d399; font-weight: 700;">{t_pass} passed</span> &bull;
-              <span style="color: #f87171; font-weight: 700;">{t_fail} failed</span>
+              <span style="color: #34d399; font-weight: 700;">{t_pass} pass</span> &bull;
+              <span style="color: #f87171; font-weight: 700;">{t_fail} fail</span> &bull;
+              <span style="color: #fbbf24; font-weight: 700;">{t_err} err</span>
             </div>
           </div>
           <div class="aegis-metric-card">
@@ -491,7 +499,30 @@ def render_live_repair(api_url: str) -> None:
             except Exception:
                 pass
 
-    elif run_status in ("failed", "error", "stalled"):
+    elif run_status == "stalled":
+        render_stalled_state(
+            reason=final_summary or f"Execution stalled at iteration {current_iter}/{max_iter}.",
+            last_phase=current_phase,
+            detail="Prior agent telemetry, architecture plans, and diagnostics are preserved below.",
+        )
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            if st.button(
+                "🚀 Start New Repair",
+                key="btn_stalled_new_repair",
+                type="primary",
+                use_container_width=True,
+            ):
+                st.session_state["nav_view"] = "🚀 New Repair"
+                st.rerun()
+        with col_f2:
+            if st.button(
+                "📊 View Repair History", key="btn_stalled_hist", use_container_width=True
+            ):
+                st.session_state["nav_view"] = "📊 Repair History"
+                st.rerun()
+
+    elif run_status in ("failed", "error"):
         fail_desc = (
             final_summary
             or f"Autonomous repair reached iteration {current_iter}/{max_iter} without passing."
@@ -534,16 +565,18 @@ def render_live_repair(api_url: str) -> None:
 
     # ── J. MULTI-TAB EXECUTION WORKSPACE ──────────────────────────────────────
     st.markdown("---")
-    console_tabs = st.tabs([
-        "📅 Overview & Stepper",
-        "🏛️ Architect Agent",
-        "💻 Coder Agent",
-        "🧪 Pytest Results",
-        "🔍 Reviewer Audit",
-        "🔀 Code Changes",
-    ])
+    console_tabs = st.tabs(
+        [
+            "📅 Overview & Stepper",
+            "🏛️ Architect Agent",
+            "💻 Coder Agent",
+            "🧪 Pytest Results",
+            "🔍 Reviewer Audit",
+            "🔀 Code Changes",
+        ]
+    )
 
-    is_already_passing = (run_status == "already_passing")
+    is_already_passing = run_status == "already_passing"
 
     with console_tabs[0]:
         st.markdown("### 📅 Execution Lifecycle Stepper")
@@ -597,6 +630,6 @@ def render_live_repair(api_url: str) -> None:
         render_code_diff_viewer(iterations, is_already_passing)
 
     # ── K. LIGHTWEIGHT REAL-TIME POLLING ──────────────────────────────────────
-    if run_status == "running":
+    if run_status in ("running", "pending", "queued"):
         time.sleep(2)
         st.rerun()

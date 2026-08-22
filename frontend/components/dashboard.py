@@ -25,9 +25,7 @@ def _render_metric_cards(runs: list[dict]) -> None:
     total_runs = len(runs)
     terminal_statuses = ("passed", "already_passing", "failed", "error", "stalled")
     completed_runs = [r for r in runs if r.get("status") in terminal_statuses]
-    passed_runs = [
-        r for r in runs if r.get("status") in ("passed", "already_passing")
-    ]
+    passed_runs = [r for r in runs if r.get("status") in ("passed", "already_passing")]
 
     if completed_runs:
         success_rate = len(passed_runs) / len(completed_runs) * 100
@@ -35,14 +33,8 @@ def _render_metric_cards(runs: list[dict]) -> None:
     else:
         success_rate_str = "—"
 
-    repaired_projects = {
-        r.get("project_name") for r in passed_runs if r.get("project_name")
-    }
-    durations = [
-        float(r["duration"])
-        for r in runs
-        if r.get("duration") is not None
-    ]
+    repaired_projects = {r.get("project_name") for r in passed_runs if r.get("project_name")}
+    durations = [float(r["duration"]) for r in runs if r.get("duration") is not None]
     avg_duration = f"{sum(durations) / len(durations):.1f}s" if durations else "—"
 
     tests_passed = sum(r.get("tests_passed", 0) or 0 for r in runs)
@@ -181,11 +173,7 @@ def _render_recent_repairs(runs: list[dict]) -> None:
         run_id = str(run.get("run_id", ""))
         project_name = str(run.get("project_name") or "Python Project")
         status = str(run.get("status") or "unknown")
-        duration = (
-            f"{float(run['duration']):.1f}s"
-            if run.get("duration") is not None
-            else "—"
-        )
+        duration = f"{float(run['duration']):.1f}s" if run.get("duration") is not None else "—"
         started = format_timestamp(run.get("created_at"))
 
         passed = run.get("tests_passed")

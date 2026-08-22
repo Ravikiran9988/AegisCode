@@ -125,9 +125,7 @@ def render_auth_tabs(
                 st.error("Passwords do not match.")
             elif len(signup_pwd) < 8:
                 st.error("Password must be at least 8 characters long.")
-            elif not re.search(r"[A-Za-z]", signup_pwd) or not re.search(
-                r"[0-9]", signup_pwd
-            ):
+            elif not re.search(r"[A-Za-z]", signup_pwd) or not re.search(r"[0-9]", signup_pwd):
                 st.error("Password must contain both letters and numbers.")
             else:
                 with st.spinner("Creating your account..."):

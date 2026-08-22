@@ -52,7 +52,7 @@ def render_system_health(backend_url: str, initial_health_data: dict) -> None:
             unsafe_allow_html=True,
         )
     with col_h2:
-        db_state_str = health_data.get('database', 'connected').capitalize()
+        db_state_str = health_data.get("database", "connected").capitalize()
         st.markdown(
             f"""
             <div class="aegis-metric-card">
@@ -80,8 +80,8 @@ def render_system_health(backend_url: str, initial_health_data: dict) -> None:
     st.markdown("---")
     st.markdown("### 🔍 Detailed Infrastructure Health Matrix")
 
-    app_name = health_data.get('app_name', 'AegisCode')
-    version_str = health_data.get('version', '0.1.0')
+    app_name = health_data.get("app_name", "AegisCode")
+    version_str = health_data.get("version", "0.1.0")
 
     col_m1, col_m2 = st.columns(2)
     with col_m1:

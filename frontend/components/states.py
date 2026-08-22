@@ -96,3 +96,109 @@ def render_rate_limit_alert() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_http_error_state(
+    status_code: int,
+    message: str | None = None,
+    technical_details: str | None = None,
+) -> None:
+    """Render authoritative HTTP error UI states for 401, 403, 404, 409, 422, 429, 500, 503, network errors."""
+    if status_code == 401:
+        title = "🔒 401 Unauthorized"
+        desc = message or "Authentication required. Your session has expired or requires sign-in."
+    elif status_code == 403:
+        title = "🛡️ 403 Access Restricted / Guest Ownership Error"
+        desc = (
+            message
+            or "Your guest session has expired or this repair belongs to another session. "
+            "Start a new repair or restore the original session."
+        )
+    elif status_code == 404:
+        title = "🔍 404 Not Found"
+        desc = message or "The requested repair run ID or workspace project could not be found."
+    elif status_code == 409:
+        title = "⚠️ 409 Resource Conflict"
+        desc = message or "The request conflicts with the current server or repair run state."
+    elif status_code == 422:
+        title = "📋 422 Validation Error"
+        desc = (
+            message
+            or "The request contained invalid parameters. Please check the fields and try again."
+        )
+    elif status_code == 429:
+        title = "⏳ 429 Rate Limit Exceeded"
+        desc = (
+            message
+            or "API or LLM rate limit reached. AegisCode is auto-retrying as token budget refills."
+        )
+    elif status_code == 503:
+        title = "🔌 503 Service Unavailable"
+        desc = (
+            message
+            or "AegisCode backend service is currently initializing or undergoing maintenance."
+        )
+    elif status_code >= 500:
+        title = "💥 500 Backend Internal Server Error"
+        desc = (
+            message
+            or "An internal error occurred on the AegisCode backend. Please retry the operation."
+        )
+    else:
+        title = "🌐 Network Connection Timeout or Error"
+        desc = (
+            message
+            or "Unable to establish connection to AegisCode backend services. Please check network connectivity."
+        )
+
+    render_error_alert(title, desc, technical_details=technical_details)
+
+
+def render_loading_state(message: str = "Loading repair execution telemetry...") -> None:
+    """Render a clean loading indicator for asynchronous operations."""
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; gap: 12px; padding: 18px 24px;
+        background: var(--bg-panel); border-radius: var(--radius-md);
+        border: 1px solid var(--border-subtle); margin: 12px 0;">
+          <div style="font-size: 1.4rem; animation: spin 1s linear infinite;">⏳</div>
+          <div>
+            <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">
+              {message}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary);">
+              Authoritative execution sync in progress...
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_stalled_state(
+    reason: str | None = None,
+    last_phase: str | None = None,
+    detail: str | None = None,
+) -> None:
+    """Render explicit STALLED state banner with explanation and recovery options."""
+    st.markdown(
+        f"""
+        <div class="aegis-status-banner failed" style="border: 1px solid rgba(245, 158, 11, 0.5);
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.03));">
+          <div>
+            <h3 class="aegis-banner-title" style="color: #fbbf24;">🟠 REPAIR EXECUTION STALLED</h3>
+            <p class="aegis-banner-desc" style="color: #fef3c7;">
+              <strong>Status: STALLED</strong><br>
+              Reason: {reason or 'The graph execution exceeded turn timeout or encountered an unhandled node freeze.'}<br>
+              Last completed phase: <strong>{last_phase or 'Autonomous Execution'}</strong>
+            </p>
+            <div style="margin-top: 8px; font-size: 0.82rem; color: #fde68a;">
+              {detail or 'The repair graph did not terminate cleanly. Prior agent telemetry is preserved below.'}
+            </div>
+          </div>
+          <div style="font-size: 2.2rem;">⏳</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )

@@ -162,7 +162,7 @@ def render_reviewer_panel(review_res: dict, is_already_passing: bool = False) ->
         """
         <div class="aegis-agent-card">
           <div class="aegis-agent-header">
-            <span class="aegis-agent-title">🔍 Reviewer Agent</span>
+            <span class="aegis-agent-title">🔍 Reviewer Audit Gate</span>
             <span class="aegis-badge risk-low">Independent Verification</span>
           </div>
         """,
@@ -170,7 +170,7 @@ def render_reviewer_panel(review_res: dict, is_already_passing: bool = False) ->
     )
     if review_res:
         app_val = review_res.get("approved")
-        app_str = "APPROVED" if app_val else "REJECTED"
+        app_str = "APPROVED" if app_val else "REJECTED (Reviewer rejected patch)"
         app_class = "passed" if app_val else "failed"
 
         raw_risk = review_res.get("regression_risk", "low")
@@ -186,10 +186,18 @@ def render_reviewer_panel(review_res: dict, is_already_passing: bool = False) ->
         if review_res.get("root_cause_fixed") is not None:
             rc_resolved = "✓ Resolved" if review_res.get("root_cause_fixed") else "× Not Resolved"
             st.markdown(f"**Root Cause Verification:** `{rc_resolved}`")
-        if review_res.get("reasoning"):
-            st.write(f"**Auditor Reasoning:** {review_res.get('reasoning')}")
-        if review_res.get("recommendation"):
-            st.write(f"**Recommendations:** {review_res.get('recommendation')}")
+
+        reasoning = review_res.get("reasoning") or review_res.get("reason", "")
+        if reasoning:
+            st.write(f"**Reason:** {reasoning}")
+        recommendation = review_res.get("recommendation") or review_res.get("recommendations", "")
+        if recommendation:
+            st.write(f"**Recommendations:** {recommendation}")
+
+        if not app_val:
+            st.warning(
+                "⚠️ Reviewer rejected patch. Returning to repair cycle or awaiting next iteration..."
+            )
     else:
         if is_already_passing:
             st.info("ℹ️ Baseline tests pass without modification — automatically approved.")
@@ -310,9 +318,7 @@ def render_agents_view(api_url: str) -> None:
 
     if active_run_id:
         st.markdown("---")
-        st.markdown(
-            f"### 📋 Live Agent Traces for Active Run (`RUN-{active_run_id[:8].upper()}`)"
-        )
+        st.markdown(f"### 📋 Live Agent Traces for Active Run (`RUN-{active_run_id[:8].upper()}`)")
         rdata = fetch_run_results(api_url, active_run_id)
         if rdata:
             iterations = rdata.get("iterations", rdata.get("iteration_details", []))
@@ -321,9 +327,7 @@ def render_agents_view(api_url: str) -> None:
                 st.markdown(f"#### Iteration {it_num}")
                 col_t1, col_t2 = st.columns(2)
                 with col_t1:
-                    render_architect_panel(
-                        it.get("architecture_plan") or it.get("architect") or {}
-                    )
+                    render_architect_panel(it.get("architecture_plan") or it.get("architect") or {})
                     render_coder_panel(it.get("code_changes") or it.get("coder") or [])
                 with col_t2:
                     render_test_panel(it.get("test_results") or it.get("tests") or {})
