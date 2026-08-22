@@ -503,8 +503,9 @@ def render_live_repair(api_url: str) -> None:
         render_stalled_state(
             reason=final_summary or f"Execution stalled at iteration {current_iter}/{max_iter}.",
             last_phase=current_phase,
-            detail="Prior agent telemetry, architecture plans, and diagnostics are preserved below.",
+            detail="Prior agent telemetry and diagnostics are preserved below.",
         )
+
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             if st.button(

@@ -368,8 +368,17 @@ try:
             except (TypeError, json.JSONDecodeError):
                 pass
         st.rerun()
+
+    cookie_guest_sid = cookie_controller.get("aegis_guest_session_id")
+    if cookie_guest_sid and not st.session_state.get("guest_session_id"):
+        st.session_state["guest_session_id"] = cookie_guest_sid
+        cookie_guest_name = cookie_controller.get("aegis_guest_name")
+        if cookie_guest_name:
+            st.session_state["guest_name"] = cookie_guest_name
+            st.session_state["guest_mode"] = True
 except ImportError:
     pass
+
 
 # Detect a fresh workspace entry (real account or guest) and request a one-time
 # sidebar expansion. Reset the marker whenever the user returns to public auth.

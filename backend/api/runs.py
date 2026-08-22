@@ -170,8 +170,36 @@ def _dt(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
 
 
+def resolve_run(db: Session, run_id: str) -> Run | None:
+    """Resolve a Run model by exact UUID, prefixed string (RUN-XXXXXXXX), or short 8-char ID."""
+    if not run_id:
+        return None
+    clean_id = run_id.strip()
+
+    # 1. Direct exact lookup first
+    run = db.get(Run, clean_id)
+    if run:
+        return run
+
+    # 2. Try stripping RUN- prefix
+    if clean_id.upper().startswith("RUN-"):
+        stripped_id = clean_id[4:]
+        run = db.get(Run, stripped_id)
+        if run:
+            return run
+        clean_id = stripped_id
+
+    # 3. Prefix lookup for short IDs
+    if len(clean_id) >= 4:
+        run = db.query(Run).filter(Run.id.ilike(f"{clean_id}%")).first()
+        if run:
+            return run
+    return None
+
+
+
 def _get_run_or_404(run_id: str, db: Session) -> Run:
-    run = db.get(Run, run_id)
+    run = resolve_run(db, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
     return run
@@ -235,8 +263,10 @@ def create_run(
 
     # ── Create Run record ─────────────────────────────────────────────────────
     now = datetime.now(timezone.utc)
+    guest_id = project.guest_id if project else None
     run = Run(
         user_id=current_user.id if current_user else None,
+        guest_id=guest_id if current_user is None else None,
         project_id=body.project_id,
         status="running",
         max_iterations=body.max_iterations,
@@ -245,6 +275,7 @@ def create_run(
     )
     db.add(run)
     db.flush()
+
 
     _emit_event(db, run.id, "system", "run_started", {"project_id": body.project_id})
     logger.info("Run %s started for project %s", run.id, body.project_id)
@@ -328,11 +359,9 @@ def start_repair_loop(
     """
     Launch the LangGraph repair graph in the background for run `run_id`.
     """
-    run = db.get(Run, run_id)
-    if not run:
-        raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found.")
-
+    run = _get_run_or_404(run_id, db)
     _check_run_access(run, current_user)
+
 
     project = db.get(Project, run.project_id)
     if not project:
@@ -387,16 +416,13 @@ def get_run_status(
     """
     Return detailed status, iteration progress, test metrics, real-time node state, and timeline.
     """
-    run = db.get(Run, run_id)
-    if not run:
-        raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found.")
-
+    run = _get_run_or_404(run_id, db)
     _check_run_access(run, current_user)
 
     # Get iterations
     iterations = (
         db.query(Iteration)
-        .filter(Iteration.run_id == run_id)
+        .filter(Iteration.run_id == run.id)
         .order_by(Iteration.iteration_number.asc())
         .all()
     )
@@ -404,10 +430,11 @@ def get_run_status(
     # Get events
     events = (
         db.query(Event)
-        .filter(Event.run_id == run_id)
+        .filter(Event.run_id == run.id)
         .order_by(Event.created_at.asc())
         .all()
     )
+
 
     latest_it = iterations[-1] if iterations else None
 

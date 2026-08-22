@@ -103,7 +103,7 @@ def render_http_error_state(
     message: str | None = None,
     technical_details: str | None = None,
 ) -> None:
-    """Render authoritative HTTP error UI states for 401, 403, 404, 409, 422, 429, 500, 503, network errors."""
+    """Render authoritative HTTP error UI states for 401, 403, 404, 409, 422, 429, 500, 503, etc."""
     if status_code == 401:
         title = "🔒 401 Unauthorized"
         desc = message or "Authentication required. Your session has expired or requires sign-in."
@@ -148,7 +148,10 @@ def render_http_error_state(
         title = "🌐 Network Connection Timeout or Error"
         desc = (
             message
-            or "Unable to establish connection to AegisCode backend services. Please check network connectivity."
+            or (
+                "Unable to establish connection to AegisCode backend services. "
+                "Please check network connectivity."
+            )
         )
 
     render_error_alert(title, desc, technical_details=technical_details)
@@ -182,6 +185,8 @@ def render_stalled_state(
     detail: str | None = None,
 ) -> None:
     """Render explicit STALLED state banner with explanation and recovery options."""
+    st_reason = reason or "The graph execution exceeded turn timeout or encountered node freeze."
+    st_detail = detail or "The repair graph did not terminate cleanly. Prior agent telemetry is preserved below."
     st.markdown(
         f"""
         <div class="aegis-status-banner failed" style="border: 1px solid rgba(245, 158, 11, 0.5);
@@ -190,14 +195,15 @@ def render_stalled_state(
             <h3 class="aegis-banner-title" style="color: #fbbf24;">🟠 REPAIR EXECUTION STALLED</h3>
             <p class="aegis-banner-desc" style="color: #fef3c7;">
               <strong>Status: STALLED</strong><br>
-              Reason: {reason or 'The graph execution exceeded turn timeout or encountered an unhandled node freeze.'}<br>
+              Reason: {st_reason}<br>
               Last completed phase: <strong>{last_phase or 'Autonomous Execution'}</strong>
             </p>
             <div style="margin-top: 8px; font-size: 0.82rem; color: #fde68a;">
-              {detail or 'The repair graph did not terminate cleanly. Prior agent telemetry is preserved below.'}
+              {st_detail}
             </div>
           </div>
           <div style="font-size: 2.2rem;">⏳</div>
+
         </div>
         """,
         unsafe_allow_html=True,

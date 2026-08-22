@@ -110,7 +110,9 @@ class GuestRunAccessMiddleware:
 
             # Individual run endpoints must belong to this guest.
             if run_id:
-                run = db.get(Run, run_id)
+                from backend.api.runs import resolve_run
+
+                run = resolve_run(db, run_id)
                 if run is None:
                     await self.app(scope, receive, send)
                     return
@@ -120,6 +122,7 @@ class GuestRunAccessMiddleware:
                         status_code=403,
                     )(scope, receive, send)
                     return
+
 
             # History/active/list endpoints are served directly for guests so
             # the existing user-oriented query cannot accidentally expose other

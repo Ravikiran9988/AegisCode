@@ -60,4 +60,4 @@ def is_repeated_failure(
         else:
             break
 
-    return consecutive_count >= (threshold - 1)
+    return (consecutive_count + 1) >= threshold

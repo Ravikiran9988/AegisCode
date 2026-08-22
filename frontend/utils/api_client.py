@@ -20,16 +20,37 @@ def _get_auth_headers() -> dict[str, str]:
     token = st.session_state.get("auth_token")
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    elif st.session_state.get("guest_mode"):
-        session_id = st.session_state.get("guest_session_id")
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            st.session_state["guest_session_id"] = session_id
-        headers["X-Guest-Session-ID"] = session_id
-        name = str(st.session_state.get("guest_name", "Guest")).strip()
-        if name:
-            headers["X-Guest-Name"] = name
+        return headers
+
+    session_id = st.session_state.get("guest_session_id")
+    if not session_id:
+        try:
+            from streamlit_cookies_controller import CookieController
+
+            cc = CookieController()
+            session_id = cc.get("aegis_guest_session_id")
+        except Exception:
+            session_id = None
+
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        st.session_state["guest_session_id"] = session_id
+        try:
+            from streamlit_cookies_controller import CookieController
+
+            cc = CookieController()
+            cc.set("aegis_guest_session_id", session_id)
+        except Exception:
+            pass
+    else:
+        st.session_state["guest_session_id"] = session_id
+
+    headers["X-Guest-Session-ID"] = session_id
+    name = str(st.session_state.get("guest_name", "Guest")).strip()
+    if name:
+        headers["X-Guest-Name"] = name
     return headers
+
 
 
 def _check_backend_once(backend_url: str, timeout: int = 10) -> tuple[bool, dict, str]:

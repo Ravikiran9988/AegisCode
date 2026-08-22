@@ -488,11 +488,29 @@ def render_guest_name_input() -> None:
             if not g_name:
                 st.error("Please enter your name to continue.")
             else:
+                import uuid
+
+                session_id = st.session_state.get("guest_session_id")
+                if not session_id:
+                    session_id = str(uuid.uuid4())
+                    st.session_state["guest_session_id"] = session_id
+
                 st.session_state["guest_mode"] = True
                 st.session_state["guest_name"] = g_name
                 st.session_state["nav_view"] = "🚀 New Repair"
                 st.session_state["auth_flow_step"] = "public_dashboard"
+
+                try:
+                    from streamlit_cookies_controller import CookieController
+
+                    cc = CookieController()
+                    cc.set("aegis_guest_session_id", session_id)
+                    cc.set("aegis_guest_name", g_name)
+                except Exception:
+                    pass
+
                 st.rerun()
+
 
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         if st.button("← Back", key="btn_back_to_auth_choice", use_container_width=True):
