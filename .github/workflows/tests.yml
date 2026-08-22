@@ -2,40 +2,54 @@ name: CI Test & Quality Suite
 
 on:
   push:
-    branches: [ main, master, dev ]
+    branches: [main, master, dev]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        # AegisCode targets Python 3.12 (see pyproject.toml).
+        python-version: ["3.12"]
+
+    env:
+      EXECUTION_BACKEND: local
+      DATABASE_URL: sqlite:///./test_ci.db
+      PYTHONUNBUFFERED: "1"
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
 
       - name: Check dependency integrity
-        run: pip check
+        run: python -m pip check
 
-      - name: Run Ruff Linter
+      - name: Compile Python sources
+        run: python -m compileall backend frontend
+
+      - name: Run Ruff linter
         run: python -m ruff check backend/ frontend/ tests/
 
-      - name: Run Complete Pytest Suite (Phases 1-5)
-        env:
-          EXECUTION_BACKEND: local
-          DATABASE_URL: sqlite:///./test_ci.db
-        run: python -m pytest -v --cov=backend --cov-report=term-missing
+      - name: Run complete Pytest suite
+        run: python -m pytest -q --cov=backend --cov-report=term-missing
