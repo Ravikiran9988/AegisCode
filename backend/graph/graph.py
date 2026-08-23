@@ -1,11 +1,9 @@
 """
 LangGraph State Machine Assembly — Phase 4.
 
-Assembles the StateGraph self-healing repair loop:
-START -> INITIAL_TEST -> ARCHITECT -> CODER -> TEST -> REVIEWER -> DECISION
-                                                                      ├── PASS -> END
-                                                                      ├── RETRY -> ARCHITECT
-                                                                      └── LIMIT -> END
+Assembles the AegisCode self-healing repair loop. The repair path keeps the
+Architect result cached across normal test failures so retries go directly to
+Coder instead of spending another LLM call re-analyzing the same failure.
 """
 
 from __future__ import annotations
@@ -41,7 +39,7 @@ logger = get_logger(__name__)
 
 
 def decision_router(state: RepairState) -> Literal["retry", "end"]:
-    """Deterministically decide whether the repair loop should retry or end."""
+    """Deterministically decide whether the reviewer-rejected repair should retry."""
     run_id = state.get("run_id", "")
     status = state.get("status", "running")
     current_iteration = state.get("iteration", 1)
@@ -89,7 +87,7 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
         return "end"
 
     logger.info(
-        "[DECISION ROUTER] Retrying repair loop: run_id=%s (iteration %d -> %d)",
+        "[DECISION ROUTER] Reviewer rejected; restarting from Architect: run_id=%s (iteration %d -> %d)",
         run_id, current_iteration, current_iteration + 1,
     )
     state["iteration"] = current_iteration + 1
@@ -99,8 +97,8 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
     return "retry"
 
 
-def test_router(state: RepairState) -> Literal["reviewer", "retry", "end"]:
-    """Route after Pytest: reviewer on success, Architect retry on failure."""
+def test_router(state: RepairState) -> Literal["reviewer", "coder_retry", "end"]:
+    """Route after Pytest: review on success, reuse the existing plan on failure."""
     status = state.get("status", "running")
     if status in ("error", "stalled", "failed", "passed", "already_passing"):
         logger.info("[TEST ROUTER] Terminal status=%r -> ending graph", status)
@@ -115,11 +113,14 @@ def test_router(state: RepairState) -> Literal["reviewer", "retry", "end"]:
         logger.info("[TEST ROUTER] Pytest PASSED -> routing to Reviewer node")
         return "reviewer"
 
+    # test_node has already advanced the iteration and recorded the failure.
+    # Keep the existing ArchitecturePlan and let Coder use the fresh pytest
+    # output. This removes one expensive Architect LLM call from every retry.
     logger.info(
-        "[TEST ROUTER] Pytest FAILED (exit_code=%d, failed=%d) -> SKIPPING Reviewer node, retrying repair loop",
+        "[TEST ROUTER] Pytest FAILED (exit_code=%d, failed=%d) -> reusing architecture plan; routing directly to Coder",
         test_res.exit_code, test_res.failed,
     )
-    return "retry"
+    return "coder_retry"
 
 
 test_router.__test__ = False
@@ -215,7 +216,7 @@ def build_repair_graph(
         test_router,
         {
             "reviewer": "reviewer",
-            "retry": "architect",
+            "coder_retry": "coder",
             "end": END,
         },
     )
