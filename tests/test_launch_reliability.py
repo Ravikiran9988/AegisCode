@@ -5,9 +5,9 @@ from unittest.mock import patch
 import requests
 
 from backend.agents.schemas import ArchitecturePlan, CodeChange, ReviewResult
+from backend.core.config import settings
 from backend.graph.graph import initial_entry_router
 from backend.llm.openai_strict import StrictGroqLLMProvider
-from backend.core.config import settings
 from frontend.utils.api_client import _request_error_message
 
 
@@ -67,10 +67,10 @@ def test_strict_groq_routes_structured_roles_to_configured_models(monkeypatch):
         observed.append((provider.model, response_format["json_schema"]["name"]))
         schema_name = response_format["json_schema"]["name"]
         if schema_name == "architectureplan":
-            return '{"summary":"s","project_type":"library","relevant_files":[],"suspected_issues":[],"test_strategy":"pytest","confidence":0.9}'
+            return '{"summary":"s","project_type":"library","relevant_files":[],"suspected_issues":[],"dependencies":[],"test_strategy":"pytest","confidence":0.9}'
         if schema_name == "codechange":
             return '{"file_path":"a.py","change_type":"write","explanation":"e","root_cause":"r","patch":"x","confidence":0.9}'
-        return '{"approved":true,"root_cause_fixed":true,"regression_risk":"low","issues":[],"reasoning":"ok","recommendation":"approve","confidence":0.9}'
+        return '{"approved":true,"root_cause_fixed":true,"regression_risk":"low","issues":[],"reasoning":"ok","recommendation":"approve"}'
 
     with patch.object(provider, "generate", side_effect=fake_generate):
         provider.generate_structured(ArchitecturePlan, "architect")
