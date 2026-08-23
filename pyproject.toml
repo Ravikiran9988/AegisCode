@@ -14,6 +14,9 @@ exclude = ["tests/fixtures"]
 select = ["E", "F", "I", "B", "UP"]
 ignore = ["B008", "UP017"]  # FastAPI Depends() in defaults; UP017 forces Python 3.11+ datetime.UTC
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
