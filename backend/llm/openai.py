@@ -98,17 +98,20 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             except Exception:
                 err_msg = resp.text
 
-            # Check for TPD / Daily quota exhaustion
+            # Check for TPD / Daily quota exhaustion (NOT per-minute TPM / RPM)
+            err_lower = err_msg.lower()
             is_tpd = (
-                "tokens per day" in err_msg.lower()
-                or "tpd" in err_msg.lower()
-                or ("limit" in err_msg.lower() and "used" in err_msg.lower() and "requested" in err_msg.lower())
+                "tokens per day" in err_lower
+                or "tpd" in err_lower
+                or "per day" in err_lower
+                or "daily limit" in err_lower
             )
             if is_tpd:
                 logger.error(
                     "Groq TPD (Tokens Per Day) limit reached: %s. Aborting retries immediately.",
                     err_msg,
                 )
+
                 limit_val = None
                 used_val = None
                 req_val = None

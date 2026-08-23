@@ -210,6 +210,38 @@ def test_temporary_429_succeeds_with_bounded_retry():
             assert provider.last_usage.get("total_tokens") == 60
 
 
+def test_groq_tpm_429_retries_and_does_not_abort_as_tpd():
+    """Verify that Groq Tokens Per Minute (TPM) 429 with 'Limit, Used, Requested' retries instead of failing as TPD."""
+    provider = OpenAICompatibleLLMProvider(api_key="test-key", model="openai/gpt-oss-120b")
+
+    mock_tpm_429 = MagicMock(spec=requests.Response)
+    mock_tpm_429.status_code = 429
+    mock_tpm_429.headers = {}
+    mock_tpm_429.json.return_value = {
+
+        "error": {
+            "message": "Rate limit reached for model openai/gpt-oss-120b on tokens per minute (TPM): Limit 8000, Used 7950, Requested 500. Please try again in 30s.",
+            "type": "tokens",
+            "code": "rate_limit_exceeded",
+        }
+    }
+
+    mock_200 = MagicMock(spec=requests.Response)
+    mock_200.status_code = 200
+    mock_200.json.return_value = {
+        "choices": [{"message": {"content": '{"status": "recovered"}'}}],
+        "usage": {"prompt_tokens": 50, "completion_tokens": 10, "total_tokens": 60},
+    }
+
+    with patch.object(provider.session, "post", side_effect=[mock_tpm_429, mock_200]) as mock_post:
+        with patch("time.sleep") as mock_sleep:
+            res = provider.generate("Test prompt")
+            assert res == '{"status": "recovered"}'
+            assert mock_post.call_count == 2
+            assert mock_sleep.called
+
+
+
 # ── TEST 6: Role-specific model configuration in factory ──────────────────────
 
 def test_role_specific_model_configuration():
