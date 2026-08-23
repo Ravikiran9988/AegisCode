@@ -17,7 +17,6 @@ from backend.llm.factory import get_llm_provider
 from backend.llm.openai import OpenAICompatibleLLMProvider
 from backend.main import create_app
 
-# ── Fixtures ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture()
 def api_client():
@@ -25,10 +24,6 @@ def api_client():
     with TestClient(app) as client:
         yield client
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 1. OPENAI-COMPATIBLE PROVIDER TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestOpenAIProvider:
     def test_factory_instantiates_openai_provider(self):
@@ -57,14 +52,19 @@ class TestOpenAIProvider:
              patch.object(settings, "openai_api_key", "gsk_real_key_123"):
             settings.validate_production_llm_config()
 
-    def test_production_startup_validation_fails_invalid_model(self):
+    def test_production_startup_validation_allows_configured_model(self):
         with patch.object(settings, "llm_provider", "openai_compatible"), \
              patch.object(settings, "openai_base_url", "https://api.groq.com/openai/v1"), \
-             patch.object(settings, "openai_model", "wrong-model"), \
+             patch.object(settings, "openai_model", "openai/gpt-oss-20b"), \
              patch.object(settings, "openai_api_key", "gsk_real_key_123"):
-            with pytest.raises(
-                ValueError, match="OPENAI_MODEL must be exactly 'openai/gpt-oss-120b'"
-            ):
+            settings.validate_production_llm_config()
+
+    def test_production_startup_validation_fails_missing_model(self):
+        with patch.object(settings, "llm_provider", "openai_compatible"), \
+             patch.object(settings, "openai_base_url", "https://api.groq.com/openai/v1"), \
+             patch.object(settings, "openai_model", ""), \
+             patch.object(settings, "openai_api_key", "gsk_real_key_123"):
+            with pytest.raises(ValueError, match="OPENAI_MODEL must not be empty"):
                 settings.validate_production_llm_config()
 
     def test_production_startup_validation_fails_missing_key(self):
@@ -127,10 +127,6 @@ class TestOpenAIProvider:
         assert "reachable" in msg
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 2. DATABASE & CONFIGURATION TESTS
-# ══════════════════════════════════════════════════════════════════════════════
-
 class TestDatabaseAndConfig:
     def test_sqlite_engine_creation(self):
         with patch.object(settings, "database_url", "sqlite:///./test.db"):
@@ -149,10 +145,6 @@ class TestDatabaseAndConfig:
         assert "access-control-allow-origin" in response.headers
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 3. DOCKER EXECUTION BACKEND SAFETY
-# ══════════════════════════════════════════════════════════════════════════════
-
 class TestDockerBackendSafety:
     def test_docker_backend_configuration(self):
         try:
@@ -170,10 +162,6 @@ class TestDockerBackendSafety:
         except Exception as exc:
             assert "Docker" in str(exc) or "PATH" in str(exc)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 4. DEPLOYMENT & ENVIRONMENT FILE INTEGRITY
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestDeploymentIntegrity:
     def test_env_example_exists_and_contains_placeholders(self):

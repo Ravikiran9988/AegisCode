@@ -40,19 +40,8 @@ from backend.tools.pytest_runner import TestResult
 logger = get_logger(__name__)
 
 
-
 def decision_router(state: RepairState) -> Literal["retry", "end"]:
-    """
-    Deterministic decision function evaluating graph state after Test (if failed) or Reviewer node (if passed).
-
-    Decision Rules
-    --------------
-    1. Status is already "error", "stalled", "passed", or "already_passing" -> END
-    2. Tests pass (exit_code == 0) AND Reviewer approves -> END (status="passed")
-    3. Iteration >= max_iterations -> END (status="failed")
-    4. Repeated failure fingerprint 2+ times -> END (status="stalled")
-    5. Otherwise -> RETRY (increment iteration, route back to Architect)
-    """
+    """Deterministically decide whether the repair loop should retry or end."""
     run_id = state.get("run_id", "")
     status = state.get("status", "running")
     current_iteration = state.get("iteration", 1)
@@ -72,14 +61,12 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
     test_res = TestResult(**test_data) if test_data else None
     review_res = ReviewResult(**review_data) if review_data else None
 
-    # Condition 1: Success & Approved
     if test_res and test_res.success and review_res and review_res.approved:
         logger.info("[REPAIR SUCCESS] run_id=%s Tests pass and Reviewer approved -> END", run_id)
         state["status"] = "passed"
         state["termination_reason"] = "all_tests_passed"
         return "end"
 
-    # Condition 2: Max Iterations Reached
     max_iterations = state.get("max_iterations", settings.max_agent_iterations)
     if current_iteration >= max_iterations:
         logger.info(
@@ -90,8 +77,6 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
         state["termination_reason"] = "max_iterations_reached"
         return "end"
 
-
-    # Condition 3: Loop Detection / Repeated Failures
     curr_fp = compute_failure_fingerprint(test_res)
     prev_fps = state.get("previous_failures", [])
     if is_repeated_failure(curr_fp, prev_fps, threshold=2):
@@ -103,9 +88,6 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
         state["termination_reason"] = "repeated_failure"
         return "end"
 
-
-
-    # Condition 4: Retry next iteration
     logger.info(
         "[DECISION ROUTER] Retrying repair loop: run_id=%s (iteration %d -> %d)",
         run_id, current_iteration, current_iteration + 1,
@@ -118,12 +100,7 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
 
 
 def test_router(state: RepairState) -> Literal["reviewer", "retry", "end"]:
-    """
-    Route after Pytest node:
-    - If status is terminal (stalled, failed, error), route to END.
-    - If tests PASSED (success == True), route to Reviewer node for safety audit.
-    - If tests FAILED (success == False), route back to retry (Architect).
-    """
+    """Route after Pytest: reviewer on success, Architect retry on failure."""
     status = state.get("status", "running")
     if status in ("error", "stalled", "failed", "passed", "already_passing"):
         logger.info("[TEST ROUTER] Terminal status=%r -> ending graph", status)
@@ -148,27 +125,28 @@ def test_router(state: RepairState) -> Literal["reviewer", "retry", "end"]:
 test_router.__test__ = False
 
 
-
-
 def initial_test_router(state: RepairState) -> Literal["continue", "end"]:
-    """Route after initial_test_node: if already passing, skip agents entirely."""
+    """Route after a fresh initial pytest pass."""
     status = state.get("status", "running")
     if status == "already_passing":
         return "end"
     return "continue"
 
 
-def coder_router(state: RepairState) -> Literal["test", "coder_retry", "architect_retry", "end"]:
+def initial_entry_router(state: RepairState) -> Literal["run_initial_test", "architect", "end"]:
+    """Skip duplicate baseline pytest when POST /runs already persisted its result."""
+    baseline = state.get("initial_test_result")
+    if baseline:
+        if TestResult(**baseline).success:
+            state["status"] = "already_passing"
+            state["termination_reason"] = "all_tests_passed"
+            return "end"
+        return "architect"
+    return "run_initial_test"
 
-    """
-    Route after coder_node:
-    1. If status is terminal (error, failed, stalled), route to END.
-    2. If patch application failed:
-       - If consecutive patch retries < 3 and iteration < max_iterations: retry coder directly.
-       - If consecutive patch retries >= 3 and iteration < max_iterations: retry architect for new strategy.
-       - If max iterations reached: terminate to END.
-    3. If patch succeeded: proceed to test validation.
-    """
+
+def coder_router(state: RepairState) -> Literal["test", "coder_retry", "architect_retry", "end"]:
+    """Route patch failures directly back to repair instead of validating unchanged code."""
     status = state.get("status", "running")
     if status in ("error", "failed", "stalled"):
         return "end"
@@ -191,20 +169,24 @@ def build_repair_graph(
     llm_provider: BaseLLMProvider,
     db: Session | None = None,
 ) -> StateGraph:
-    """
-    Construct and compile the AegisCode LangGraph repair graph.
-    """
+    """Construct and compile the AegisCode LangGraph repair graph."""
     builder = StateGraph(RepairState)
 
-    # Bind provider & db session to nodes using partials
     builder.add_node("initial_test", partial(initial_test_node, db=db))
     builder.add_node("architect", partial(architect_node, llm_provider=llm_provider, db=db))
     builder.add_node("coder", partial(coder_node, llm_provider=llm_provider, db=db))
     builder.add_node("test", partial(test_node, db=db))
     builder.add_node("reviewer", partial(reviewer_node, llm_provider=llm_provider, db=db))
 
-    # Add edges
-    builder.add_edge(START, "initial_test")
+    builder.add_conditional_edges(
+        START,
+        initial_entry_router,
+        {
+            "run_initial_test": "initial_test",
+            "architect": "architect",
+            "end": END,
+        },
+    )
 
     builder.add_conditional_edges(
         "initial_test",
@@ -228,7 +210,6 @@ def build_repair_graph(
         },
     )
 
-    # Route after Pytest node: skip Reviewer if tests failed, reach Reviewer if tests passed
     builder.add_conditional_edges(
         "test",
         test_router,
@@ -239,7 +220,6 @@ def build_repair_graph(
         },
     )
 
-    # Route after Reviewer node: check reviewer approval
     builder.add_conditional_edges(
         "reviewer",
         decision_router,
@@ -261,9 +241,7 @@ def run_repair_workflow(
     max_iterations: int | None = None,
     custom_instructions: str | None = None,
 ) -> RepairState:
-    """
-    High-level entry point to execute the repair graph for a run.
-    """
+    """High-level entry point to execute the repair graph for a run."""
     start_time = time.monotonic()
     eff_max = max_iterations or settings.max_agent_iterations
 
@@ -272,9 +250,29 @@ def run_repair_workflow(
         run_id, workspace_id, eff_max, project_path,
     )
 
-    # Ensure git repo is initialized for diff tracking
     init_repo(Path(project_path))
 
+    # POST /api/runs already executes and persists the baseline pytest pass.
+    # Reuse that result so the background graph does not run the same suite twice.
+    persisted_baseline: dict | None = None
+    if db and run_id:
+        try:
+            run_record = db.get(Run, run_id)
+            if run_record:
+                baseline_it = next(
+                    (
+                        it
+                        for it in run_record.iterations
+                        if it.iteration_number == 1 and it.test_results
+                    ),
+                    None,
+                )
+                if baseline_it:
+                    persisted_baseline = dict(baseline_it.test_results)
+        except Exception as exc:
+            logger.warning("Failed to load persisted baseline for run %s: %s", run_id, exc)
+
+    initial_failed = int((persisted_baseline or {}).get("failed", 0))
     initial_state: RepairState = {
         "run_id": run_id,
         "workspace_id": workspace_id,
@@ -297,14 +295,18 @@ def run_repair_workflow(
         "iteration_reason": None,
         "start_time": start_time,
         "total_duration": 0.0,
-        "initial_failed_count": 0,
-        "final_failed_count": 0,
+        "initial_failed_count": initial_failed,
+        "final_failed_count": initial_failed,
         "tool_call_count": 0,
         "reviewer_rejections": 0,
     }
 
-    graph = build_repair_graph(llm_provider=llm_provider, db=db)
+    if persisted_baseline:
+        initial_state["initial_test_result"] = persisted_baseline
+        initial_state["test_result"] = persisted_baseline
+        initial_state["validation_status"] = "passed" if not initial_failed else "failed"
 
+    graph = build_repair_graph(llm_provider=llm_provider, db=db)
 
     try:
         final_state = graph.invoke(initial_state)
@@ -325,8 +327,6 @@ def run_repair_workflow(
         final_state["status"] = "error"
         final_state["termination_reason"] = f"llm_error: {exc}"
 
-
-    # Ensure status is finalised strictly based on success criteria
     if final_state.get("status") in ("running", "passed"):
         test_data = final_state.get("test_result")
         review_data = final_state.get("review_result")
@@ -353,11 +353,9 @@ def run_repair_workflow(
                 else "stopped"
             )
 
-
     elapsed = time.monotonic() - start_time
     final_state["total_duration"] = elapsed
 
-    # Update DB Run record status
     if db and run_id:
         try:
             run_rec = db.get(Run, run_id)
@@ -372,8 +370,6 @@ def run_repair_workflow(
                 db.commit()
         except Exception as exc:
             logger.warning("Failed to update Run record status: %s", exc)
-
-    # Log precise performance telemetry
 
     timings = final_state.get("iteration_timings", {})
     for it_num, t_map in timings.items():
@@ -395,4 +391,3 @@ def run_repair_workflow(
     )
 
     return final_state
-
