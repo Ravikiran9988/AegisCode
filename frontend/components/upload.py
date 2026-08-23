@@ -14,16 +14,15 @@ try:
         render_error_alert,
         render_warning_alert,
     )
-    from frontend.utils.api_client import _safe_post, fetch_run_status
+    from frontend.utils.api_client import _safe_post, fetch_run_status, get_last_request_error
     from frontend.utils.helpers import _parse_api_error, format_file_size
 except ImportError:
     from components.states import (
         render_error_alert,
         render_warning_alert,
     )
-    from utils.api_client import _safe_post, fetch_run_status
+    from utils.api_client import _safe_post, fetch_run_status, get_last_request_error
     from utils.helpers import _parse_api_error, format_file_size
-
 
 
 def render_upload(api_url: str) -> None:
@@ -42,7 +41,6 @@ def render_upload(api_url: str) -> None:
         unsafe_allow_html=True,
     )
 
-    # Centered Workspace Card
     col_u1, col_u2, col_u3 = st.columns([1, 6, 1])
     with col_u2:
         uploaded_file = st.file_uploader(
@@ -52,13 +50,11 @@ def render_upload(api_url: str) -> None:
             key="project_zip_uploader",
         )
 
-        # Automatic Workspace Extraction upon Drop / Selection
         if uploaded_file is not None:
             file_bytes = uploaded_file.getvalue()
             file_size_str = format_file_size(len(file_bytes))
             file_sig = f"{uploaded_file.name}_{len(file_bytes)}"
 
-            # If new file or signature changed, automatically initialize workspace
             if st.session_state.get("uploaded_file_sig") != file_sig:
                 with st.spinner("Extracting workspace and initializing git baseline..."):
                     try:
@@ -68,10 +64,11 @@ def render_upload(api_url: str) -> None:
                             "application/zip",
                         )
                         files = {"file": file_tuple}
-                        res = _safe_post(f"{api_url}/projects/upload", files=files, timeout=30)
+                        res = _safe_post(f"{api_url}/projects/upload", files=files, timeout=60)
                         if res is None:
                             st.session_state["upload_error"] = (
-                                "Could not connect to backend to initialize workspace."
+                                get_last_request_error()
+                                or "Could not connect to backend to initialize workspace."
                             )
                             st.session_state.pop("project_id", None)
                         elif res.status_code == 201:
@@ -92,9 +89,7 @@ def render_upload(api_url: str) -> None:
                             )
                             st.session_state.pop("project_id", None)
                         elif res.status_code == 415:
-                            st.session_state["upload_error"] = (
-                                "Only .zip archive format is accepted."
-                            )
+                            st.session_state["upload_error"] = "Only .zip archive format is accepted."
                             st.session_state.pop("project_id", None)
                         elif res.status_code == 422:
                             st.session_state["upload_error"] = _parse_api_error(res)
@@ -107,14 +102,12 @@ def render_upload(api_url: str) -> None:
                         st.session_state.pop("project_id", None)
                     st.rerun()
 
-            # Check if upload error occurred
             if "upload_error" in st.session_state and st.session_state["upload_error"]:
                 render_error_alert(
                     "Workspace Initialization Failed",
                     st.session_state["upload_error"],
                 )
 
-            # Workspace Ready & Inspected Metadata Card
             if "project_id" in st.session_state:
                 pid = st.session_state["project_id"]
                 pname = st.session_state.get("project_name", uploaded_file.name)
@@ -152,11 +145,9 @@ def render_upload(api_url: str) -> None:
                     unsafe_allow_html=True,
                 )
 
-                # Repair Lifecycle State Handling
                 repair_status = st.session_state.get("repair_status")
                 repair_run_id = st.session_state.get("repair_run_id")
 
-                # If no repair is currently running or failed, show Configuration & Launch
                 if not repair_status:
                     st.markdown("---")
                     st.markdown("### Configure Repair Execution")
@@ -183,11 +174,19 @@ def render_upload(api_url: str) -> None:
                                     "project_id": pid,
                                     "max_iterations": max_iters,
                                 }
-                                create_res = _safe_post(f"{api_url}/runs", json=payload, timeout=30)
+                                # Project creation performs the baseline pytest pass. Give the
+                                # backend enough time for that bounded operation instead of
+                                # incorrectly reporting a connection failure after 30 seconds.
+                                create_res = _safe_post(
+                                    f"{api_url}/runs",
+                                    json=payload,
+                                    timeout=90,
+                                )
                                 if create_res is None:
                                     st.session_state["repair_status"] = "error"
                                     st.session_state["repair_error"] = (
-                                        "Could not reach backend to spawn repair run."
+                                        get_last_request_error()
+                                        or "Could not reach backend to spawn repair run."
                                     )
                                 elif create_res.status_code == 201:
                                     run_id = create_res.json()["run_id"]
@@ -196,22 +195,18 @@ def render_upload(api_url: str) -> None:
                                     st.session_state["repair_status"] = "running"
                                     st.session_state.pop("repair_error", None)
 
-                                    # Trigger background repair graph
                                     repair_res = _safe_post(
-                                        f"{api_url}/runs/{run_id}/repair", timeout=15
+                                        f"{api_url}/runs/{run_id}/repair", timeout=30
                                     )
-                                    if repair_res is None or repair_res.status_code not in (
-                                        200,
-                                        202,
-                                    ):
+                                    if repair_res is None or repair_res.status_code not in (200, 202):
                                         st.session_state["repair_status"] = "error"
                                         st.session_state["repair_error"] = (
                                             _parse_api_error(repair_res)
                                             if repair_res
-                                            else "Failed to launch repair graph in background."
+                                            else get_last_request_error()
+                                            or "Failed to launch repair graph in background."
                                         )
                                     else:
-                                        # Navigate to Active Repairs
                                         st.session_state["nav_view"] = "🤖 Active Repairs"
                                 else:
                                     st.session_state["repair_status"] = "error"
@@ -221,7 +216,6 @@ def render_upload(api_url: str) -> None:
                                 st.session_state["repair_error"] = str(exc)
                         st.rerun()
 
-                # Execution State: Running (Live Execution & Progress Monitoring)
                 elif repair_status == "running" and repair_run_id:
                     st.markdown("---")
                     st.markdown(
@@ -254,7 +248,6 @@ def render_upload(api_url: str) -> None:
                             text=f"Iteration {cur_iter} of {max_iter} in progress...",
                         )
 
-                        # Terminal Success: Automatically navigate to Active Repairs
                         if cur_status in ("passed", "already_passing"):
                             st.session_state["active_run_id"] = repair_run_id
                             st.session_state["nav_view"] = "🤖 Active Repairs"
@@ -263,7 +256,6 @@ def render_upload(api_url: str) -> None:
                             st.session_state.pop("repair_error", None)
                             st.rerun()
 
-                        # Terminal Failure / Stalled / Error: Keep on page and show failure details
                         elif cur_status in ("failed", "stalled", "error"):
                             st.session_state["repair_status"] = cur_status
                             st.session_state["repair_error"] = (
@@ -272,7 +264,6 @@ def render_upload(api_url: str) -> None:
                             )
                             st.rerun()
 
-                        # Terminal Cancelled / Stopped
                         elif cur_status in ("cancelled", "stopped"):
                             st.session_state["repair_status"] = "cancelled"
                             st.session_state["repair_error"] = (
@@ -280,7 +271,6 @@ def render_upload(api_url: str) -> None:
                             )
                             st.rerun()
 
-                        # Still running: Poll backend
                         else:
                             st.caption("Auto-refreshing execution telemetry...")
                             col_c1, col_c2 = st.columns([4, 1])
@@ -291,9 +281,7 @@ def render_upload(api_url: str) -> None:
                                     use_container_width=True,
                                 ):
                                     st.session_state["repair_status"] = "cancelled"
-                                    st.session_state["repair_error"] = (
-                                        "Repair tracking was stopped by user."
-                                    )
+                                    st.session_state["repair_error"] = "Repair tracking was stopped by user."
                                     st.rerun()
                             time.sleep(1.5)
                             st.rerun()
@@ -302,16 +290,15 @@ def render_upload(api_url: str) -> None:
                         time.sleep(1.5)
                         st.rerun()
 
-                # Terminal Failure / Error State Display
                 elif repair_status in ("failed", "stalled", "error"):
                     st.markdown("---")
                     err_msg = st.session_state.get(
                         "repair_error", "Autonomous repair was unsuccessful."
                     )
+                    run_label = repair_run_id or "run was not created"
                     render_error_alert(
                         f"Autonomous Repair {repair_status.upper()}",
-                        f"Run ID <code>{repair_run_id}</code> failed to produce a passing patch: "
-                        f"{err_msg}",
+                        f"Run ID <code>{run_label}</code> failed to produce a passing patch: {err_msg}",
                     )
 
                     col_f1, col_f2 = st.columns(2)
@@ -335,7 +322,6 @@ def render_upload(api_url: str) -> None:
                             st.session_state["nav_view"] = "📊 Repair History"
                             st.rerun()
 
-                # Terminal Cancelled State Display
                 elif repair_status == "cancelled":
                     st.markdown("---")
                     render_warning_alert(
@@ -353,7 +339,6 @@ def render_upload(api_url: str) -> None:
                         st.session_state.pop("repair_error", None)
                         st.rerun()
         else:
-            # File removed / cleared: reset session state
             st.session_state.pop("uploaded_file_sig", None)
             st.session_state.pop("project_id", None)
             st.session_state.pop("upload_error", None)
