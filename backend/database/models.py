@@ -36,11 +36,26 @@ class Base(DeclarativeBase):
     pass
 
 
+class Guest(Base):
+    __tablename__ = "guests"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_uuid)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    session_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    projects: Mapped[list[Project]] = relationship("Project", back_populates="guest")
+    runs: Mapped[list[Run]] = relationship("Run", back_populates="guest")
+
+    def __repr__(self) -> str:
+        return f"<Guest id={self.id} name={self.name!r}>"
+
+
 class User(Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+
     name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     full_name: Mapped[str] = mapped_column(String(255), nullable=True, default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

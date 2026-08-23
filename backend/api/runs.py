@@ -496,7 +496,14 @@ def get_run_status(
             return "running"
         if run.status in ("passed", "already_passing"):
             return "completed"
+        if (
+            run.status in ("failed", "stalled", "error")
+            and "TEST_COMPLETED" in ev_types_cur_iter
+            and node_name == "reviewer"
+        ):
+            return "skipped"
         return "pending"
+
 
     pipeline_nodes = [
         {

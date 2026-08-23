@@ -497,7 +497,17 @@ def test_node(
 
     if not res.success:
         eff_max = state.get("max_iterations", settings.max_agent_iterations)
-        if is_repeated_failure(curr_fp, prev_fps, threshold=2):
+        git_diff = state.get("git_diff") or {}
+        has_changes = bool(git_diff.get("has_changes", False)) if isinstance(git_diff, dict) else False
+
+        if is_repeated_failure(curr_fp, prev_fps, threshold=2) and not has_changes:
+            logger.warning(
+                "[REPAIR STALLED] run_id=%s No effective code change produced for failing test (%s) -> STALLED",
+                run_id, curr_fp,
+            )
+            updates["status"] = "stalled"
+            updates["termination_reason"] = "no_effective_code_change"
+        elif is_repeated_failure(curr_fp, prev_fps, threshold=3):
             logger.warning(
                 "[REPAIR STALLED] run_id=%s Repeated failure detected (%s) -> STALLED",
                 run_id, curr_fp,
@@ -517,6 +527,7 @@ def test_node(
 
     _record_timing(state, updates, iteration, "pytest", pytest_dur)
     return updates
+
 
 
 # Prevent pytest from auto-collecting LangGraph node functions as test cases

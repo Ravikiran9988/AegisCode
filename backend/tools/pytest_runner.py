@@ -95,40 +95,56 @@ def run_pytest(
             exit_code=_EXIT_INTERNALERROR,
             success=False,
             error_message=f"Directory does not exist or is not a directory: {project_path}",
-            duration=0.0,
             command=[],
         )
+
+    import os
+
+    resolved_path = project_path.resolve()
+
+    cache_dir = resolved_path / ".pytest_cache"
 
     command = [
         sys.executable,   # same Python that runs the app
         "-m", "pytest",
+        "-o", f"cache_dir={cache_dir}",
+        "-o", f"rootdir={resolved_path}",
         "--tb=short",
         "-v",
         "--no-header",
     ]
 
-
     if extra_args:
         command.extend(extra_args)
 
-    logger.info("Running pytest in %s (timeout=%ds)", project_path, effective_timeout)
-    logger.debug("Command: %s", " ".join(command))
+    logger.info(
+        "[PYTEST EXEC] working_directory=%s command=%s timeout=%ds",
+        resolved_path, " ".join(command), effective_timeout,
+    )
 
     start = time.monotonic()
     timed_out = False
 
+    sub_env = {
+        **os.environ,
+        "PYTHONPATH": str(resolved_path),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+
     try:
         proc = subprocess.run(
             command,
-            cwd=str(project_path),
+            cwd=str(resolved_path),
             capture_output=True,
             text=True,
             timeout=effective_timeout,
+            env=sub_env,
         )
         duration = time.monotonic() - start
         stdout = proc.stdout
         stderr = proc.stderr
         exit_code = proc.returncode
+
 
     except subprocess.TimeoutExpired as exc:
         duration = time.monotonic() - start

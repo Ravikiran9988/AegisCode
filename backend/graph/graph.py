@@ -93,7 +93,18 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
     # Condition 3: Loop Detection / Repeated Failures
     curr_fp = compute_failure_fingerprint(test_res)
     prev_fps = state.get("previous_failures", [])
-    if is_repeated_failure(curr_fp, prev_fps, threshold=2):
+    git_diff = state.get("git_diff") or {}
+    has_changes = bool(git_diff.get("has_changes", False)) if isinstance(git_diff, dict) else False
+
+    if is_repeated_failure(curr_fp, prev_fps, threshold=2) and not has_changes:
+        logger.warning(
+            "[REPAIR STALLED] run_id=%s No effective code change produced (%s) -> STALLED",
+            run_id, curr_fp,
+        )
+        state["status"] = "stalled"
+        state["termination_reason"] = "no_effective_code_change"
+        return "end"
+    elif is_repeated_failure(curr_fp, prev_fps, threshold=3):
         logger.warning(
             "[REPAIR STALLED] run_id=%s Repeated failure detected (%s) -> STALLED",
             run_id, curr_fp,
@@ -101,6 +112,7 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
         state["status"] = "stalled"
         state["termination_reason"] = "repeated_failure"
         return "end"
+
 
     # Condition 4: Retry next iteration
     logger.info(

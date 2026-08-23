@@ -103,7 +103,11 @@ class CoderAgent:
             run_id, change.file_path, change.change_type,
         )
 
+        init_read = read_file(workspace, change.file_path)
+        initial_content = init_read.content if init_read.success else None
+
         if change.change_type == "write":
+
             _emit_agent_event(
                 db, run_id, "coder", "TOOL_CALLED",
                 {"tool": "write_file", "path": change.file_path}
@@ -214,10 +218,67 @@ Produce only the CodeChange object required by the schema.
                         f"Failed to patch file {change.file_path}: {patch_res.error}"
                     )
 
+        # ── Verify net content changes (No-Op patch detection) ─────────────────
+        final_res = read_file(workspace, change.file_path)
+        final_content = final_res.content if final_res.success else None
+        if (
+            change.change_type in ("write", "patch")
+            and initial_content is not None
+            and final_content is not None
+            and initial_content.strip() == final_content.strip()
+        ):
+
+            logger.warning(
+                "[CODER NO-OP PATCH DETECTED] run_id=%s file=%s had no net changes",
+                run_id, change.file_path,
+            )
+            # Attempt one deterministic rewrite recovery
+            noop_recovery_prompt = f"""
+The previous patch for `{change.file_path}` produced NO CHANGES to the file content.
+The file remains identical to its original failing state.
+
+You MUST return a NEW CodeChange using change_type='write'.
+The `patch` field MUST contain the full corrected source file implementing the fix.
+Inspect the failing test assertions and ensure the function logic is actually modified.
+Do not modify tests.
+
+[CURRENT FILE CONTENT]
+<untrusted_source_code>
+{initial_content}
+</untrusted_source_code>
+
+[REPAIR PLAN]
+{plan.summary}
+
+Return only the required CodeChange JSON.
+""".strip()
+            try:
+                recovered = self.llm.generate_structured(
+                    schema=CodeChange,
+                    prompt=noop_recovery_prompt,
+                    system_prompt=SYSTEM_PROMPT,
+                )
+                if (
+                    recovered.file_path == change.file_path
+                    and recovered.change_type == "write"
+                    and recovered.patch.strip()
+                    and recovered.patch.strip() != initial_content.strip()
+                ):
+                    write_res = write_file(workspace, recovered.file_path, recovered.patch)
+                    if write_res.success:
+                        logger.info(
+                            "[NO-OP RECOVERY SUCCESS] run_id=%s rewrote %s with actual changes",
+                            run_id, recovered.file_path,
+                        )
+                        change = recovered
+            except Exception as noop_exc:
+                logger.warning("[NO-OP RECOVERY FAILED] run_id=%s: %s", run_id, noop_exc)
+
         logger.info(
             "[PATCH COMPLETE] run_id=%s file=%s type=%s",
             run_id, change.file_path, change.change_type,
         )
+
 
         _emit_agent_event(
             db, run_id, "coder", "CODER_COMPLETED",
@@ -232,6 +293,7 @@ Produce only the CodeChange object required by the schema.
             run_id, change.change_type, change.file_path,
         )
         return change
+
 
 
 def _emit_agent_event(

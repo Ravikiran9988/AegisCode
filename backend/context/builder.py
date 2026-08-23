@@ -26,6 +26,8 @@ Character-to-token ratio for code/logs is roughly 3-4 chars/token, so
 
 from __future__ import annotations
 
+import re
+
 from backend.core.config import settings
 from backend.execution.workspace import WorkspaceManager
 from backend.tools.filesystem import get_project_structure, read_file
@@ -62,6 +64,65 @@ def _extract_failure_summary(test_result: TestResult) -> str:
     return _truncate(combined, 1000)
 
 
+def _extract_test_file_snippets(
+    workspace: WorkspaceManager,
+    test_result: TestResult | None,
+    max_chars: int = 1200,
+) -> str:
+
+    """
+    Extract relevant test file definitions (read-only) so Architect and Coder can
+    inspect exact test assertions and expectations.
+    """
+    test_files: list[str] = []
+    if test_result:
+        combined = f"{test_result.stdout or ''}\n{test_result.stderr or ''}"
+        for match in re.finditer(
+            r"(?:FAILED|ERROR|rootdir:|\b)\s*([a-zA-Z0-9_./\\-]*test[a-zA-Z0-9_./\\-]*\.py)",
+            combined,
+            re.IGNORECASE,
+        ):
+            path_str = match.group(1).replace("\\", "/").strip().lstrip("./")
+            # If path contains subdirectories, simplify to relative path inside workspace
+            if "/" in path_str and "project/" in path_str:
+                path_str = path_str.split("project/", 1)[1]
+            if path_str and path_str not in test_files:
+                test_files.append(path_str)
+
+    if not test_files:
+        from backend.tools.filesystem import list_files
+
+        flist = list_files(workspace, "**/*.py")
+        if flist.success:
+            for f in flist.files:
+                fname = f.replace("\\", "/")
+                basename = fname.split("/")[-1]
+                if (
+                    basename.startswith("test_")
+                    or basename.endswith("_test.py")
+                    or "/tests/" in fname
+                    or fname.startswith("tests/")
+                ):
+                    test_files.append(fname)
+
+    snippets: list[str] = []
+    total_len = 0
+    for tf in test_files[:2]:
+        res = read_file(workspace, tf)
+        if res.success and res.content:
+            snippet = f"--- TEST FILE: {tf} ---\n{res.content}\n"
+            if total_len + len(snippet) <= max_chars:
+                snippets.append(snippet)
+                total_len += len(snippet)
+            else:
+                snippets.append(
+                    f"--- TEST FILE: {tf} ---\n{_truncate(res.content, max(100, max_chars - total_len))}\n"
+                )
+                break
+
+    return "\n".join(snippets)
+
+
 def build_architect_context(
     workspace: WorkspaceManager,
     test_result: TestResult | None = None,
@@ -73,10 +134,8 @@ def build_architect_context(
 
     Includes:
     - Project structure tree
-    - Key test failure details (if available)
+    - Relevant test code & failure details (read-only)
     - Untrusted data warning blocks
-
-    Token budget: stdout truncated to 1500 chars, stderr to 800 chars.
     """
     if cached_project_structure:
         tree_str = cached_project_structure
@@ -93,6 +152,15 @@ def build_architect_context(
             f"--- Failure Diagnostics Snippet ---\n{_extract_failure_summary(test_result)}"
         )
 
+    test_snippets = _extract_test_file_snippets(workspace, test_result, max_chars=1200)
+    test_block = ""
+    if test_snippets:
+        test_block = f"""
+
+[RELEVANT TEST SUITE (READ ONLY - DO NOT MODIFY TESTS)]
+<untrusted_test_code>
+{test_snippets}
+</untrusted_test_code>"""
 
     context_str = f"""
 [PROJECT FILE STRUCTURE]
@@ -103,7 +171,7 @@ def build_architect_context(
 [TEST EXECUTION RESULTS]
 <untrusted_test_output>
 {test_summary}
-</untrusted_test_output>
+</untrusted_test_output>{test_block}
 """.strip()
 
     if custom_instructions:
@@ -124,23 +192,21 @@ def build_coder_context(
     Includes:
     - Architecture plan summary & suspected issues
     - Contents of relevant source & test files (within size budget)
-    - Exact test failure output
-
-    Token budget: file content budget = max_file_context_size // 3 (was // 2).
-    Stdout truncated to 1200 chars (was 2500).
+    - Exact test failure output and failing test code assertions (read-only)
     """
     files_content_parts: list[str] = []
     total_len = 0
-    # Tighter file content budget to reduce input tokens per call
     budget = settings.max_file_context_size // 3
 
     target_files = list(relevant_files)
     if not target_files:
         from backend.tools.filesystem import list_files
+
         flist = list_files(workspace, "**/*.py")
         if flist.success:
             target_files = [
-                f for f in flist.files
+                f
+                for f in flist.files
                 if not f.startswith("test") and "test_" not in f and "_test" not in f
             ]
 
@@ -158,11 +224,30 @@ def build_coder_context(
 
     test_failure_block = "No recent test failure output."
     if test_result:
-        test_failure_block = (
-            f"Exit code: {test_result.exit_code}\n"
-            f"Passed: {test_result.passed}, Failed: {test_result.failed}\n"
-            f"Captured Output:\n{_truncate(test_result.stdout, 1200)}"
-        )
+        diag_parts = [
+            f"Pytest Exit Code: {test_result.exit_code}",
+            f"Passed: {test_result.passed}, Failed: {test_result.failed}, Errors: {test_result.errors}",
+        ]
+        failure_summary = _extract_failure_summary(test_result)
+        if failure_summary and failure_summary != "No stdout/stderr output captured.":
+            diag_parts.append(f"--- Key Failure Diagnostics ---\n{_truncate(failure_summary, 800)}")
+
+        if test_result.stdout:
+            diag_parts.append(f"--- Captured Stdout ---\n{_truncate(test_result.stdout, 600)}")
+        if test_result.stderr:
+            diag_parts.append(f"--- Captured Stderr ---\n{_truncate(test_result.stderr, 400)}")
+
+        test_failure_block = "\n\n".join(diag_parts)
+
+    test_snippets = _extract_test_file_snippets(workspace, test_result, max_chars=1200)
+    test_block = ""
+    if test_snippets:
+        test_block = f"""
+
+[FAILING TEST DEFINITIONS (READ ONLY - DO NOT MODIFY TESTS)]
+<untrusted_test_code>
+{test_snippets}
+</untrusted_test_code>"""
 
     context_str = f"""
 [REPAIR PLAN SUMMARY]
@@ -176,10 +261,12 @@ def build_coder_context(
 [CURRENT TEST FAILURES]
 <untrusted_test_output>
 {test_failure_block}
-</untrusted_test_output>
+</untrusted_test_output>{test_block}
 """.strip()
 
     return _truncate(context_str, settings.max_file_context_size)
+
+
 
 
 def build_reviewer_context(
