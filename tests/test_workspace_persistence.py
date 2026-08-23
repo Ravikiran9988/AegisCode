@@ -37,12 +37,27 @@ from backend.main import create_app
 
 
 def _safe_rmtree(path: Path) -> None:
+    import gc
+    import time
+
     def _remove_readonly(func, p, _exc_info):
         os.chmod(p, stat.S_IWRITE)
         func(p)
 
-    if path.exists():
-        shutil.rmtree(path, onerror=_remove_readonly)
+    if not path.exists():
+        return
+
+    gc.collect()
+    for attempt in range(5):
+        try:
+            shutil.rmtree(path, onerror=_remove_readonly)
+            break
+        except (PermissionError, OSError):
+            if attempt == 4:
+                raise
+            time.sleep(0.1)
+            gc.collect()
+
 
 
 def _create_sample_zip() -> bytes:

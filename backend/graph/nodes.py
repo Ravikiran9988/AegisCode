@@ -19,11 +19,13 @@ from backend.agents.coder import CoderAgent
 from backend.agents.policies import PolicyViolationError
 from backend.agents.reviewer import ReviewerAgent
 from backend.agents.schemas import ArchitecturePlan, CodeChange, ReviewResult
+from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event, Run
 from backend.database.persistence import upsert_iteration
 from backend.execution import get_execution_backend
 from backend.execution.workspace import WorkspaceManager
+from backend.graph.loop_detector import compute_failure_fingerprint, is_repeated_failure
 from backend.graph.state import RepairState
 from backend.llm.base import BaseLLMProvider
 from backend.tools.filesystem import get_project_structure
@@ -485,10 +487,34 @@ def test_node(
         duration_seconds=res.duration,
     )
 
-    updates = {
+    curr_fp = compute_failure_fingerprint(res)
+    prev_fps = list(state.get("previous_failures") or [])
+
+    updates: dict = {
         "test_result": res_dict,
         "final_failed_count": res.failed,
     }
+
+    if not res.success:
+        eff_max = state.get("max_iterations", settings.max_agent_iterations)
+        if is_repeated_failure(curr_fp, prev_fps, threshold=2):
+            logger.warning(
+                "[REPAIR STALLED] run_id=%s Repeated failure detected (%s) -> STALLED",
+                run_id, curr_fp,
+            )
+            updates["status"] = "stalled"
+            updates["termination_reason"] = "repeated_failure"
+        elif iteration >= eff_max:
+            logger.info(
+                "[REPAIR FAILED] run_id=%s Max iterations (%d) reached -> END",
+                run_id, eff_max,
+            )
+            updates["status"] = "failed"
+            updates["termination_reason"] = "max_iterations_reached"
+        else:
+            updates["iteration"] = iteration + 1
+            updates["previous_failures"] = prev_fps + [curr_fp]
+
     _record_timing(state, updates, iteration, "pytest", pytest_dur)
     return updates
 
@@ -607,9 +633,31 @@ def reviewer_node(
                     db.commit()
             except Exception as exc:
                 logger.warning("Failed to update Run record on review approval: %s", exc)
+    else:
+        eff_max = state.get("max_iterations", settings.max_agent_iterations)
+        curr_fp = compute_failure_fingerprint(new_res)
+        prev_fps = list(state.get("previous_failures") or [])
+        if is_repeated_failure(curr_fp, prev_fps, threshold=2):
+            logger.warning(
+                "[REPAIR STALLED] run_id=%s Repeated failure detected (%s) -> STALLED",
+                run_id, curr_fp,
+            )
+            updates["status"] = "stalled"
+            updates["termination_reason"] = "repeated_failure"
+        elif iteration >= eff_max:
+            logger.info(
+                "[REPAIR FAILED] run_id=%s Max iterations (%d) reached -> END",
+                run_id, eff_max,
+            )
+            updates["status"] = "failed"
+            updates["termination_reason"] = "reviewer_rejected"
+        else:
+            updates["iteration"] = iteration + 1
+            updates["previous_failures"] = prev_fps + [curr_fp]
 
     _record_timing(state, updates, iteration, "reviewer", rev_dur)
     return updates
+
 
 
 

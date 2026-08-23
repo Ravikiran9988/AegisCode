@@ -117,13 +117,18 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
 def test_router(state: RepairState) -> Literal["reviewer", "retry", "end"]:
     """
     Route after Pytest node:
+    - If status is terminal (stalled, failed, error), route to END.
     - If tests PASSED (success == True), route to Reviewer node for safety audit.
-    - If tests FAILED (success == False), SKIP Reviewer node and evaluate loop decision directly.
+    - If tests FAILED (success == False), route back to retry (Architect).
     """
+    status = state.get("status", "running")
+    if status in ("error", "stalled", "failed", "passed", "already_passing"):
+        logger.info("[TEST ROUTER] Terminal status=%r -> ending graph", status)
+        return "end"
+
     test_data = state.get("test_result")
     if not test_data:
-        logger.info("[TEST ROUTER] No test result found -> skipping Reviewer, evaluating decision")
-        return decision_router(state)
+        return "end"
 
     test_res = TestResult(**test_data)
     if test_res.success:
@@ -131,13 +136,14 @@ def test_router(state: RepairState) -> Literal["reviewer", "retry", "end"]:
         return "reviewer"
 
     logger.info(
-        "[TEST ROUTER] Pytest FAILED (exit_code=%d, failed=%d) -> SKIPPING Reviewer node, evaluating loop decision directly",
+        "[TEST ROUTER] Pytest FAILED (exit_code=%d, failed=%d) -> SKIPPING Reviewer node, retrying repair loop",
         test_res.exit_code, test_res.failed,
     )
-    return decision_router(state)
+    return "retry"
 
 
 test_router.__test__ = False
+
 
 
 
