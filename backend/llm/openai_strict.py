@@ -28,6 +28,18 @@ class StrictGroqLLMProvider(OpenAICompatibleLLMProvider):
         payload.setdefault("reasoning_effort", "low")
         return super()._call_with_retry(url, headers, payload)
 
+    @staticmethod
+    def _role_model(schema: type[BaseModel], default_model: str) -> str:
+        """Resolve an optional per-agent model override from the schema being generated."""
+        schema_name = getattr(schema, "__name__", "")
+        if schema_name == "ArchitecturePlan" and settings.architect_model.strip():
+            return settings.architect_model.strip()
+        if schema_name == "CodeChange" and settings.coder_model.strip():
+            return settings.coder_model.strip()
+        if schema_name == "ReviewResult" and settings.reviewer_model.strip():
+            return settings.reviewer_model.strip()
+        return default_model
+
     def generate_structured(
         self,
         schema: Any,
@@ -48,37 +60,43 @@ class StrictGroqLLMProvider(OpenAICompatibleLLMProvider):
             target_schema = schema
             actual_prompt = str(prompt)
 
-        schema_json = _strict_json_schema(target_schema.model_json_schema())
-        full_prompt = (
-            f"{actual_prompt}\n\nOUTPUT RULES: Return exactly one JSON object conforming to the schema. "
-            "Keep string fields concise. For code changes, return only the minimal targeted fix. "
-            "No markdown, code fences, reasoning, or commentary."
-        )
-        effective_max_tokens = max_tokens or settings.max_llm_output_tokens
-
-
-        raw_text = self.generate(
-            prompt=full_prompt,
-            system_prompt=system_prompt,
-            temperature=temperature,
-            max_tokens=effective_max_tokens,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": _schema_name(target_schema),
-                    "strict": True,
-                    "schema": schema_json,
-                },
-            },
-            reasoning_format="hidden",
-            **kwargs,
-        )
+        # The graph intentionally shares one provider instance across agents.
+        # Resolve the model per structured-output schema so Architect/Coder/Reviewer
+        # can use different Groq models without changing the graph or provider API.
+        original_model = self.model
+        self.model = self._role_model(target_schema, original_model)
         try:
-            return target_schema.model_validate(json.loads(raw_text.strip()))
-        except Exception as exc:
-            logger.error("Strict Groq structured response validation failed: %s", exc)
-            raise LLMProviderError(f"Invalid JSON returned by LLM: {exc}") from exc
+            schema_json = _strict_json_schema(target_schema.model_json_schema())
+            full_prompt = (
+                f"{actual_prompt}\n\nOUTPUT RULES: Return exactly one JSON object conforming to the schema. "
+                "Keep string fields concise. For code changes, return only the minimal targeted fix. "
+                "No markdown, code fences, reasoning, or commentary."
+            )
+            effective_max_tokens = max_tokens or settings.max_llm_output_tokens
 
+            raw_text = self.generate(
+                prompt=full_prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=effective_max_tokens,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": _schema_name(target_schema),
+                        "strict": True,
+                        "schema": schema_json,
+                    },
+                },
+                reasoning_format="hidden",
+                **kwargs,
+            )
+            try:
+                return target_schema.model_validate(json.loads(raw_text.strip()))
+            except Exception as exc:
+                logger.error("Strict Groq structured response validation failed: %s", exc)
+                raise LLMProviderError(f"Invalid JSON returned by LLM: {exc}") from exc
+        finally:
+            self.model = original_model
 
 
 def _schema_name(schema: type[BaseModel]) -> str:
