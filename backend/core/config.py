@@ -61,7 +61,7 @@ class Settings(BaseSettings):
         description="Base URL for OpenAI-compatible REST endpoint (Groq)",
     )
     openai_model: str = Field(
-        default="openai/gpt-oss-120b",
+        default="openai/gpt-oss-20b",
         description="Default model name for the OpenAI-compatible provider",
     )
     architect_model: str = Field(
@@ -91,13 +91,19 @@ class Settings(BaseSettings):
 
     # LLM context & output bounds
     max_agent_iterations: int = 5
-    max_llm_output_tokens: int = 6144
-    architect_max_tokens: int = 2000
-    coder_max_tokens: int = 3000
-    reviewer_max_tokens: int = 800
+    max_llm_output_tokens: int = 4096
+    architect_max_tokens: int = 1600
+    coder_max_tokens: int = 2400
+    reviewer_max_tokens: int = 600
     max_file_context_size: int = 5000
     max_files_per_agent: int = 3
     llm_timeout_seconds: int = 60
+
+    # Rate-limit policy: fail fast instead of spending minutes sleeping through
+    # repeated 429s. A single short retry handles transient TPM/RPM throttling;
+    # daily TPD exhaustion is detected separately and never retried.
+    llm_rate_limit_retries: int = 1
+    llm_rate_limit_max_wait_seconds: int = 30
 
     # Execution / Sandbox
     workspace_base_dir: str = "./workspaces"
