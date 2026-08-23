@@ -23,10 +23,10 @@ from backend.llm.base import BaseLLMProvider, LLMProviderError, QuotaExhaustedEr
 logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
-_MAX_RETRIES = 4
-_BACKOFF_BASE = 5.0
-_MAX_WAIT_SECONDS = 90.0
-_JITTER_SECONDS = 2.0
+_DEFAULT_MAX_RETRIES = 1
+_DEFAULT_BACKOFF_BASE = 2.0
+_DEFAULT_MAX_WAIT_SECONDS = 30.0
+_JITTER_SECONDS = 0.5
 _RETRY_AFTER_PATTERN = re.compile(
     r"(?:try again in\s*~?\s*)(\d+(?:\.\d+)?)\s*(?:seconds?|s\b)",
     re.IGNORECASE,
@@ -65,14 +65,23 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         return self.model
 
     def _call_with_retry(self, url: str, headers: dict, payload: dict) -> requests.Response:
-        # Use persistent session for HTTP Keep-Alive pooling in production,
-        # but fallback to requests.post if unit tests patched requests.post directly.
+        """Call the API with one short retry for transient 429s.
+
+        Daily token quota exhaustion is detected before this retry path. For
+        short TPM/RPM throttles, honor Retry-After when it is safe to wait;
+        otherwise fail fast so an autonomous repair run does not sit idle for
+        minutes while burning its execution window.
+        """
         if hasattr(requests.post, "assert_called") or hasattr(requests.post, "return_value"):
             post_fn = requests.post
         else:
             post_fn = self.session.post
 
-        for attempt in range(_MAX_RETRIES + 1):
+        max_retries = max(0, int(getattr(settings, "llm_rate_limit_retries", _DEFAULT_MAX_RETRIES)))
+        max_wait = max(0.0, float(getattr(settings, "llm_rate_limit_max_wait_seconds", _DEFAULT_MAX_WAIT_SECONDS)))
+        backoff_base = _DEFAULT_BACKOFF_BASE
+
+        for attempt in range(max_retries + 1):
             try:
                 resp = post_fn(
                     url,
@@ -80,7 +89,6 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
                     json=payload,
                     timeout=self.timeout,
                 )
-
             except requests.exceptions.Timeout as exc:
                 raise LLMProviderError(
                     f"OpenAI API request timed out after {self.timeout}s"
@@ -98,7 +106,6 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             except Exception:
                 err_msg = resp.text
 
-            # Check for TPD / Daily quota exhaustion (NOT per-minute TPM / RPM)
             err_lower = err_msg.lower()
             is_tpd = (
                 "tokens per day" in err_lower
@@ -133,24 +140,31 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
                     requested_value=req_val,
                 )
 
-            if attempt >= _MAX_RETRIES:
+            wait = _parse_retry_wait(resp, attempt)
+            if attempt >= max_retries:
                 raise RateLimitError(
-                    f"Groq rate limit (HTTP 429) exhausted after {_MAX_RETRIES} retries. "
-                    f"Error: {err_msg}. Please wait a minute and try again."
+                    f"Groq rate limit (HTTP 429). Retry window is about {wait:.1f}s; "
+                    f"AegisCode stopped after {max_retries} retry to avoid a long stall. "
+                    f"Error: {err_msg}"
                 )
 
-            wait = _parse_retry_wait(resp, attempt)
+            if wait > max_wait:
+                raise RateLimitError(
+                    f"Groq rate limit (HTTP 429) requires waiting about {wait:.1f}s, "
+                    f"which exceeds AegisCode's {max_wait:.0f}s retry budget. "
+                    f"Error: {err_msg}"
+                )
+
             logger.warning(
                 "Groq API rate limit hit (attempt %d/%d). Waiting %.1f s. Model: %s",
                 attempt + 1,
-                _MAX_RETRIES,
+                max_retries + 1,
                 wait,
                 self.model,
             )
             time.sleep(wait)
 
         raise RateLimitError("Rate limit retries exhausted")
-
 
     def generate(
         self,
@@ -162,12 +176,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         reasoning_format: str | None = None,
         **kwargs: Any,
     ) -> str:
-        """Generate text, optionally enforcing an API response format.
-
-        `reasoning_format` is retained as a backwards-compatible argument but
-        is intentionally not forwarded to Groq. GPT-OSS does not support the
-        OpenAI-compatible `reasoning_format` request field.
-        """
+        """Generate text, optionally enforcing an API response format."""
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Content-Type": "application/json",
@@ -186,7 +195,6 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         }
         if response_format is not None:
             payload["response_format"] = response_format
-        # Do not send reasoning_format to Groq GPT-OSS models.
 
         try:
             resp = self._call_with_retry(url, headers, payload)
@@ -220,14 +228,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         max_tokens: int | None = None,
         **kwargs: Any,
     ) -> Any:
-        """
-        Generate a Pydantic-validated object.
-
-        Groq/OpenAI-compatible JSON Object Mode is enabled for this path so
-        model reasoning cannot leak into the JSON payload. Handles argument
-        ordering flexibly and enforces sufficient token budget.
-        """
-        # Flexible argument ordering guard
+        """Generate a Pydantic-validated object."""
         if isinstance(schema, str) and isinstance(prompt, type) and issubclass(prompt, BaseModel):
             target_schema: type[BaseModel] = prompt
             actual_prompt: str = schema
@@ -248,7 +249,6 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
 
         full_prompt = f"{actual_prompt}{format_instruction}"
         effective_max_tokens = max_tokens or settings.max_llm_output_tokens
-
 
         raw_text = self.generate(
             prompt=full_prompt,
@@ -289,8 +289,11 @@ def _parse_retry_wait(resp: requests.Response, attempt: int) -> float:
     """Determine a safe wait duration after a 429 response."""
     wait: float | None = None
     retry_after_hdr = resp.headers.get("Retry-After", "").strip()
-    if retry_after_hdr.isdigit():
-        wait = float(retry_after_hdr)
+    if retry_after_hdr:
+        try:
+            wait = float(retry_after_hdr)
+        except ValueError:
+            wait = None
 
     if wait is None:
         try:
@@ -302,6 +305,6 @@ def _parse_retry_wait(resp: requests.Response, attempt: int) -> float:
         except Exception:
             pass
 
-    backoff_floor = _BACKOFF_BASE * (2 ** attempt)
-    effective = min(max(wait or 0.0, backoff_floor), _MAX_WAIT_SECONDS)
+    backoff_floor = _DEFAULT_BACKOFF_BASE * (2 ** attempt)
+    effective = max(wait or 0.0, backoff_floor)
     return max(0.0, effective + random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS))
