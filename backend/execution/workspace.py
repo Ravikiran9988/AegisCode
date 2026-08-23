@@ -115,15 +115,37 @@ class WorkspaceManager:
 
     @classmethod
     def from_id(
-        cls, workspace_id: str, base_dir: Path | str | None = None
+        cls,
+        workspace_id: str,
+        base_dir: Path | str | None = None,
+        archive_data: bytes | None = None,
     ) -> WorkspaceManager:
         base = Path(base_dir or settings.workspace_path).resolve()
         target = base / f"run_{workspace_id}"
-        if not target.exists() or not _is_within(target, base):
+        is_valid = target.exists() and (target / "project").exists() and _is_within(target, base)
+        if not is_valid:
+            if archive_data:
+                logger.info(
+                    "Workspace directory %s not found on local disk. Auto-restoring from archive (%d bytes)...",
+                    target,
+                    len(archive_data),
+                )
+                wm = cls(workspace_id=workspace_id, base_dir=base)
+                wm._workspace_root.mkdir(parents=True, exist_ok=True)
+                wm._project_path.mkdir(parents=True, exist_ok=True)
+                effective_root = wm.extract_project(archive_data)
+                wm.set_project_root(effective_root)
+                try:
+                    from backend.tools.git_tools import init_repo
+                    init_repo(effective_root)
+                except Exception as git_exc:
+                    logger.warning("Failed to initialize git repository during restore: %s", git_exc)
+                return wm
             raise WorkspaceError(f"Workspace directory {target} does not exist")
         wm = cls(workspace_id=workspace_id, base_dir=base)
         wm._workspace_root = target
         return wm
+
 
     @classmethod
     def from_project_path(cls, project_path: Path | str) -> WorkspaceManager:

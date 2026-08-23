@@ -32,6 +32,11 @@ def init_db() -> None:
             _add_column_if_missing(
                 conn, "projects", "guest_id", "ALTER TABLE projects ADD COLUMN guest_id VARCHAR(36)", inspector
             )
+            blob_type = "BYTEA" if engine.dialect.name == "postgresql" else "BLOB"
+            _add_column_if_missing(
+                conn, "projects", "archive_data", f"ALTER TABLE projects ADD COLUMN archive_data {blob_type}", inspector
+            )
+
         if "runs" in tables:
             _add_column_if_missing(
                 conn, "runs", "user_id", "ALTER TABLE runs ADD COLUMN user_id VARCHAR(255)", inspector

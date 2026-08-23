@@ -285,6 +285,7 @@ def create_run(
         workspace = WorkspaceManager.from_id(
             _workspace_id_from_project(project),
             base_dir=settings.workspace_path,
+            archive_data=project.archive_data,
         )
         project_path = workspace.get_project_path()
     except WorkspaceError as exc:
@@ -370,6 +371,7 @@ def start_repair_loop(
     workspace = WorkspaceManager.from_id(
         _workspace_id_from_project(project),
         base_dir=settings.workspace_path,
+        archive_data=project.archive_data,
     )
     project_path = str(workspace.get_project_path())
 
@@ -994,6 +996,7 @@ def download_repaired_project(
         workspace = WorkspaceManager.from_id(
             _workspace_id_from_project(project),
             base_dir=settings.workspace_path,
+            archive_data=project.archive_data,
         )
         project_path: Path = workspace.get_project_path()
     except WorkspaceError as exc:

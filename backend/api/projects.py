@@ -57,7 +57,29 @@ async def upload_project(
         workspace.cleanup(); raise HTTPException(status_code=422, detail=f"ZIP validation failed: {exc}") from exc
     except WorkspaceError as exc:
         workspace.cleanup(); raise HTTPException(status_code=422, detail=f"Extraction failed: {exc}") from exc
-    file_count = sum(1 for _ in project_path.rglob("*.py")); project_name = file.filename.removesuffix(".zip")
-    project = Project(user_id=current_user.id if current_user else None, guest_id=guest.id if guest else None, name=project_name, original_filename=file.filename, workspace_path=str(workspace.get_workspace_path()), file_count=file_count, size_bytes=len(data))
-    db.add(project); db.flush(); db.commit()
-    return ProjectUploadResponse(project_id=project.id, name=project_name, file_count=file_count, size_bytes=len(data), workspace_id=workspace.workspace_id, uploaded_at=datetime.now(timezone.utc).isoformat(), message=f"Project uploaded successfully. {file_count} Python file(s) found.")
+    file_count = sum(1 for _ in project_path.rglob("*.py"))
+    project_name = file.filename.removesuffix(".zip")
+    project = Project(
+        user_id=current_user.id if current_user else None,
+        guest_id=guest.id if guest else None,
+        name=project_name,
+        original_filename=file.filename,
+        workspace_path=str(workspace.get_workspace_path()),
+        file_count=file_count,
+        size_bytes=len(data),
+        archive_data=data,
+    )
+    db.add(project)
+    db.flush()
+    db.commit()
+
+    return ProjectUploadResponse(
+        project_id=project.id,
+        name=project_name,
+        file_count=file_count,
+        size_bytes=len(data),
+        workspace_id=workspace.workspace_id,
+        uploaded_at=datetime.now(timezone.utc).isoformat(),
+        message=f"Project uploaded successfully. {file_count} Python file(s) found.",
+    )
+

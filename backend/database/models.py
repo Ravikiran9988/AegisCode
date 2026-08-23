@@ -18,6 +18,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     event,
@@ -69,9 +70,11 @@ class Project(Base):
     file_count: Mapped[int] = mapped_column(Integer, default=0)
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    archive_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     user: Mapped[User | None] = relationship("User", back_populates="projects")
     guest: Mapped[Guest | None] = relationship("Guest", back_populates="projects")
     runs: Mapped[list[Run]] = relationship("Run", back_populates="project", cascade="all, delete-orphan")
+
 
 
 class Run(Base):
