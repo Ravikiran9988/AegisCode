@@ -55,12 +55,12 @@ def _get_auth_headers() -> dict[str, str]:
 
 def _request_error_message(exc: Exception, timeout: int) -> str:
     """Convert transport exceptions into safe, actionable UI diagnostics."""
+    if isinstance(exc, requests.exceptions.SSLError):
+        return "Backend TLS/SSL connection failed. Check the configured backend URL and certificate."
     if isinstance(exc, requests.exceptions.Timeout):
         return f"Backend request timed out after {timeout}s."
     if isinstance(exc, requests.exceptions.ConnectionError):
         return "Could not connect to the backend. Check BACKEND_URL and the backend deployment."
-    if isinstance(exc, requests.exceptions.SSLError):
-        return "Backend TLS/SSL connection failed. Check the configured backend URL and certificate."
     return f"Backend request failed: {exc.__class__.__name__}"
 
 
