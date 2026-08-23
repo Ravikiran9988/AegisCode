@@ -228,7 +228,8 @@ def test_same_failure_no_effective_change_stalls(tmp_path: Path):
                 updates = test_node(state, db=None)
 
     assert updates["status"] == "stalled"
-    assert updates["termination_reason"] == "no_effective_code_change"
+    assert updates["termination_reason"] == "repeated_failure"
+
 
 
 def test_same_failure_with_code_changes_allows_retry(tmp_path: Path):

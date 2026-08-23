@@ -506,8 +506,9 @@ def test_node(
                 run_id, curr_fp,
             )
             updates["status"] = "stalled"
-            updates["termination_reason"] = "no_effective_code_change"
+            updates["termination_reason"] = "repeated_failure"
         elif is_repeated_failure(curr_fp, prev_fps, threshold=3):
+
             logger.warning(
                 "[REPAIR STALLED] run_id=%s Repeated failure detected (%s) -> STALLED",
                 run_id, curr_fp,
