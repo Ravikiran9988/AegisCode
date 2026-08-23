@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from backend.agents.policies import PolicyViolationError, check_file_modification_policy
 from backend.agents.prompts.coder import SYSTEM_PROMPT, TASK_PROMPT_TEMPLATE
-from backend.agents.schemas import ArchitecturePlan, CodeChange
+from backend.agents.schemas import ArchitecturePlan, CodeChange, PatchApplicationError
 from backend.context.builder import build_coder_context
 from backend.core.config import settings
 from backend.core.logging import get_logger
@@ -27,13 +27,24 @@ from backend.database.models import Event
 from backend.execution.workspace import WorkspaceManager
 from backend.llm.base import BaseLLMProvider
 from backend.tools.filesystem import _clean_patch, apply_patch, read_file, write_file
+from backend.tools.git_tools import get_git_diff
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
 
 
+
 class CoderAgent:
-    """Coder Agent — generates and applies targeted code repairs."""
+    """
+    Autonomous code synthesizer and patch applicator.
+
+    Interactions:
+    1. Builds context containing architecture plan and target file contents.
+    2. Calls LLM to produce a strongly typed CodeChange object.
+    3. Validates file modification security policy.
+    4. Applies patch (unified diff) or writes full file into WorkspaceManager.
+    5. Confirms net changes were made before returning.
+    """
 
     def __init__(self, llm_provider: BaseLLMProvider) -> None:
         self.llm = llm_provider
@@ -47,6 +58,7 @@ class CoderAgent:
         db: Session | None = None,
         allow_test_modification: bool = False,
         previous_attempt_summary: str | None = None,
+        patch_error: str | None = None,
     ) -> CodeChange:
         """
         Generate a CodeChange schema from context, evaluate security policies,
@@ -54,8 +66,8 @@ class CoderAgent:
         """
         _emit_agent_event(db, run_id, "coder", "CODER_STARTED")
         logger.info(
-            "[CODER START] run_id=%s workspace=%s relevant_files=%s",
-            run_id, workspace.workspace_id, plan.relevant_files,
+            "[CODER START] run_id=%s workspace=%s relevant_files=%s patch_error=%s",
+            run_id, workspace.workspace_id, plan.relevant_files, patch_error,
         )
 
         context = build_coder_context(
@@ -64,6 +76,7 @@ class CoderAgent:
             relevant_files=plan.relevant_files,
             test_result=test_result,
             previous_attempt_summary=previous_attempt_summary,
+            patch_error=patch_error,
         )
 
         prompt = TASK_PROMPT_TEMPLATE.format(context=context)
@@ -81,12 +94,14 @@ class CoderAgent:
             raise
 
         if change.change_type == "none" or not change.file_path:
-            logger.info("CoderAgent proposed no changes.")
+            logger.warning("CoderAgent proposed no changes.")
             _emit_agent_event(
-                db, run_id, "coder", "CODER_COMPLETED",
+                db, run_id, "coder", "TOOL_FAILED",
                 {"change_type": "none", "explanation": change.explanation}
             )
-            return change
+            raise PatchApplicationError(
+                f"CoderAgent returned no code modifications (change_type='none'): {change.explanation}"
+            )
 
         try:
             check_file_modification_policy(
@@ -121,7 +136,7 @@ class CoderAgent:
                     db, run_id, "coder", "TOOL_FAILED",
                     {"tool": "write_file", "path": change.file_path, "error": write_res.error}
                 )
-                raise RuntimeError(f"Failed to write file {change.file_path}: {write_res.error}")
+                raise PatchApplicationError(f"Failed to write file {change.file_path}: {write_res.error}")
 
         elif change.change_type == "patch":
             _emit_agent_event(
@@ -217,7 +232,7 @@ Produce only the CodeChange object required by the schema.
                         db, run_id, "coder", "TOOL_FAILED",
                         {"tool": "apply_patch", "path": change.file_path, "error": patch_res.error}
                     )
-                    raise RuntimeError(
+                    raise PatchApplicationError(
                         f"Failed to patch file {change.file_path}: {patch_res.error}"
                     )
 
@@ -277,11 +292,21 @@ Return only the required CodeChange JSON.
             except Exception as noop_exc:
                 logger.warning("[NO-OP RECOVERY FAILED] run_id=%s: %s", run_id, noop_exc)
 
-        logger.info(
-            "[PATCH COMPLETE] run_id=%s file=%s type=%s",
-            run_id, change.file_path, change.change_type,
-        )
+        # ── Final Git Diff Authoritative Verification ─────────────────────────
+        diff_res = get_git_diff(workspace)
+        if not diff_res.has_changes:
+            _emit_agent_event(
+                db, run_id, "coder", "TOOL_FAILED",
+                {"tool": change.change_type, "path": change.file_path, "error": "No changes made to workspace"}
+            )
+            raise PatchApplicationError(
+                f"No changes were detected in workspace for {change.file_path} after applying modification"
+            )
 
+        logger.info(
+            "[PATCH COMPLETE] run_id=%s file=%s type=%s changed_files=%s",
+            run_id, change.file_path, change.change_type, diff_res.changed_files,
+        )
 
         _emit_agent_event(
             db, run_id, "coder", "CODER_COMPLETED",
@@ -289,6 +314,7 @@ Return only the required CodeChange JSON.
                 "file_path": change.file_path,
                 "change_type": change.change_type,
                 "explanation": change.explanation,
+                "changed_files": diff_res.changed_files,
             }
         )
         logger.info(

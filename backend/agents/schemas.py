@@ -102,3 +102,8 @@ class ReviewResult(BaseModel):
             "'Retry with alternative approach')."
         )
     )
+
+
+class PatchApplicationError(Exception):
+    """Raised when a Coder-synthesized patch or write operation could not be applied or produces no net changes."""
+    pass

@@ -18,7 +18,7 @@ from backend.agents.architect import ArchitectAgent
 from backend.agents.coder import CoderAgent
 from backend.agents.policies import PolicyViolationError
 from backend.agents.reviewer import ReviewerAgent
-from backend.agents.schemas import ArchitecturePlan, CodeChange, ReviewResult
+from backend.agents.schemas import ArchitecturePlan, CodeChange, PatchApplicationError, ReviewResult
 from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event, Run
@@ -113,6 +113,8 @@ def initial_test_node(
         "test_result": res_dict,
         "initial_failed_count": res.failed,
         "final_failed_count": res.failed,
+        "validation_status": "passed" if res.success else "failed",
+        "targeted_test_status": "skipped",
     }
 
     _record_timing(state, updates, 1, "initial_test", init_dur)
@@ -280,6 +282,7 @@ def coder_node(
     run_id = state.get("run_id", "")
     iteration = state.get("iteration", 1)
     project_path = state["project_path"]
+    eff_max = state.get("max_iterations", settings.max_agent_iterations)
 
     rel_file = ""
     if state.get("architecture_plan") and state["architecture_plan"].get("relevant_files"):
@@ -309,11 +312,13 @@ def coder_node(
     plan = ArchitecturePlan(**state["architecture_plan"])
     test_res = TestResult(**state["test_result"]) if state.get("test_result") else None
 
-
     prev_summary: str | None = None
     if iteration > 1 and state.get("code_change"):
         prev_cc = state.get("code_change") or {}
         prev_summary = f"File: {prev_cc.get('file_path')}, Change: {prev_cc.get('change_type')}, Explanation: {prev_cc.get('explanation')}"
+
+    prev_patch_err = state.get("patch_error")
+    patch_retries = state.get("patch_retry_count", 0)
 
     try:
         change: CodeChange = agent.generate_and_apply_fix(
@@ -323,6 +328,7 @@ def coder_node(
             run_id=run_id,
             db=db,
             previous_attempt_summary=prev_summary,
+            patch_error=prev_patch_err,
         )
     except QuotaExhaustedError as exc:
         err_msg = str(exc)
@@ -371,23 +377,35 @@ def coder_node(
             "termination_reason": "policy_violation",
             "code_change": failed_change.model_dump(),
         }
-    except RuntimeError as exc:
+    except (PatchApplicationError, RuntimeError) as exc:
         err_msg = str(exc)
+        new_patch_retries = patch_retries + 1
         _emit_event(
             db,
             run_id,
             iteration,
             "coder",
-            "PATCH_ERROR",
+            "PATCH_FAILED",
             {
                 "node": "coder",
                 "agent": "Coder Agent",
                 "phase": "Code Repair & Patch",
                 "error": err_msg,
-                "description": f"Iteration {iteration}: Patch application failed — {err_msg}",
+                "patch_status": "failed",
+                "patch_error": err_msg,
+                "validation_status": "skipped",
+                "patch_retry_count": new_patch_retries,
+                "next_action": "Coder Retry" if new_patch_retries < 3 else "Architect Retry",
+                "description": (
+                    f"Iteration {iteration}: Patch application failed ({err_msg}). "
+                    "Skipping test validation and scheduling retry."
+                ),
             },
         )
-        logger.warning("[CODER PATCH ERROR] run_id=%s iteration=%d: %s", run_id, iteration, err_msg)
+        logger.warning(
+            "[CODER PATCH FAILED] run_id=%s iteration=%d retries=%d: %s",
+            run_id, iteration, new_patch_retries, err_msg,
+        )
         diff_res = get_git_diff(wm)
         failed_change = CodeChange(
             file_path=plan.relevant_files[0] if plan.relevant_files else "unknown",
@@ -403,12 +421,23 @@ def coder_node(
             iteration_number=iteration,
             code_changes=[failed_change.model_dump()],
         )
-        return {
+        updates = {
             "code_change": failed_change.model_dump(),
             "coder_error": err_msg,
+            "patch_status": "failed",
+            "patch_error": err_msg,
+            "coder_status": "patch_failed",
+            "files_modified": [],
+            "validation_status": "skipped",
+            "targeted_test_status": "skipped",
+            "patch_retry_count": new_patch_retries,
             "git_diff": diff_res.model_dump(),
             "tool_call_count": state.get("tool_call_count", 0) + 1,
         }
+        if new_patch_retries >= 3 and iteration >= eff_max:
+            updates["status"] = "failed"
+            updates["termination_reason"] = "patch_application_failed"
+        return updates
 
     coder_dur = time.monotonic() - start_t
     diff_res = get_git_diff(wm)
@@ -426,6 +455,8 @@ def coder_node(
             "file_path": change.file_path,
             "change_type": change.change_type,
             "explanation": change.explanation,
+            "patch_status": "succeeded",
+            "files_modified": diff_res.changed_files,
             "duration": round(coder_dur, 2),
             "description": (
                 f"Iteration {iteration}: Applied patch to `{change.file_path}` "
@@ -434,8 +465,8 @@ def coder_node(
         },
     )
     logger.info(
-        "[CODER COMPLETE] run_id=%s iteration=%d file=%s type=%s duration=%.2fs",
-        run_id, iteration, change.file_path, change.change_type, coder_dur,
+        "[CODER COMPLETE] run_id=%s iteration=%d file=%s type=%s changed_files=%s duration=%.2fs",
+        run_id, iteration, change.file_path, change.change_type, diff_res.changed_files, coder_dur,
     )
 
     change_dict = change.model_dump()
@@ -448,6 +479,12 @@ def coder_node(
 
     updates = {
         "code_change": change_dict,
+        "patch_status": "succeeded",
+        "patch_error": None,
+        "coder_status": "succeeded",
+        "files_modified": diff_res.changed_files,
+        "patch_retry_count": 0,
+        "validation_status": "pending",
         "git_diff": diff_res.model_dump(),
         "tool_call_count": state.get("tool_call_count", 0) + 1,
     }
@@ -457,6 +494,7 @@ def coder_node(
 
     _record_timing(state, updates, iteration, "coder", coder_dur)
     return updates
+
 
 
 
@@ -555,7 +593,13 @@ def test_node(
     updates: dict = {
         "test_result": res_dict,
         "final_failed_count": res.failed,
+        "validation_status": "passed" if res.success else "failed",
+        "targeted_test_status": "passed" if (target_files and res.success) else ("failed" if target_files else "skipped"),
+        "patch_status": "succeeded",
+        "patch_error": None,
+        "files_modified": state.get("files_modified") or [],
     }
+
 
     if not res.success:
         eff_max = state.get("max_iterations", settings.max_agent_iterations)

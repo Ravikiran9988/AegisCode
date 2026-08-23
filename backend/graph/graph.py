@@ -158,11 +158,32 @@ def initial_test_router(state: RepairState) -> Literal["continue", "end"]:
     return "continue"
 
 
-def coder_router(state: RepairState) -> Literal["test", "end"]:
-    """Route after coder_node: if policy violation or error occurred, terminate safely."""
+def coder_router(state: RepairState) -> Literal["test", "coder_retry", "architect_retry", "end"]:
+
+    """
+    Route after coder_node:
+    1. If status is terminal (error, failed, stalled), route to END.
+    2. If patch application failed:
+       - If consecutive patch retries < 3 and iteration < max_iterations: retry coder directly.
+       - If consecutive patch retries >= 3 and iteration < max_iterations: retry architect for new strategy.
+       - If max iterations reached: terminate to END.
+    3. If patch succeeded: proceed to test validation.
+    """
     status = state.get("status", "running")
-    if status == "error":
+    if status in ("error", "failed", "stalled"):
         return "end"
+
+    patch_status = state.get("patch_status")
+    if patch_status == "failed":
+        patch_retries = state.get("patch_retry_count", 0)
+        eff_max = state.get("max_iterations", settings.max_agent_iterations)
+        current_iter = state.get("iteration", 1)
+        if patch_retries >= 3 or current_iter >= eff_max:
+            if current_iter >= eff_max:
+                return "end"
+            return "architect_retry"
+        return "coder_retry"
+
     return "test"
 
 
@@ -201,6 +222,8 @@ def build_repair_graph(
         coder_router,
         {
             "test": "test",
+            "coder_retry": "coder",
+            "architect_retry": "architect",
             "end": END,
         },
     )
@@ -227,7 +250,6 @@ def build_repair_graph(
     )
 
     return builder.compile()
-
 
 
 def run_repair_workflow(
@@ -265,6 +287,14 @@ def run_repair_workflow(
         "repeated_failure_count": 0,
         "status": "running",
         "termination_reason": None,
+        "patch_status": None,
+        "patch_error": None,
+        "files_modified": [],
+        "patch_retry_count": 0,
+        "coder_status": None,
+        "validation_status": "pending",
+        "targeted_test_status": "pending",
+        "iteration_reason": None,
         "start_time": start_time,
         "total_duration": 0.0,
         "initial_failed_count": 0,
@@ -274,6 +304,7 @@ def run_repair_workflow(
     }
 
     graph = build_repair_graph(llm_provider=llm_provider, db=db)
+
 
     try:
         final_state = graph.invoke(initial_state)

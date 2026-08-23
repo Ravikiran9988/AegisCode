@@ -104,7 +104,98 @@ class TestPatchRecovery:
 
             assert "coder_error" in node_output
             assert "No hunks found in patch" in node_output["coder_error"]
+            assert node_output["patch_status"] == "failed"
+            assert node_output["validation_status"] == "skipped"
             assert node_output["code_change"]["change_type"] == "none"
+        finally:
+            wm.cleanup()
+
+    def test_patch_failure_skips_pytest_validation_in_router(self):
+        """Verify coder_router routes patch failure directly to retry, skipping test node."""
+        from backend.graph.graph import coder_router
+        state = {
+            "run_id": "test-run-123",
+            "iteration": 1,
+            "max_iterations": 3,
+            "status": "running",
+            "patch_status": "failed",
+            "patch_retry_count": 1,
+        }
+        next_step = coder_router(state)
+        assert next_step == "coder_retry"
+        assert next_step != "test"
+
+    def test_repeated_patch_failures_routes_to_architect_or_end(self):
+        """Verify 3 consecutive patch failures routes to architect for a fresh strategy."""
+        from backend.graph.graph import coder_router
+        state = {
+            "run_id": "test-run-123",
+            "iteration": 1,
+            "max_iterations": 3,
+            "status": "running",
+            "patch_status": "failed",
+            "patch_retry_count": 3,
+        }
+        next_step = coder_router(state)
+        assert next_step == "architect_retry"
+
+        # If max iterations reached, terminate
+        state["iteration"] = 3
+        assert coder_router(state) == "end"
+
+    def test_coder_context_receives_exact_patch_error(self):
+        """Verify coder context builder includes PREVIOUS PATCH APPLICATION FAILED block."""
+        from backend.context.builder import build_coder_context
+        wm = WorkspaceManager.create()
+        try:
+            pdir = wm.get_project_path()
+            (pdir / "calc.py").write_text("def add(a, b): return a - b\n", encoding="utf-8")
+
+            context = build_coder_context(
+                workspace=wm,
+                architecture_summary="Fix calc.py",
+                relevant_files=["calc.py"],
+                patch_error="Failed to patch file calc.py: No hunks found in patch",
+            )
+
+            assert "[PREVIOUS PATCH APPLICATION FAILED]" in context
+            assert "No hunks found in patch" in context
+            assert "change_type='write'" in context
+        finally:
+            wm.cleanup()
+
+    def test_no_op_patch_treated_as_patch_failure(self):
+        """Verify patch proposing change_type='none' is treated as patch failure."""
+        wm = WorkspaceManager.create()
+        try:
+            pdir = wm.get_project_path()
+            (pdir / "calc.py").write_text("def add(a, b): return a - b\n", encoding="utf-8")
+
+            mock_llm = MagicMock(spec=BaseLLMProvider)
+            mock_llm.generate_structured.return_value = CodeChange(
+                file_path="calc.py",
+                change_type="none",
+                explanation="No changes proposed",
+                root_cause="None",
+                patch="",
+                confidence=0.5,
+            )
+
+            state = {
+                "run_id": "test-no-op",
+                "iteration": 1,
+                "project_path": str(pdir),
+                "architecture_plan": ArchitecturePlan(
+                    summary="Fix calc bug",
+                    relevant_files=["calc.py"],
+                    test_strategy="Run pytest",
+                ).model_dump(),
+            }
+
+            node_output = coder_node(state, mock_llm)
+            assert node_output["patch_status"] == "failed"
+            assert node_output["validation_status"] == "skipped"
+            assert "returned no code modifications" in node_output["coder_error"]
         finally:
             wm.cleanup()
 

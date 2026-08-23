@@ -284,6 +284,7 @@ def build_coder_context(
     relevant_files: list[str],
     test_result: TestResult | None = None,
     previous_attempt_summary: str | None = None,
+    patch_error: str | None = None,
 ) -> str:
     """
     Build prompt context for the Coder Agent.
@@ -293,6 +294,7 @@ def build_coder_context(
     - Contents of relevant source & test files (within size budget)
     - Exact test failure output and failing test code assertions (read-only)
     - Optional previous attempt notes for multi-iteration loop intelligence
+    - Optional patch application error diagnostics for fast recovery
     """
     files_content_parts: list[str] = []
     total_len = 0
@@ -334,7 +336,6 @@ def build_coder_context(
 
         test_failure_block = "\n\n".join(diag_parts)
 
-
     test_snippets = _extract_test_file_snippets(workspace, test_result, max_chars=1200)
     test_block = ""
     if test_snippets:
@@ -355,6 +356,17 @@ def build_coder_context(
 </untrusted_previous_patch>
 Note: The previous modification did NOT fix the failure. You MUST produce a new, different fix."""
 
+    patch_err_block = ""
+    if patch_error:
+        patch_err_block = f"""
+
+[PREVIOUS PATCH APPLICATION FAILED]
+<untrusted_patch_error>
+{patch_error}
+</untrusted_patch_error>
+CRITICAL: The previous patch could NOT be applied to the target file.
+Inspect the current source code above and return change_type='write' with the complete corrected file contents, or provide a strictly valid unified diff matching exact file lines."""
+
     context_str = f"""
 [REPAIR PLAN SUMMARY]
 {architecture_summary}
@@ -367,10 +379,11 @@ Note: The previous modification did NOT fix the failure. You MUST produce a new,
 [CURRENT TEST FAILURES]
 <untrusted_test_output>
 {test_failure_block}
-</untrusted_test_output>{test_block}{prev_attempt_block}
+</untrusted_test_output>{test_block}{prev_attempt_block}{patch_err_block}
 """.strip()
 
     return _truncate(context_str, settings.max_file_context_size)
+
 
 
 

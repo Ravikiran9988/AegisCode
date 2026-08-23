@@ -36,6 +36,16 @@ class RepairState(TypedDict, total=False):
     review_result: dict[str, Any] | None
     git_diff: dict[str, Any] | None
 
+    # Patch & Coder execution tracking
+    patch_status: str | None  # "succeeded", "failed", "none"
+    patch_error: str | None
+    files_modified: list[str]
+    patch_retry_count: int
+    coder_status: str | None  # "succeeded", "patch_failed", "generation_failed"
+    validation_status: str | None  # "pending", "skipped", "passed", "failed"
+    targeted_test_status: str | None  # "pending", "passed", "failed", "skipped"
+    iteration_reason: str | None
+
     # Failure history & Loop detection
     previous_failures: list[str]  # list of failure fingerprints
     repeated_failure_count: int
@@ -44,7 +54,8 @@ class RepairState(TypedDict, total=False):
     status: str  # "running", "passed", "failed", "stalled", "already_passing", "error"
     termination_reason: str | None
     # Options: "all_tests_passed", "max_iterations_reached", "repeated_failure",
-    #          "policy_violation", "llm_error", "workspace_error"
+    #          "policy_violation", "patch_application_failed", "quota_exhausted",
+    #          "llm_error", "workspace_error"
 
     # Evaluation Metrics & Telemetry
     start_time: float
@@ -54,4 +65,3 @@ class RepairState(TypedDict, total=False):
     tool_call_count: int
     reviewer_rejections: int
     iteration_timings: dict[int, dict[str, float]]
-
