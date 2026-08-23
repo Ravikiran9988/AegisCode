@@ -291,26 +291,21 @@ def run_repair_workflow(
             final_state["termination_reason"] = "all_tests_passed"
         elif final_state.get("status") == "already_passing":
             pass
+        elif final_state.get("iteration", 1) >= eff_max:
+            final_state["status"] = "failed"
+            final_state["termination_reason"] = (
+                "reviewer_rejected"
+                if (review_res and not review_res.approved)
+                else "max_iterations_reached"
+            )
         else:
-            curr_fp = compute_failure_fingerprint(test_res)
-            prev_fps = final_state.get("previous_failures", [])
-            if is_repeated_failure(curr_fp, prev_fps, threshold=2):
-                final_state["status"] = "stalled"
-                final_state["termination_reason"] = "repeated_failure"
-            elif final_state.get("iteration", 1) >= eff_max:
-                final_state["status"] = "failed"
-                final_state["termination_reason"] = (
-                    "reviewer_rejected"
-                    if (review_res and not review_res.approved)
-                    else "max_iterations_reached"
-                )
-            else:
-                final_state["status"] = "failed"
-                final_state["termination_reason"] = (
-                    "reviewer_rejected"
-                    if (review_res and not review_res.approved)
-                    else "stopped"
-                )
+            final_state["status"] = "failed"
+            final_state["termination_reason"] = (
+                "reviewer_rejected"
+                if (review_res and not review_res.approved)
+                else "stopped"
+            )
+
 
     elapsed = time.monotonic() - start_time
     final_state["total_duration"] = elapsed
