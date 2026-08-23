@@ -12,6 +12,7 @@ try:
     from frontend.utils.helpers import _normalize_backend_url
 except ImportError:
     from utils.helpers import _normalize_backend_url
+
 _COLD_START_RETRY_DELAYS = [0, 2, 4, 8, 12]
 
 
@@ -51,6 +52,25 @@ def _get_auth_headers() -> dict[str, str]:
         headers["X-Guest-Name"] = name
     return headers
 
+
+def _request_error_message(exc: Exception, timeout: int) -> str:
+    """Convert transport exceptions into safe, actionable UI diagnostics."""
+    if isinstance(exc, requests.exceptions.Timeout):
+        return f"Backend request timed out after {timeout}s."
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return "Could not connect to the backend. Check BACKEND_URL and the backend deployment."
+    if isinstance(exc, requests.exceptions.SSLError):
+        return "Backend TLS/SSL connection failed. Check the configured backend URL and certificate."
+    return f"Backend request failed: {exc.__class__.__name__}"
+
+
+def _set_last_request_error(message: str = "") -> None:
+    st.session_state["api_last_error"] = message
+
+
+def get_last_request_error() -> str:
+    """Return the latest transport-level API error captured by a safe request."""
+    return str(st.session_state.get("api_last_error", ""))
 
 
 def _check_backend_once(backend_url: str, timeout: int = 10) -> tuple[bool, dict, str]:
@@ -94,18 +114,22 @@ def check_backend_with_retry(
 def _safe_get(url: str, timeout: int = 30, **kwargs) -> requests.Response | None:
     headers = _get_auth_headers()
     headers.update(kwargs.pop("headers", {}))
+    _set_last_request_error()
     try:
         return requests.get(url, timeout=timeout, headers=headers, **kwargs)
-    except Exception:
+    except Exception as exc:
+        _set_last_request_error(_request_error_message(exc, timeout))
         return None
 
 
 def _safe_post(url: str, timeout: int = 30, **kwargs) -> requests.Response | None:
     headers = _get_auth_headers()
     headers.update(kwargs.pop("headers", {}))
+    _set_last_request_error()
     try:
         return requests.post(url, timeout=timeout, headers=headers, **kwargs)
-    except Exception:
+    except Exception as exc:
+        _set_last_request_error(_request_error_message(exc, timeout))
         return None
 
 
@@ -263,7 +287,7 @@ def fetch_history_runs(api_url: str, limit: int = 50, status: str | None = None)
 def fetch_run_status_detail(api_url: str, run_id: str) -> tuple[dict | None, int, str]:
     res = _safe_get(f"{api_url}/runs/{run_id}/status", timeout=10)
     if res is None:
-        return None, 0, "Network connection timeout or unreachable backend"
+        return None, 0, get_last_request_error() or "Network connection timeout or unreachable backend"
     if res.status_code == 200:
         try:
             return res.json(), 200, ""
@@ -281,7 +305,7 @@ def fetch_run_status(api_url: str, run_id: str) -> dict | None:
 def fetch_run_results_detail(api_url: str, run_id: str) -> tuple[dict | None, int, str]:
     res = _safe_get(f"{api_url}/runs/{run_id}/results", timeout=10)
     if res is None:
-        return None, 0, "Network connection timeout or unreachable backend"
+        return None, 0, get_last_request_error() or "Network connection timeout or unreachable backend"
     if res.status_code == 200:
         try:
             return res.json(), 200, ""
