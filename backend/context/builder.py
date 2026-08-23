@@ -123,11 +123,97 @@ def _extract_test_file_snippets(
     return "\n".join(snippets)
 
 
+def find_relevant_source_files(
+    workspace: WorkspaceManager,
+    test_result: TestResult | None,
+    max_files: int = 3,
+) -> list[str]:
+    """
+    Deterministically identify the most relevant source files for a failing test.
+
+    Extraction order:
+    1. Source files referenced in tracebacks / error lines
+    2. Implementation files imported by failing test files
+    3. Source files matching the test filename convention (e.g. test_calc.py -> calc.py)
+    """
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def _add_candidate(p: str) -> None:
+        p_clean = p.replace("\\", "/").strip().lstrip("./")
+        if "/" in p_clean and "project/" in p_clean:
+            p_clean = p_clean.split("project/", 1)[1]
+        base = p_clean.split("/")[-1].lower()
+        if (
+            p_clean
+            and p_clean not in seen
+            and not base.startswith("test_")
+            and not base.endswith("_test.py")
+            and not p_clean.startswith("tests/")
+            and "/tests/" not in p_clean
+            and "site-packages" not in p_clean
+            and not p_clean.startswith(".")
+        ):
+            # Verify file actually exists in workspace
+            res = read_file(workspace, p_clean)
+            if res.success:
+                seen.add(p_clean)
+                candidates.append(p_clean)
+
+    if test_result:
+        combined = f"{test_result.stdout or ''}\n{test_result.stderr or ''}"
+        # 1. Traceback references
+        for m in re.finditer(r'File "([^"]+\.py)"', combined):
+            _add_candidate(m.group(1))
+        for m in re.finditer(r'([a-zA-Z0-9_/\\.-]+\.py):\d+:', combined):
+            _add_candidate(m.group(1))
+
+        # 2. Extract test files to find their imports
+        test_files: list[str] = []
+        for m in re.finditer(r'(?:FAILED|ERROR|\b)([a-zA-Z0-9_./\\-]*test[a-zA-Z0-9_./\\-]*\.py)', combined):
+            tf = m.group(1).replace("\\", "/").strip().lstrip("./")
+            if "/" in tf and "project/" in tf:
+                tf = tf.split("project/", 1)[1]
+            if tf and tf not in test_files:
+                test_files.append(tf)
+
+        for tf in test_files[:2]:
+            t_res = read_file(workspace, tf)
+            if t_res.success and t_res.content:
+                # Look for `from foo import ...` or `import foo`
+                for imp_match in re.finditer(r'^\s*(?:from|import)\s+([a-zA-Z0-9_]+)', t_res.content, re.MULTILINE):
+                    mod_name = imp_match.group(1)
+                    if mod_name not in ("pytest", "unittest", "typing", "sys", "os", "pathlib", "math", "re", "json"):
+                        _add_candidate(f"{mod_name}.py")
+                        _add_candidate(f"src/{mod_name}.py")
+                        _add_candidate(f"app/{mod_name}.py")
+
+                # Name matching (test_foo.py -> foo.py)
+                base = tf.split("/")[-1]
+                if base.startswith("test_"):
+                    target_name = base[5:]
+                    _add_candidate(target_name)
+                    _add_candidate(f"src/{target_name}")
+                    _add_candidate(f"app/{target_name}")
+
+    if not candidates:
+        from backend.tools.filesystem import list_files
+        flist = list_files(workspace, "**/*.py")
+        if flist.success:
+            for f in flist.files:
+                _add_candidate(f)
+                if len(candidates) >= max_files:
+                    break
+
+    return candidates[:max_files]
+
+
 def build_architect_context(
     workspace: WorkspaceManager,
     test_result: TestResult | None = None,
     custom_instructions: str | None = None,
     cached_project_structure: str | None = None,
+    previous_attempt_summary: str | None = None,
 ) -> str:
     """
     Build prompt context for the Architect Agent.
@@ -136,6 +222,7 @@ def build_architect_context(
     - Project structure tree
     - Relevant test code & failure details (read-only)
     - Untrusted data warning blocks
+    - Optional previous attempt notes for multi-iteration loop intelligence
     """
     if cached_project_structure:
         tree_str = cached_project_structure
@@ -162,6 +249,17 @@ def build_architect_context(
 {test_snippets}
 </untrusted_test_code>"""
 
+    prev_attempt_block = ""
+    if previous_attempt_summary:
+        prev_attempt_block = f"""
+
+[PREVIOUS REPAIR ATTEMPT (FAILED)]
+<untrusted_previous_patch>
+{previous_attempt_summary}
+</untrusted_previous_patch>
+Note: The previous patch did NOT resolve the failing test. Do NOT repeat the same change.
+Formulate a new hypothesis based on the exact test assertions."""
+
     context_str = f"""
 [PROJECT FILE STRUCTURE]
 <untrusted_project_tree>
@@ -171,7 +269,7 @@ def build_architect_context(
 [TEST EXECUTION RESULTS]
 <untrusted_test_output>
 {test_summary}
-</untrusted_test_output>{test_block}
+</untrusted_test_output>{test_block}{prev_attempt_block}
 """.strip()
 
     if custom_instructions:
@@ -185,6 +283,7 @@ def build_coder_context(
     architecture_summary: str,
     relevant_files: list[str],
     test_result: TestResult | None = None,
+    previous_attempt_summary: str | None = None,
 ) -> str:
     """
     Build prompt context for the Coder Agent.
@@ -193,22 +292,15 @@ def build_coder_context(
     - Architecture plan summary & suspected issues
     - Contents of relevant source & test files (within size budget)
     - Exact test failure output and failing test code assertions (read-only)
+    - Optional previous attempt notes for multi-iteration loop intelligence
     """
     files_content_parts: list[str] = []
     total_len = 0
     budget = settings.max_file_context_size // 3
 
-    target_files = list(relevant_files)
+    target_files = [f for f in relevant_files if f]
     if not target_files:
-        from backend.tools.filesystem import list_files
-
-        flist = list_files(workspace, "**/*.py")
-        if flist.success:
-            target_files = [
-                f
-                for f in flist.files
-                if not f.startswith("test") and "test_" not in f and "_test" not in f
-            ]
+        target_files = find_relevant_source_files(workspace, test_result, max_files=settings.max_files_per_agent)
 
     for file_path in target_files[: settings.max_files_per_agent]:
         res = read_file(workspace, file_path)
@@ -218,6 +310,9 @@ def build_coder_context(
                 files_content_parts.append(snippet)
                 total_len += len(snippet)
             else:
+                files_content_parts.append(
+                    f"--- FILE: {file_path} ---\n{_truncate(res.content, max(100, budget - total_len))}\n"
+                )
                 break
 
     source_code_block = "\n".join(files_content_parts) or "(No relevant files read)"
@@ -230,14 +325,15 @@ def build_coder_context(
         ]
         failure_summary = _extract_failure_summary(test_result)
         if failure_summary and failure_summary != "No stdout/stderr output captured.":
-            diag_parts.append(f"--- Key Failure Diagnostics ---\n{_truncate(failure_summary, 800)}")
+            diag_parts.append(f"--- Key Failure Diagnostics ---\n{_truncate(failure_summary, 600)}")
 
         if test_result.stdout:
-            diag_parts.append(f"--- Captured Stdout ---\n{_truncate(test_result.stdout, 600)}")
+            diag_parts.append(f"--- Captured Stdout ---\n{_truncate(test_result.stdout, 400)}")
         if test_result.stderr:
             diag_parts.append(f"--- Captured Stderr ---\n{_truncate(test_result.stderr, 400)}")
 
         test_failure_block = "\n\n".join(diag_parts)
+
 
     test_snippets = _extract_test_file_snippets(workspace, test_result, max_chars=1200)
     test_block = ""
@@ -248,6 +344,16 @@ def build_coder_context(
 <untrusted_test_code>
 {test_snippets}
 </untrusted_test_code>"""
+
+    prev_attempt_block = ""
+    if previous_attempt_summary:
+        prev_attempt_block = f"""
+
+[PREVIOUS REPAIR ATTEMPT (FAILED)]
+<untrusted_previous_patch>
+{previous_attempt_summary}
+</untrusted_previous_patch>
+Note: The previous modification did NOT fix the failure. You MUST produce a new, different fix."""
 
     context_str = f"""
 [REPAIR PLAN SUMMARY]
@@ -261,10 +367,11 @@ def build_coder_context(
 [CURRENT TEST FAILURES]
 <untrusted_test_output>
 {test_failure_block}
-</untrusted_test_output>{test_block}
+</untrusted_test_output>{test_block}{prev_attempt_block}
 """.strip()
 
     return _truncate(context_str, settings.max_file_context_size)
+
 
 
 

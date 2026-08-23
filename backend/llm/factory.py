@@ -23,8 +23,9 @@ def get_llm_provider(
     provider_name: str | None = None,
     provider_type: str | None = None,
     override_instance: BaseLLMProvider | None = None,
+    role: str | None = None,
 ) -> BaseLLMProvider:
-    """Return the configured LLM provider instance."""
+    """Return the configured LLM provider instance, optionally customized per agent role."""
     if override_instance:
         return override_instance
 
@@ -42,16 +43,26 @@ def get_llm_provider(
         )
         return OllamaLLMProvider()
     if name in ("openai", "openai_compatible", "hosted"):
+        target_model = settings.openai_model
+        if role == "architect" and settings.architect_model:
+            target_model = settings.architect_model
+        elif role == "coder" and settings.coder_model:
+            target_model = settings.coder_model
+        elif role == "reviewer" and settings.reviewer_model:
+            target_model = settings.reviewer_model
+
         logger.info(
-            "Using StrictGroqLLMProvider (url=%s, model=%s)",
+            "Using StrictGroqLLMProvider (url=%s, model=%s, role=%s)",
             settings.openai_base_url,
-            settings.openai_model,
+            target_model,
+            role or "default",
         )
-        return StrictGroqLLMProvider()
+        return StrictGroqLLMProvider(model=target_model)
     raise ValueError(
         f"Unsupported LLM provider {name!r}. Production AegisCode requires "
         f"'openai_compatible' with Groq model 'openai/gpt-oss-120b'."
     )
+
 
 
 def check_llm_health(provider_name: str | None = None) -> dict[str, str | bool]:

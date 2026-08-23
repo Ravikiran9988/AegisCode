@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from backend.core.config import settings
 from backend.core.logging import get_logger
-from backend.llm.base import BaseLLMProvider, LLMProviderError
+from backend.llm.base import BaseLLMProvider, LLMProviderError, QuotaExhaustedError, RateLimitError
 
 logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
@@ -31,10 +31,6 @@ _RETRY_AFTER_PATTERN = re.compile(
     r"(?:try again in\s*~?\s*)(\d+(?:\.\d+)?)\s*(?:seconds?|s\b)",
     re.IGNORECASE,
 )
-
-
-class RateLimitError(LLMProviderError):
-    """Raised when a rate limit remains after all retry attempts."""
 
 
 class OpenAICompatibleLLMProvider(BaseLLMProvider):
@@ -52,6 +48,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         self.model = model or settings.openai_model
         self.timeout = timeout or settings.llm_timeout_seconds
         self._session: requests.Session | None = None
+        self.last_usage: dict[str, Any] = {}
 
     @property
     def session(self) -> requests.Session:
@@ -84,7 +81,6 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
                     timeout=self.timeout,
                 )
 
-
             except requests.exceptions.Timeout as exc:
                 raise LLMProviderError(
                     f"OpenAI API request timed out after {self.timeout}s"
@@ -95,12 +91,46 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             if resp.status_code != 429:
                 return resp
 
+            err_msg = ""
+            try:
+                err_body = resp.json()
+                err_msg = err_body.get("error", {}).get("message", "") or str(err_body)
+            except Exception:
+                err_msg = resp.text
+
+            # Check for TPD / Daily quota exhaustion
+            is_tpd = (
+                "tokens per day" in err_msg.lower()
+                or "tpd" in err_msg.lower()
+                or ("limit" in err_msg.lower() and "used" in err_msg.lower() and "requested" in err_msg.lower())
+            )
+            if is_tpd:
+                logger.error(
+                    "Groq TPD (Tokens Per Day) limit reached: %s. Aborting retries immediately.",
+                    err_msg,
+                )
+                limit_val = None
+                used_val = None
+                req_val = None
+                m_lim = re.search(r"Limit\s+(\d+)", err_msg, re.IGNORECASE)
+                m_used = re.search(r"Used\s+(\d+)", err_msg, re.IGNORECASE)
+                m_req = re.search(r"Requested\s+(\d+)", err_msg, re.IGNORECASE)
+                if m_lim:
+                    limit_val = int(m_lim.group(1))
+                if m_used:
+                    used_val = int(m_used.group(1))
+                if m_req:
+                    req_val = int(m_req.group(1))
+
+                raise QuotaExhaustedError(
+                    message=f"Groq daily token quota (TPD) exhausted: {err_msg}",
+                    limit_type="TPD",
+                    limit_value=limit_val,
+                    used_value=used_val,
+                    requested_value=req_val,
+                )
+
             if attempt >= _MAX_RETRIES:
-                try:
-                    err_body = resp.json()
-                    err_msg = err_body.get("error", {}).get("message", "") or str(err_body)[:200]
-                except Exception:
-                    err_msg = resp.text[:200]
                 raise RateLimitError(
                     f"Groq rate limit (HTTP 429) exhausted after {_MAX_RETRIES} retries. "
                     f"Error: {err_msg}. Please wait a minute and try again."
@@ -117,6 +147,7 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             time.sleep(wait)
 
         raise RateLimitError("Rate limit retries exhausted")
+
 
     def generate(
         self,
@@ -158,7 +189,9 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             resp = self._call_with_retry(url, headers, payload)
             resp.raise_for_status()
             data = resp.json()
+            self.last_usage = data.get("usage", {})
             return data["choices"][0]["message"]["content"]
+
         except RateLimitError:
             raise
         except requests.exceptions.HTTPError as exc:

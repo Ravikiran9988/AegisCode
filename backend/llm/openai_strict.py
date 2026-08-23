@@ -49,14 +49,13 @@ class StrictGroqLLMProvider(OpenAICompatibleLLMProvider):
             actual_prompt = str(prompt)
 
         schema_json = _strict_json_schema(target_schema.model_json_schema())
-        schema_text = json.dumps(schema_json, separators=(",", ":"))
         full_prompt = (
-            f"{actual_prompt}\n\nOUTPUT RULES: Return exactly one JSON object matching the schema. "
-            "Keep all string fields concise. For code changes, return only the "
-            "minimal targeted diff. No markdown, code fences, reasoning, or commentary. "
-            f"Schema:{schema_text}"
+            f"{actual_prompt}\n\nOUTPUT RULES: Return exactly one JSON object conforming to the schema. "
+            "Keep string fields concise. For code changes, return only the minimal targeted fix. "
+            "No markdown, code fences, reasoning, or commentary."
         )
         effective_max_tokens = max_tokens or settings.max_llm_output_tokens
+
 
         raw_text = self.generate(
             prompt=full_prompt,

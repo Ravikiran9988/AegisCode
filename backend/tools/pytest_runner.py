@@ -232,3 +232,17 @@ def _parse_counts(stdout: str) -> tuple[int, int, int, int]:
         _extract("error(?:s)?"),
         _extract("skipped"),
     )
+
+
+def run_targeted_pytest(
+    project_path: Path,
+    target_files: list[str],
+    timeout: int | None = None,
+) -> TestResult:
+    """
+    Run pytest targeted specifically on the provided test files for fast validation.
+    """
+    clean_files = [f for f in target_files if f and (project_path / f).exists()]
+    if not clean_files:
+        return run_pytest(project_path, timeout=timeout)
+    return run_pytest(project_path, timeout=timeout, extra_args=clean_files)

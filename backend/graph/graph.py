@@ -32,12 +32,13 @@ from backend.graph.nodes import (
     test_node,
 )
 from backend.graph.state import RepairState
-from backend.llm.base import BaseLLMProvider
+from backend.llm.base import BaseLLMProvider, QuotaExhaustedError
 from backend.llm.openai import RateLimitError
 from backend.tools.git_tools import init_repo
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)
+
 
 
 def decision_router(state: RepairState) -> Literal["retry", "end"]:
@@ -276,6 +277,12 @@ def run_repair_workflow(
 
     try:
         final_state = graph.invoke(initial_state)
+    except QuotaExhaustedError as exc:
+        logger.error("[QUOTA EXHAUSTED] run_id=%s: %s", run_id, exc)
+        final_state = dict(initial_state)
+        final_state["status"] = "failed"
+        final_state["termination_reason"] = "quota_exhausted"
+        final_state["final_summary"] = str(exc)
     except RateLimitError as exc:
         logger.warning("[RATE LIMIT EXCEEDED] run_id=%s: %s", run_id, exc)
         final_state = dict(initial_state)
@@ -286,6 +293,7 @@ def run_repair_workflow(
         final_state = dict(initial_state)
         final_state["status"] = "error"
         final_state["termination_reason"] = f"llm_error: {exc}"
+
 
     # Ensure status is finalised strictly based on success criteria
     if final_state.get("status") in ("running", "passed"):

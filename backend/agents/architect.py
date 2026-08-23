@@ -38,6 +38,7 @@ class ArchitectAgent:
         run_id: str | None = None,
         db: Session | None = None,
         cached_project_structure: str | None = None,
+        previous_attempt_summary: str | None = None,
     ) -> ArchitecturePlan:
         """
         Analyze the project workspace and return a validated ArchitecturePlan.
@@ -68,7 +69,9 @@ class ArchitectAgent:
             workspace,
             test_result=test_result,
             cached_project_structure=cached_project_structure,
+            previous_attempt_summary=previous_attempt_summary,
         )
+
         prompt = TASK_PROMPT_TEMPLATE.format(context=context)
 
         try:

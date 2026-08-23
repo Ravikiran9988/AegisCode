@@ -19,6 +19,34 @@ class LLMProviderError(Exception):
     """Base exception for LLM provider errors."""
 
 
+class RateLimitError(LLMProviderError):
+    """Raised when a rate limit remains after all retry attempts."""
+
+
+class QuotaExhaustedError(RateLimitError):
+    """Raised immediately when a daily quota (e.g. TPD / tokens per day) is exhausted.
+
+    Indicates retrying is futile until the quota resets.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        limit_type: str = "TPD",
+        limit_value: int | None = None,
+        used_value: int | None = None,
+        requested_value: int | None = None,
+        retry_after: float | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.limit_type = limit_type
+        self.limit_value = limit_value
+        self.used_value = used_value
+        self.requested_value = requested_value
+        self.retry_after = retry_after
+
+
+
 class BaseLLMProvider(ABC):
     """Abstract LLM Provider interface."""
 

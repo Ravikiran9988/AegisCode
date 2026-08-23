@@ -27,10 +27,10 @@ from backend.execution import get_execution_backend
 from backend.execution.workspace import WorkspaceManager
 from backend.graph.loop_detector import compute_failure_fingerprint, is_repeated_failure
 from backend.graph.state import RepairState
-from backend.llm.base import BaseLLMProvider
+from backend.llm.base import BaseLLMProvider, QuotaExhaustedError
 from backend.tools.filesystem import get_project_structure
 from backend.tools.git_tools import GitDiff, get_git_diff
-from backend.tools.pytest_runner import TestResult
+from backend.tools.pytest_runner import TestResult, run_targeted_pytest
 
 logger = get_logger(__name__)
 
@@ -203,13 +203,34 @@ def architect_node(
 
     cached_struct = state.get("project_structure")
     test_res = TestResult(**state["test_result"]) if state.get("test_result") else None
-    plan: ArchitecturePlan = agent.analyze(
-        workspace=wm,
-        test_result=test_res,
-        run_id=run_id,
-        db=db,
-        cached_project_structure=cached_struct,
-    )
+
+    prev_summary: str | None = None
+    if iteration > 1 and state.get("code_change"):
+        prev_cc = state.get("code_change") or {}
+        prev_summary = f"File: {prev_cc.get('file_path')}, Change: {prev_cc.get('change_type')}, Explanation: {prev_cc.get('explanation')}"
+
+    try:
+        plan: ArchitecturePlan = agent.analyze(
+            workspace=wm,
+            test_result=test_res,
+            run_id=run_id,
+            db=db,
+            cached_project_structure=cached_struct,
+            previous_attempt_summary=prev_summary,
+        )
+    except QuotaExhaustedError as exc:
+        err_msg = str(exc)
+        logger.error("[ARCHITECT QUOTA EXHAUSTED] run_id=%s: %s", run_id, err_msg)
+        _emit_event(
+            db, run_id, iteration, "architect", "QUOTA_EXHAUSTED",
+            {"error": err_msg, "limit_type": exc.limit_type, "limit_value": exc.limit_value}
+        )
+        return {
+            "status": "failed",
+            "termination_reason": "quota_exhausted",
+            "final_summary": err_msg,
+        }
+
     arch_dur = time.monotonic() - start_t
 
     _emit_event(
@@ -249,6 +270,7 @@ def architect_node(
 
 
 
+
 def coder_node(
     state: RepairState,
     llm_provider: BaseLLMProvider,
@@ -284,9 +306,14 @@ def coder_node(
     start_t = time.monotonic()
     wm = WorkspaceManager.from_project_path(project_path)
     agent = CoderAgent(llm_provider)
-
     plan = ArchitecturePlan(**state["architecture_plan"])
     test_res = TestResult(**state["test_result"]) if state.get("test_result") else None
+
+
+    prev_summary: str | None = None
+    if iteration > 1 and state.get("code_change"):
+        prev_cc = state.get("code_change") or {}
+        prev_summary = f"File: {prev_cc.get('file_path')}, Change: {prev_cc.get('change_type')}, Explanation: {prev_cc.get('explanation')}"
 
     try:
         change: CodeChange = agent.generate_and_apply_fix(
@@ -295,7 +322,20 @@ def coder_node(
             test_result=test_res,
             run_id=run_id,
             db=db,
+            previous_attempt_summary=prev_summary,
         )
+    except QuotaExhaustedError as exc:
+        err_msg = str(exc)
+        logger.error("[CODER QUOTA EXHAUSTED] run_id=%s: %s", run_id, err_msg)
+        _emit_event(
+            db, run_id, iteration, "coder", "QUOTA_EXHAUSTED",
+            {"error": err_msg, "limit_type": exc.limit_type, "limit_value": exc.limit_value}
+        )
+        return {
+            "status": "failed",
+            "termination_reason": "quota_exhausted",
+            "final_summary": err_msg,
+        }
     except PolicyViolationError as exc:
         _emit_event(
             db,
@@ -415,7 +455,6 @@ def coder_node(
     if change.change_type in ("write", "create", "delete"):
         updates["project_structure"] = ""
 
-
     _record_timing(state, updates, iteration, "coder", coder_dur)
     return updates
 
@@ -448,7 +487,30 @@ def test_node(
     logger.info("[TEST START] run_id=%s iteration=%d", run_id, iteration)
 
     start_t = time.monotonic()
-    res: TestResult = get_execution_backend().run_pytest(project_path)
+
+    # Targeted testing optimization
+
+    target_files: list[str] = []
+    if settings.targeted_testing_enabled and state.get("test_result"):
+        import re
+        t_data = state["test_result"]
+        comb_out = f"{t_data.get('stdout', '')}\n{t_data.get('stderr', '')}"
+        for m in re.finditer(r'(?:FAILED|ERROR|\b)([a-zA-Z0-9_./\\-]*test[a-zA-Z0-9_./\\-]*\.py)', comb_out):
+            tf = m.group(1).replace("\\", "/").strip().lstrip("./")
+            if "/" in tf and "project/" in tf:
+                tf = tf.split("project/", 1)[1]
+            if tf and tf not in target_files and (project_path / tf).exists():
+                target_files.append(tf)
+
+    if target_files:
+        logger.info("[TARGETED TEST] Running targeted test on %s first", target_files)
+        res = run_targeted_pytest(project_path, target_files)
+        if res.success:
+            logger.info("[TARGETED TEST PASSED] Running full test suite to guarantee no regressions...")
+            res = get_execution_backend().run_pytest(project_path)
+    else:
+        res = get_execution_backend().run_pytest(project_path)
+
     pytest_dur = time.monotonic() - start_t
     res_dict = res.model_dump()
 
@@ -508,7 +570,6 @@ def test_node(
             updates["status"] = "stalled"
             updates["termination_reason"] = "repeated_failure"
         elif is_repeated_failure(curr_fp, prev_fps, threshold=3):
-
             logger.warning(
                 "[REPAIR STALLED] run_id=%s Repeated failure detected (%s) -> STALLED",
                 run_id, curr_fp,
@@ -574,17 +635,31 @@ def reviewer_node(
     new_res = TestResult(**state["test_result"]) if state.get("test_result") else None
 
     cached_diff = GitDiff(**state["git_diff"]) if state.get("git_diff") else None
-    review: ReviewResult = agent.review(
-        workspace=wm,
-        coder_explanation=code_change.explanation if code_change else "",
-        initial_test_result=initial_res,
-        new_test_result=new_res,
-        run_id=run_id,
-        db=db,
-        git_diff=cached_diff,
-    )
+    try:
+        review: ReviewResult = agent.review(
+            workspace=wm,
+            coder_explanation=code_change.explanation if code_change else "",
+            initial_test_result=initial_res,
+            new_test_result=new_res,
+            run_id=run_id,
+            db=db,
+            git_diff=cached_diff,
+        )
+    except QuotaExhaustedError as exc:
+        err_msg = str(exc)
+        logger.error("[REVIEWER QUOTA EXHAUSTED] run_id=%s: %s", run_id, err_msg)
+        _emit_event(
+            db, run_id, iteration, "reviewer", "QUOTA_EXHAUSTED",
+            {"error": err_msg, "limit_type": exc.limit_type, "limit_value": exc.limit_value}
+        )
+        return {
+            "status": "failed",
+            "termination_reason": "quota_exhausted",
+            "final_summary": err_msg,
+        }
 
     rev_dur = time.monotonic() - start_t
+
 
     review_dict = review.model_dump()
     upsert_iteration(

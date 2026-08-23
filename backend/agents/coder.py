@@ -46,6 +46,7 @@ class CoderAgent:
         run_id: str | None = None,
         db: Session | None = None,
         allow_test_modification: bool = False,
+        previous_attempt_summary: str | None = None,
     ) -> CodeChange:
         """
         Generate a CodeChange schema from context, evaluate security policies,
@@ -62,7 +63,9 @@ class CoderAgent:
             architecture_summary=plan.summary,
             relevant_files=plan.relevant_files,
             test_result=test_result,
+            previous_attempt_summary=previous_attempt_summary,
         )
+
         prompt = TASK_PROMPT_TEMPLATE.format(context=context)
 
         try:

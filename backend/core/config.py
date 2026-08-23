@@ -64,8 +64,25 @@ class Settings(BaseSettings):
         default="openai/gpt-oss-120b",
         description="Model name for OpenAI-compatible provider (Groq)",
     )
+    architect_model: str = Field(
+        default="",
+        description="Optional model override for Architect Agent (defaults to openai_model)",
+    )
+    coder_model: str = Field(
+        default="",
+        description="Optional model override for Coder Agent (defaults to openai_model)",
+    )
+    reviewer_model: str = Field(
+        default="",
+        description="Optional model override for Reviewer Agent (defaults to openai_model)",
+    )
+    targeted_testing_enabled: bool = Field(
+        default=True,
+        description="Run targeted failing test files first before full test suite",
+    )
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-3-5-sonnet-20241022"
+
 
     # Security & network
     cors_origins: str = Field(
