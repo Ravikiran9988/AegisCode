@@ -5,14 +5,12 @@ Preserves required helpers for compatibility with tests.
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
 from typing import Any
 
-import os
-
 import requests
-
 
 
 def get_default_backend_url() -> str:

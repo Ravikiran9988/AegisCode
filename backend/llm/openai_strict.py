@@ -30,40 +30,56 @@ class StrictGroqLLMProvider(OpenAICompatibleLLMProvider):
 
     def generate_structured(
         self,
-        prompt: str,
-        schema: type[T],
+        schema: Any,
+        prompt: Any = "",
         system_prompt: str | None = None,
         temperature: float = 0.1,
-    ) -> T:
-        """Generate schema-conformant JSON with constrained decoding."""
-        schema_json = _strict_json_schema(schema.model_json_schema())
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Generate schema-conformant JSON using Groq strict JSON Schema mode."""
+        if isinstance(schema, str) and isinstance(prompt, type) and issubclass(prompt, BaseModel):
+            target_schema: type[BaseModel] = prompt
+            actual_prompt: str = schema
+        elif isinstance(schema, type) and issubclass(schema, BaseModel):
+            target_schema = schema
+            actual_prompt = str(prompt)
+        else:
+            target_schema = schema
+            actual_prompt = str(prompt)
+
+        schema_json = _strict_json_schema(target_schema.model_json_schema())
         schema_text = json.dumps(schema_json, separators=(",", ":"))
         full_prompt = (
-            f"{prompt}\n\nOUTPUT RULES: Return exactly one JSON object matching the schema. "
+            f"{actual_prompt}\n\nOUTPUT RULES: Return exactly one JSON object matching the schema. "
             "Keep all string fields concise. For code changes, return only the "
             "minimal targeted diff. No markdown, code fences, reasoning, or commentary. "
             f"Schema:{schema_text}"
         )
+        effective_max_tokens = max_tokens or settings.max_llm_output_tokens
+
         raw_text = self.generate(
             prompt=full_prompt,
             system_prompt=system_prompt,
             temperature=temperature,
-            max_tokens=settings.max_llm_output_tokens,
+            max_tokens=effective_max_tokens,
             response_format={
                 "type": "json_schema",
                 "json_schema": {
-                    "name": _schema_name(schema),
+                    "name": _schema_name(target_schema),
                     "strict": True,
                     "schema": schema_json,
                 },
             },
             reasoning_format="hidden",
+            **kwargs,
         )
         try:
-            return schema.model_validate(json.loads(raw_text.strip()))
+            return target_schema.model_validate(json.loads(raw_text.strip()))
         except Exception as exc:
             logger.error("Strict Groq structured response validation failed: %s", exc)
             raise LLMProviderError(f"Invalid JSON returned by LLM: {exc}") from exc
+
 
 
 def _schema_name(schema: type[BaseModel]) -> str:

@@ -19,7 +19,7 @@ from backend.core.logging import get_logger
 from backend.database.models import Event
 from backend.execution.workspace import WorkspaceManager
 from backend.llm.base import BaseLLMProvider
-from backend.tools.git_tools import get_git_diff
+from backend.tools.git_tools import GitDiff, get_git_diff
 from backend.tools.pytest_runner import TestResult
 
 logger = get_logger(__name__)

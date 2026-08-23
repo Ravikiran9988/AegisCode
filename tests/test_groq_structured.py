@@ -78,3 +78,66 @@ def test_strict_provider_keeps_code_change_output_compact(mock_post):
 
     assert result.change_type == "patch"
     assert result.patch.startswith("@@")
+
+
+@patch("requests.post")
+def test_strict_provider_accepts_max_tokens_keyword_argument(mock_post):
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        '{"file_path":"app.py","change_type":"write",'
+                        '"explanation":"fix","patch":"print(1)"}'
+                    )
+                }
+            }
+        ]
+    }
+    mock_post.return_value = response
+
+    provider = StrictGroqLLMProvider(api_key="gsk-test-key")
+    result = provider.generate_structured(
+        schema=RepairResult,
+        prompt="Fix app.py",
+        system_prompt="You are a coder.",
+        max_tokens=1500,
+    )
+
+    assert result.file_path == "app.py"
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["max_completion_tokens"] == 1500
+    assert "max_tokens" not in payload
+
+
+@patch("requests.post")
+def test_strict_provider_flexible_argument_ordering(mock_post):
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        '{"file_path":"b.py","change_type":"write",'
+                        '"explanation":"fix","patch":"print(2)"}'
+                    )
+                }
+            }
+        ]
+    }
+    mock_post.return_value = response
+
+    provider = StrictGroqLLMProvider(api_key="gsk-test-key")
+    # Call with schema first (positional)
+    res1 = provider.generate_structured(RepairResult, "Fix b.py", max_tokens=800)
+    assert res1.file_path == "b.py"
+    assert mock_post.call_args.kwargs["json"]["max_completion_tokens"] == 800
+
+    # Call with prompt first (positional)
+    res2 = provider.generate_structured("Fix b.py", RepairResult, max_tokens=1200)
+    assert res2.file_path == "b.py"
+    assert mock_post.call_args.kwargs["json"]["max_completion_tokens"] == 1200
+

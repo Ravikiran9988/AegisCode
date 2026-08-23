@@ -30,7 +30,6 @@ from backend.tools.filesystem import get_project_structure
 from backend.tools.git_tools import GitDiff, get_git_diff
 from backend.tools.pytest_runner import TestResult
 
-
 logger = get_logger(__name__)
 
 

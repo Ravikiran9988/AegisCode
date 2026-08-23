@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import uuid
 
-
 import requests
 import streamlit as st
 
