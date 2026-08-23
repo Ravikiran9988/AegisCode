@@ -21,6 +21,7 @@ from backend.agents.policies import PolicyViolationError, check_file_modificatio
 from backend.agents.prompts.coder import SYSTEM_PROMPT, TASK_PROMPT_TEMPLATE
 from backend.agents.schemas import ArchitecturePlan, CodeChange
 from backend.context.builder import build_coder_context
+from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event
 from backend.execution.workspace import WorkspaceManager
@@ -69,6 +70,7 @@ class CoderAgent:
                 schema=CodeChange,
                 prompt=prompt,
                 system_prompt=SYSTEM_PROMPT,
+                max_tokens=settings.coder_max_tokens,
             )
         except Exception as exc:
             _emit_agent_event(db, run_id, "coder", "LLM_ERROR", {"error": str(exc)})

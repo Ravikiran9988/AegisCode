@@ -8,6 +8,7 @@ persists DB events and iterations via authoritative upserts, and returns updated
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,10 +26,27 @@ from backend.execution import get_execution_backend
 from backend.execution.workspace import WorkspaceManager
 from backend.graph.state import RepairState
 from backend.llm.base import BaseLLMProvider
-from backend.tools.git_tools import get_git_diff
+from backend.tools.filesystem import get_project_structure
+from backend.tools.git_tools import GitDiff, get_git_diff
 from backend.tools.pytest_runner import TestResult
 
+
 logger = get_logger(__name__)
+
+
+def _record_timing(
+    state: RepairState,
+    updates: dict,
+    iteration: int,
+    stage_name: str,
+    duration: float,
+) -> None:
+    timings = dict(updates.get("iteration_timings") or state.get("iteration_timings") or {})
+    iter_t = dict(timings.get(iteration) or {})
+    iter_t[stage_name] = round(duration, 3)
+    timings[iteration] = iter_t
+    updates["iteration_timings"] = timings
+
 
 
 def initial_test_node(
@@ -59,7 +77,9 @@ def initial_test_node(
         run_id, workspace_id, project_path,
     )
 
+    start_t = time.monotonic()
     res: TestResult = get_execution_backend().run_pytest(project_path)
+    init_dur = time.monotonic() - start_t
     res_dict = res.model_dump()
 
     _emit_event(
@@ -83,8 +103,8 @@ def initial_test_node(
         },
     )
     logger.info(
-        "[INITIAL TEST COMPLETE] run_id=%s exit_code=%d passed=%d failed=%d success=%s",
-        run_id, res.exit_code, res.passed, res.failed, res.success,
+        "[INITIAL TEST COMPLETE] run_id=%s exit_code=%d passed=%d failed=%d success=%s duration=%.2fs",
+        run_id, res.exit_code, res.passed, res.failed, res.success, init_dur,
     )
 
     updates: dict = {
@@ -93,6 +113,19 @@ def initial_test_node(
         "initial_failed_count": res.failed,
         "final_failed_count": res.failed,
     }
+
+    _record_timing(state, updates, 1, "initial_test", init_dur)
+
+    # Build and cache project structure during initial assessment
+    if not state.get("project_structure"):
+        try:
+            wm = WorkspaceManager.from_project_path(str(project_path))
+            struct = get_project_structure(wm)
+            if struct.success:
+                updates["project_structure"] = struct.tree
+        except Exception as exc:
+            logger.warning("Failed to cache project structure in initial_test_node: %s", exc)
+
 
     if res.success:
         logger.info("[INITIAL TEST] ALL TESTS PASSED ALREADY for run_id=%s", run_id)
@@ -163,16 +196,20 @@ def architect_node(
     )
     logger.info("[ARCHITECT START] run_id=%s iteration=%d", run_id, iteration)
 
+    start_t = time.monotonic()
     wm = WorkspaceManager.from_project_path(project_path)
     agent = ArchitectAgent(llm_provider)
 
+    cached_struct = state.get("project_structure")
     test_res = TestResult(**state["test_result"]) if state.get("test_result") else None
     plan: ArchitecturePlan = agent.analyze(
         workspace=wm,
         test_result=test_res,
         run_id=run_id,
         db=db,
+        cached_project_structure=cached_struct,
     )
+    arch_dur = time.monotonic() - start_t
 
     _emit_event(
         db,
@@ -186,12 +223,15 @@ def architect_node(
             "phase": "Root Cause Analysis",
             "summary": plan.summary,
             "relevant_files": plan.relevant_files,
-            "description": f"Iteration {iteration}: Root cause plan formulated — {plan.summary}",
+            "duration": round(arch_dur, 2),
+            "description": (
+                f"Iteration {iteration}: Root cause plan formulated in {arch_dur:.2f}s — {plan.summary}"
+            ),
         },
     )
     logger.info(
-        "[ARCHITECT COMPLETE] run_id=%s iteration=%d summary=%r relevant_files=%s",
-        run_id, iteration, plan.summary, plan.relevant_files,
+        "[ARCHITECT COMPLETE] run_id=%s iteration=%d summary=%r relevant_files=%s duration=%.2fs",
+        run_id, iteration, plan.summary, plan.relevant_files, arch_dur,
     )
 
     plan_dict = plan.model_dump()
@@ -202,7 +242,10 @@ def architect_node(
         architecture_plan=plan_dict,
     )
 
-    return {"architecture_plan": plan_dict}
+    updates = {"architecture_plan": plan_dict}
+    _record_timing(state, updates, iteration, "architect", arch_dur)
+    return updates
+
 
 
 def coder_node(
@@ -237,6 +280,7 @@ def coder_node(
     )
     logger.info("[CODER START] run_id=%s iteration=%d", run_id, iteration)
 
+    start_t = time.monotonic()
     wm = WorkspaceManager.from_project_path(project_path)
     agent = CoderAgent(llm_provider)
 
@@ -325,6 +369,7 @@ def coder_node(
             "tool_call_count": state.get("tool_call_count", 0) + 1,
         }
 
+    coder_dur = time.monotonic() - start_t
     diff_res = get_git_diff(wm)
 
     _emit_event(
@@ -340,15 +385,16 @@ def coder_node(
             "file_path": change.file_path,
             "change_type": change.change_type,
             "explanation": change.explanation,
+            "duration": round(coder_dur, 2),
             "description": (
                 f"Iteration {iteration}: Applied patch to `{change.file_path}` "
-                f"({change.change_type}) — {change.explanation}"
+                f"({change.change_type}) in {coder_dur:.2f}s — {change.explanation}"
             ),
         },
     )
     logger.info(
-        "[CODER COMPLETE] run_id=%s iteration=%d file=%s type=%s",
-        run_id, iteration, change.file_path, change.change_type,
+        "[CODER COMPLETE] run_id=%s iteration=%d file=%s type=%s duration=%.2fs",
+        run_id, iteration, change.file_path, change.change_type, coder_dur,
     )
 
     change_dict = change.model_dump()
@@ -359,11 +405,19 @@ def coder_node(
         code_changes=[change_dict],
     )
 
-    return {
+    updates = {
         "code_change": change_dict,
         "git_diff": diff_res.model_dump(),
         "tool_call_count": state.get("tool_call_count", 0) + 1,
     }
+    # Invalidate cached tree structure if files were written, created, or deleted
+    if change.change_type in ("write", "create", "delete"):
+        updates["project_structure"] = ""
+
+
+    _record_timing(state, updates, iteration, "coder", coder_dur)
+    return updates
+
 
 
 def test_node(
@@ -392,7 +446,9 @@ def test_node(
     )
     logger.info("[TEST START] run_id=%s iteration=%d", run_id, iteration)
 
+    start_t = time.monotonic()
     res: TestResult = get_execution_backend().run_pytest(project_path)
+    pytest_dur = time.monotonic() - start_t
     res_dict = res.model_dump()
 
     _emit_event(
@@ -407,7 +463,7 @@ def test_node(
             "phase": "Test & Validation",
             "description": (
                 f"Iteration {iteration}: Pytest finished with {res.passed} passed, "
-                f"{res.failed} failed in {res.duration:.2f}s."
+                f"{res.failed} failed in {pytest_dur:.2f}s."
             ),
             "exit_code": res.exit_code,
             "passed": res.passed,
@@ -416,8 +472,8 @@ def test_node(
         },
     )
     logger.info(
-        "[TEST COMPLETE] run_id=%s iteration=%d passed=%d failed=%d exit_code=%d",
-        run_id, iteration, res.passed, res.failed, res.exit_code,
+        "[TEST COMPLETE] run_id=%s iteration=%d passed=%d failed=%d exit_code=%d duration=%.2fs",
+        run_id, iteration, res.passed, res.failed, res.exit_code, pytest_dur,
     )
 
     upsert_iteration(
@@ -430,10 +486,12 @@ def test_node(
         duration_seconds=res.duration,
     )
 
-    return {
+    updates = {
         "test_result": res_dict,
         "final_failed_count": res.failed,
     }
+    _record_timing(state, updates, iteration, "pytest", pytest_dur)
+    return updates
 
 
 # Prevent pytest from auto-collecting LangGraph node functions as test cases
@@ -469,6 +527,7 @@ def reviewer_node(
     )
     logger.info("[REVIEWER START] run_id=%s iteration=%d", run_id, iteration)
 
+    start_t = time.monotonic()
     wm = WorkspaceManager.from_project_path(project_path)
     agent = ReviewerAgent(llm_provider)
 
@@ -477,6 +536,7 @@ def reviewer_node(
     initial_res = TestResult(**init_data) if init_data else None
     new_res = TestResult(**state["test_result"]) if state.get("test_result") else None
 
+    cached_diff = GitDiff(**state["git_diff"]) if state.get("git_diff") else None
     review: ReviewResult = agent.review(
         workspace=wm,
         coder_explanation=code_change.explanation if code_change else "",
@@ -484,7 +544,10 @@ def reviewer_node(
         new_test_result=new_res,
         run_id=run_id,
         db=db,
+        git_diff=cached_diff,
     )
+
+    rev_dur = time.monotonic() - start_t
 
     review_dict = review.model_dump()
     upsert_iteration(
@@ -508,16 +571,17 @@ def reviewer_node(
             "phase": "Reviewer Gate",
             "description": (
                 f"Iteration {iteration}: Reviewer {appr_str} "
-                f"patch (Regression Risk: {review.regression_risk.upper()})."
+                f"patch in {rev_dur:.2f}s (Regression Risk: {review.regression_risk.upper()})."
             ),
             "approved": review.approved,
             "root_cause_fixed": review.root_cause_fixed,
             "regression_risk": review.regression_risk,
+            "duration": round(rev_dur, 2),
         },
     )
     logger.info(
-        "[REVIEWER COMPLETE] run_id=%s iteration=%d approved=%s root_cause_fixed=%s risk=%s",
-        run_id, iteration, review.approved, review.root_cause_fixed, review.regression_risk,
+        "[REVIEWER COMPLETE] run_id=%s iteration=%d approved=%s risk=%s duration=%.2fs",
+        run_id, iteration, review.approved, review.regression_risk, rev_dur,
     )
 
     rejections = state.get("reviewer_rejections", 0)
@@ -545,7 +609,9 @@ def reviewer_node(
             except Exception as exc:
                 logger.warning("Failed to update Run record on review approval: %s", exc)
 
+    _record_timing(state, updates, iteration, "reviewer", rev_dur)
     return updates
+
 
 
 def _emit_event(

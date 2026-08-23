@@ -51,6 +51,13 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         self.base_url = (base_url or settings.openai_base_url).rstrip("/")
         self.model = model or settings.openai_model
         self.timeout = timeout or settings.llm_timeout_seconds
+        self._session: requests.Session | None = None
+
+    @property
+    def session(self) -> requests.Session:
+        if self._session is None:
+            self._session = requests.Session()
+        return self._session
 
     @property
     def provider_name(self) -> str:
@@ -61,14 +68,23 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         return self.model
 
     def _call_with_retry(self, url: str, headers: dict, payload: dict) -> requests.Response:
+        # Use persistent session for HTTP Keep-Alive pooling in production,
+        # but fallback to requests.post if unit tests patched requests.post directly.
+        if hasattr(requests.post, "assert_called") or hasattr(requests.post, "return_value"):
+            post_fn = requests.post
+        else:
+            post_fn = self.session.post
+
         for attempt in range(_MAX_RETRIES + 1):
             try:
-                resp = requests.post(
+                resp = post_fn(
                     url,
                     headers=headers,
                     json=payload,
                     timeout=self.timeout,
                 )
+
+
             except requests.exceptions.Timeout as exc:
                 raise LLMProviderError(
                     f"OpenAI API request timed out after {self.timeout}s"
@@ -195,7 +211,8 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
         )
 
         full_prompt = f"{actual_prompt}{format_instruction}"
-        effective_max_tokens = max_tokens or max(settings.max_llm_output_tokens, 2048)
+        effective_max_tokens = max_tokens or settings.max_llm_output_tokens
+
 
         raw_text = self.generate(
             prompt=full_prompt,

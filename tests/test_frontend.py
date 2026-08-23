@@ -49,7 +49,18 @@ with patch.dict(
 
 class TestFrontendHealthConnectivity:
 
+    def test_get_default_backend_url_configured(self):
+        from frontend.utils.helpers import get_default_backend_url
+        with patch.dict("os.environ", {"BACKEND_URL": "http://127.0.0.1:8000"}):
+            assert get_default_backend_url() == "http://127.0.0.1:8000"
+
+    def test_check_backend_once_missing_url(self):
+        is_online, data, error = _check_backend_once("")
+        assert is_online is False
+        assert error == "BACKEND_URL is not configured."
+
     def test_normalize_backend_url(self):
+
         assert _normalize_backend_url(
             "https://aegiscode-vrob.onrender.com"
         ) == "https://aegiscode-vrob.onrender.com"

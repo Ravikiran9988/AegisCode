@@ -60,6 +60,7 @@ try:
         _extract_filename_from_content_disposition,
         _normalize_backend_url,
         _parse_api_error,
+        get_default_backend_url,
     )
 except ImportError:
     from components.agents import render_agents_view
@@ -92,6 +93,7 @@ except ImportError:
         _extract_filename_from_content_disposition,
         _normalize_backend_url,
         _parse_api_error,
+        get_default_backend_url,
     )
 
 __all__ = [
@@ -327,7 +329,8 @@ if st.session_state["theme_mode"] == "light":
         unsafe_allow_html=True,
     )
 
-DEFAULT_BACKEND = os.environ.get("BACKEND_URL", "https://aegiscode-vrob.onrender.com")
+DEFAULT_BACKEND = get_default_backend_url()
+
 
 if "backend_online" not in st.session_state:
     st.session_state["backend_online"] = False
@@ -344,13 +347,21 @@ if "guest_name" not in st.session_state:
 if "auth_flow_step" not in st.session_state:
     st.session_state["auth_flow_step"] = "public_dashboard"
 
-base_backend_url = _normalize_backend_url(DEFAULT_BACKEND)
+base_backend_url = _normalize_backend_url(DEFAULT_BACKEND) if DEFAULT_BACKEND else ""
 
-if not st.session_state["backend_online"]:
+if not DEFAULT_BACKEND:
+    st.session_state["backend_online"] = False
+    st.session_state["health_data"] = {}
+    st.session_state["backend_error"] = (
+        "BACKEND_URL is not configured. Please set the BACKEND_URL environment variable "
+        "(e.g. BACKEND_URL=http://127.0.0.1:8000)."
+    )
+elif not st.session_state["backend_online"]:
     online, h_data, err_msg = check_backend_with_retry(base_backend_url)
     st.session_state["backend_online"] = online
     st.session_state["health_data"] = h_data
     st.session_state["backend_error"] = err_msg
+
 
 try:
     import json

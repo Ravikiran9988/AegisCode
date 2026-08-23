@@ -54,8 +54,11 @@ def _get_auth_headers() -> dict[str, str]:
 
 
 def _check_backend_once(backend_url: str, timeout: int = 10) -> tuple[bool, dict, str]:
+    if not backend_url or not backend_url.strip():
+        return False, {}, "BACKEND_URL is not configured."
     try:
         resp = requests.get(f"{_normalize_backend_url(backend_url)}/health", timeout=timeout)
+
         if resp.status_code == 200:
             try:
                 data = resp.json()

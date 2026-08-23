@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from backend.agents.prompts.architect import SYSTEM_PROMPT, TASK_PROMPT_TEMPLATE
 from backend.agents.schemas import ArchitecturePlan
 from backend.context.builder import build_architect_context
+from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event
 from backend.execution.workspace import WorkspaceManager
@@ -36,6 +37,7 @@ class ArchitectAgent:
         test_result: TestResult | None = None,
         run_id: str | None = None,
         db: Session | None = None,
+        cached_project_structure: str | None = None,
     ) -> ArchitecturePlan:
         """
         Analyze the project workspace and return a validated ArchitecturePlan.
@@ -43,25 +45,30 @@ class ArchitectAgent:
         _emit_agent_event(db, run_id, "architect", "ARCHITECT_STARTED")
         logger.info("ArchitectAgent starting analysis for workspace %s", workspace.workspace_id)
 
-        # Step 1: Read-only tool calls for inspection
-        _emit_agent_event(
-            db, run_id, "architect", "TOOL_CALLED",
-            {"tool": "get_project_structure"}
-        )
-        get_project_structure(workspace)
+        # Step 1: Read-only tool calls for inspection (re-use cached structure if present)
+        if not cached_project_structure:
+            _emit_agent_event(
+                db, run_id, "architect", "TOOL_CALLED",
+                {"tool": "get_project_structure"}
+            )
+            get_project_structure(workspace)
 
-        _emit_agent_event(
-            db, run_id, "architect", "TOOL_CALLED",
-            {"tool": "list_files", "pattern": "**/*.py"}
-        )
-        file_list = list_files(workspace, "**/*.py")
+            _emit_agent_event(
+                db, run_id, "architect", "TOOL_CALLED",
+                {"tool": "list_files", "pattern": "**/*.py"}
+            )
+            file_list = list_files(workspace, "**/*.py")
 
-        logger.debug(
-            "Architect inspected structure: %d files found", file_list.files.__len__()
-        )
+            logger.debug(
+                "Architect inspected structure: %d files found", len(file_list.files)
+            )
 
         # Step 2: Build context & call LLM for structured output
-        context = build_architect_context(workspace, test_result=test_result)
+        context = build_architect_context(
+            workspace,
+            test_result=test_result,
+            cached_project_structure=cached_project_structure,
+        )
         prompt = TASK_PROMPT_TEMPLATE.format(context=context)
 
         try:
@@ -69,7 +76,9 @@ class ArchitectAgent:
                 schema=ArchitecturePlan,
                 prompt=prompt,
                 system_prompt=SYSTEM_PROMPT,
+                max_tokens=settings.architect_max_tokens,
             )
+
             _emit_agent_event(
                 db, run_id, "architect", "ARCHITECT_COMPLETED",
                 {"summary": plan.summary, "relevant_files": plan.relevant_files}

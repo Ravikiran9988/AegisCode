@@ -42,7 +42,7 @@ logger = get_logger(__name__)
 
 def decision_router(state: RepairState) -> Literal["retry", "end"]:
     """
-    Deterministic decision function evaluating graph state after Reviewer node.
+    Deterministic decision function evaluating graph state after Test (if failed) or Reviewer node (if passed).
 
     Decision Rules
     --------------
@@ -89,6 +89,7 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
         state["termination_reason"] = "max_iterations_reached"
         return "end"
 
+
     # Condition 3: Loop Detection / Repeated Failures
     curr_fp = compute_failure_fingerprint(test_res)
     prev_fps = state.get("previous_failures", [])
@@ -111,6 +112,33 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
     state["previous_failures"] = prev_fps
 
     return "retry"
+
+
+def test_router(state: RepairState) -> Literal["reviewer", "retry", "end"]:
+    """
+    Route after Pytest node:
+    - If tests PASSED (success == True), route to Reviewer node for safety audit.
+    - If tests FAILED (success == False), SKIP Reviewer node and evaluate loop decision directly.
+    """
+    test_data = state.get("test_result")
+    if not test_data:
+        logger.info("[TEST ROUTER] No test result found -> skipping Reviewer, evaluating decision")
+        return decision_router(state)
+
+    test_res = TestResult(**test_data)
+    if test_res.success:
+        logger.info("[TEST ROUTER] Pytest PASSED -> routing to Reviewer node")
+        return "reviewer"
+
+    logger.info(
+        "[TEST ROUTER] Pytest FAILED (exit_code=%d, failed=%d) -> SKIPPING Reviewer node, evaluating loop decision directly",
+        test_res.exit_code, test_res.failed,
+    )
+    return decision_router(state)
+
+
+test_router.__test__ = False
+
 
 
 def initial_test_router(state: RepairState) -> Literal["continue", "end"]:
@@ -168,8 +196,18 @@ def build_repair_graph(
         },
     )
 
-    builder.add_edge("test", "reviewer")
+    # Route after Pytest node: skip Reviewer if tests failed, reach Reviewer if tests passed
+    builder.add_conditional_edges(
+        "test",
+        test_router,
+        {
+            "reviewer": "reviewer",
+            "retry": "architect",
+            "end": END,
+        },
+    )
 
+    # Route after Reviewer node: check reviewer approval
     builder.add_conditional_edges(
         "reviewer",
         decision_router,
@@ -180,6 +218,7 @@ def build_repair_graph(
     )
 
     return builder.compile()
+
 
 
 def run_repair_workflow(
@@ -292,9 +331,26 @@ def run_repair_workflow(
         except Exception as exc:
             logger.warning("Failed to update Run record status: %s", exc)
 
+    # Log precise performance telemetry
+
+    timings = final_state.get("iteration_timings", {})
+    for it_num, t_map in timings.items():
+        arch_t = t_map.get("architect", 0.0)
+        coder_t = t_map.get("coder", 0.0)
+        test_t = t_map.get("pytest", 0.0)
+        rev_t_val = t_map.get("reviewer")
+        rev_str = f"{rev_t_val:.2f}s" if rev_t_val is not None else "skipped (tests failed)"
+        iter_tot = round(sum(v for v in t_map.values() if isinstance(v, int | float)), 2)
+
+        logger.info(
+            "[TIMING TELEMETRY] run_id=%s iteration=%d | Architect: %.2fs | Coder: %.2fs | Pytest: %.2fs | Reviewer: %s | Iteration total: %.2fs",
+            run_id, it_num, arch_t, coder_t, test_t, rev_str, iter_tot,
+        )
+
     logger.info(
         "[RUN COMPLETE] run_id=%s final_status=%s duration=%.2fs termination_reason=%s",
         run_id, final_state.get("status"), elapsed, final_state.get("termination_reason"),
     )
 
     return final_state
+

@@ -77,10 +77,14 @@ class Settings(BaseSettings):
     max_agent_iterations: int = 5
     # 6144 remains the safe completion ceiling after earlier GPT-OSS truncation failures.
     max_llm_output_tokens: int = 6144
+    architect_max_tokens: int = 2000
+    coder_max_tokens: int = 3000
+    reviewer_max_tokens: int = 800
     # Tighter input context reduces Groq latency while retaining enough repair context.
     max_file_context_size: int = 5000
     max_files_per_agent: int = 3
     llm_timeout_seconds: int = 60
+
 
     # Execution / Sandbox
     workspace_base_dir: str = "./workspaces"

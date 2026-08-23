@@ -46,10 +46,12 @@ class RepairState(TypedDict, total=False):
     # Options: "all_tests_passed", "max_iterations_reached", "repeated_failure",
     #          "policy_violation", "llm_error", "workspace_error"
 
-    # Evaluation Metrics
+    # Evaluation Metrics & Telemetry
     start_time: float
     total_duration: float
     initial_failed_count: int
     final_failed_count: int
     tool_call_count: int
     reviewer_rejections: int
+    iteration_timings: dict[int, dict[str, float]]
+

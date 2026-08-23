@@ -33,10 +33,40 @@ from backend.tools.git_tools import GitDiff
 from backend.tools.pytest_runner import TestResult
 
 
+def _extract_failure_summary(test_result: TestResult) -> str:
+    """
+    Extract high-value test failure diagnostics (FAILED lines, tracebacks, AssertionError)
+    to keep LLM prompt contexts concise and focused.
+    """
+    stdout = test_result.stdout or ""
+    stderr = test_result.stderr or ""
+    combined = f"{stdout}\n{stderr}"
+    if not combined.strip():
+        return "No stdout/stderr output captured."
+
+    lines = combined.splitlines()
+    relevant: list[str] = []
+    in_failure = False
+
+    for line in lines:
+        if "FAILURES" in line or "ERRORS" in line or line.startswith("FAILED "):
+            in_failure = True
+            relevant.append(line)
+        elif in_failure or any(kw in line for kw in ("AssertionError", "E   ", "Error:", "Traceback", "FAILED")):
+            relevant.append(line)
+            if len(relevant) >= 30:
+                break
+
+    if relevant:
+        return "\n".join(relevant[:30])
+    return _truncate(combined, 1000)
+
+
 def build_architect_context(
     workspace: WorkspaceManager,
     test_result: TestResult | None = None,
     custom_instructions: str | None = None,
+    cached_project_structure: str | None = None,
 ) -> str:
     """
     Build prompt context for the Architect Agent.
@@ -48,8 +78,11 @@ def build_architect_context(
 
     Token budget: stdout truncated to 1500 chars, stderr to 800 chars.
     """
-    struct = get_project_structure(workspace)
-    tree_str = struct.tree if struct.success else "(Tree unavailable)"
+    if cached_project_structure:
+        tree_str = cached_project_structure
+    else:
+        struct = get_project_structure(workspace)
+        tree_str = struct.tree if struct.success else "(Tree unavailable)"
 
     test_summary = "No previous test run available."
     if test_result:
@@ -57,9 +90,9 @@ def build_architect_context(
             f"Pytest Exit Code: {test_result.exit_code}\n"
             f"Passed: {test_result.passed}, Failed: {test_result.failed}, "
             f"Errors: {test_result.errors}, Skipped: {test_result.skipped}\n\n"
-            f"--- Captured Stdout Snippet ---\n{_truncate(test_result.stdout, 1500)}\n"
-            f"--- Captured Stderr Snippet ---\n{_truncate(test_result.stderr, 800)}"
+            f"--- Failure Diagnostics Snippet ---\n{_extract_failure_summary(test_result)}"
         )
+
 
     context_str = f"""
 [PROJECT FILE STRUCTURE]

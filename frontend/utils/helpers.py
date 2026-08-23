@@ -9,7 +9,30 @@ import re
 from datetime import datetime
 from typing import Any
 
+import os
+
 import requests
+
+
+
+def get_default_backend_url() -> str:
+    """
+    Resolve default backend URL exclusively from environment variable BACKEND_URL.
+
+    No hardcoded fallbacks, no guessing, and no automatic probing.
+    Returns empty string if BACKEND_URL is missing or empty.
+    """
+    try:
+        import dotenv
+        dotenv.load_dotenv()
+    except Exception:
+        pass
+
+    env_url = os.environ.get("BACKEND_URL", "").strip()
+    if env_url:
+        return _normalize_backend_url(env_url)
+    return ""
+
 
 
 def _normalize_backend_url(url: str) -> str:
@@ -23,6 +46,7 @@ def _normalize_backend_url(url: str) -> str:
     elif u.endswith("/api"):
         u = u[:-4].rstrip("/")
     return u
+
 
 
 def _parse_api_error(resp: requests.Response) -> str:

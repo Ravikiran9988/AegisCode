@@ -176,7 +176,7 @@ class TestEndToEndRepair:
             # Mock LLM calls: Architect -> Coder -> Reviewer
             mock_llm = MagicMock(spec=BaseLLMProvider)
 
-            def mock_generate_structured(schema, prompt, system_prompt=None):
+            def mock_generate_structured(schema, prompt, system_prompt=None, **kwargs):
                 if schema == ArchitecturePlan:
                     return ArchitecturePlan(
                         summary="Fix subtraction operator in add() to addition",
@@ -280,7 +280,7 @@ class TestEndToEndRepair:
 
             mock_llm = MagicMock(spec=BaseLLMProvider)
 
-            def mock_generate_structured(schema, prompt, system_prompt=None):
+            def mock_generate_structured(schema, prompt, system_prompt=None, **kwargs):
                 if schema == ArchitecturePlan:
                     return ArchitecturePlan(
                         summary="Fix calculator bug",
@@ -359,7 +359,7 @@ class TestEndToEndRepair:
 
             mock_llm = MagicMock(spec=BaseLLMProvider)
 
-            def mock_generate_structured(schema, prompt, system_prompt=None):
+            def mock_generate_structured(schema, prompt, system_prompt=None, **kwargs):
                 if schema == ArchitecturePlan:
                     return ArchitecturePlan(
                         summary="Plan",

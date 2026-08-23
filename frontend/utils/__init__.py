@@ -8,8 +8,8 @@ the existing guest-entry UI flow.
 
 from __future__ import annotations
 
-import os
 import uuid
+
 
 import requests
 import streamlit as st
@@ -33,7 +33,13 @@ def _persist_guest_before_rerun() -> None:
         session_id = str(uuid.uuid4())
         st.session_state["guest_session_id"] = session_id
 
-    backend_url = os.environ.get("BACKEND_URL", "https://aegiscode-vrob.onrender.com").rstrip("/")
+    try:
+        from frontend.utils.helpers import get_default_backend_url
+    except ImportError:
+        from utils.helpers import get_default_backend_url
+
+    backend_url = get_default_backend_url().rstrip("/")
+
     try:
         response = requests.post(
             f"{backend_url}/api/guests",

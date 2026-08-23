@@ -108,7 +108,9 @@ def render_sidebar(
             current_nav = "◉ Overview"
 
         # Synchronize radio widget state if nav_view was modified programmatically
-        if st.session_state.get("app_navigation_radio") != current_nav:
+        if "app_navigation_radio" not in st.session_state:
+            st.session_state["app_navigation_radio"] = current_nav
+        elif st.session_state["app_navigation_radio"] != current_nav:
             st.session_state["app_navigation_radio"] = current_nav
 
         def _on_nav_change() -> None:
@@ -123,12 +125,12 @@ def render_sidebar(
         selected_nav = st.radio(
             "Navigation",
             options=nav_options,
-            index=nav_options.index(current_nav),
             key="app_navigation_radio",
             on_change=_on_nav_change,
             label_visibility="collapsed",
         )
         st.session_state["nav_view"] = selected_nav
+
 
         # Backend URL configuration drawer
         with st.expander("🔌 Backend Connection", expanded=False):

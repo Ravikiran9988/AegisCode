@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from backend.agents.prompts.reviewer import SYSTEM_PROMPT, TASK_PROMPT_TEMPLATE
 from backend.agents.schemas import ReviewResult
 from backend.context.builder import build_reviewer_context
+from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event
 from backend.execution.workspace import WorkspaceManager
@@ -33,11 +34,12 @@ class ReviewerAgent:
     def review(
         self,
         workspace: WorkspaceManager,
-        coder_explanation: str,
+        coder_explanation: str = "",
         initial_test_result: TestResult | None = None,
         new_test_result: TestResult | None = None,
         run_id: str | None = None,
         db: Session | None = None,
+        git_diff: GitDiff | None = None,
     ) -> ReviewResult:
         """
         Inspect git diff and test results, returning a validated ReviewResult.
@@ -45,12 +47,13 @@ class ReviewerAgent:
         _emit_agent_event(db, run_id, "reviewer", "REVIEWER_STARTED")
         logger.info("ReviewerAgent starting review for workspace %s", workspace.workspace_id)
 
-        # Step 1: Read-only tool call to get Git diff
-        _emit_agent_event(
-            db, run_id, "reviewer", "TOOL_CALLED",
-            {"tool": "get_git_diff"}
-        )
-        git_diff = get_git_diff(workspace)
+        # Step 1: Read-only tool call to get Git diff (reuse if provided)
+        if git_diff is None:
+            _emit_agent_event(
+                db, run_id, "reviewer", "TOOL_CALLED",
+                {"tool": "get_git_diff"}
+            )
+            git_diff = get_git_diff(workspace)
 
         # Step 2: Build context & call LLM for ReviewResult
         context = build_reviewer_context(
@@ -67,6 +70,7 @@ class ReviewerAgent:
                 schema=ReviewResult,
                 prompt=prompt,
                 system_prompt=SYSTEM_PROMPT,
+                max_tokens=settings.reviewer_max_tokens,
             )
             _emit_agent_event(
                 db, run_id, "reviewer", "REVIEWER_COMPLETED",
