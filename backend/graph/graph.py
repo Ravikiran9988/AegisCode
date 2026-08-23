@@ -138,6 +138,8 @@ def initial_entry_router(state: RepairState) -> Literal["run_initial_test", "arc
     baseline = state.get("initial_test_result")
     if baseline:
         if TestResult(**baseline).success:
+            state["status"] = "already_passing"
+            state["termination_reason"] = "all_tests_passed"
             return "end"
         return "architect"
     return "run_initial_test"
