@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     )
     openai_model: str = Field(
         default="openai/gpt-oss-120b",
-        description="Model name for OpenAI-compatible provider (Groq)",
+        description="Default model name for the OpenAI-compatible provider",
     )
     architect_model: str = Field(
         default="",
@@ -83,7 +83,6 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-3-5-sonnet-20241022"
 
-
     # Security & network
     cors_origins: str = Field(
         default="http://localhost:8501,http://localhost:3000,http://127.0.0.1:8501",
@@ -92,16 +91,13 @@ class Settings(BaseSettings):
 
     # LLM context & output bounds
     max_agent_iterations: int = 5
-    # 6144 remains the safe completion ceiling after earlier GPT-OSS truncation failures.
     max_llm_output_tokens: int = 6144
     architect_max_tokens: int = 2000
     coder_max_tokens: int = 3000
     reviewer_max_tokens: int = 800
-    # Tighter input context reduces Groq latency while retaining enough repair context.
     max_file_context_size: int = 5000
     max_files_per_agent: int = 3
     llm_timeout_seconds: int = 60
-
 
     # Execution / Sandbox
     workspace_base_dir: str = "./workspaces"
@@ -127,7 +123,7 @@ class Settings(BaseSettings):
         return self.debug
 
     def validate_production_llm_config(self) -> None:
-        """Validate the required production Groq configuration."""
+        """Validate production hosted-provider configuration without pinning a model."""
         errors = []
         provider_clean = self.llm_provider.lower()
         if provider_clean not in ("openai_compatible", "openai", "hosted"):
@@ -136,15 +132,11 @@ class Settings(BaseSettings):
             )
 
         base_clean = self.openai_base_url.rstrip("/")
-        if base_clean != "https://api.groq.com/openai/v1":
-            errors.append(
-                f"OPENAI_BASE_URL must be 'https://api.groq.com/openai/v1', got {base_clean!r}"
-            )
+        if not base_clean:
+            errors.append("OPENAI_BASE_URL must not be empty")
 
-        if self.openai_model != "openai/gpt-oss-120b":
-            errors.append(
-                f"OPENAI_MODEL must be exactly 'openai/gpt-oss-120b', got {self.openai_model!r}"
-            )
+        if not self.openai_model.strip():
+            errors.append("OPENAI_MODEL must not be empty")
 
         if (
             not self.openai_api_key
@@ -153,8 +145,16 @@ class Settings(BaseSettings):
         ):
             errors.append(
                 "OPENAI_API_KEY is missing or invalid placeholder. "
-                "A valid Groq API key is required."
+                "A valid hosted-provider API key is required."
             )
+
+        for field_name, model_name in (
+            ("ARCHITECT_MODEL", self.architect_model),
+            ("CODER_MODEL", self.coder_model),
+            ("REVIEWER_MODEL", self.reviewer_model),
+        ):
+            if model_name and not model_name.strip():
+                errors.append(f"{field_name} must be empty or a non-empty model ID")
 
         if errors:
             err_str = "\n".join(f" - {e}" for e in errors)
