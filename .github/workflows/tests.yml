@@ -18,8 +18,16 @@ jobs:
         # AegisCode targets Python 3.12 (see pyproject.toml).
         python-version: ["3.12"]
 
+    # CI must be deterministic: never depend on a hosted LLM, Ollama, Docker,
+    # or the production Render database.
     env:
+      ENV: test
+      ENVIRONMENT: test
       EXECUTION_BACKEND: local
+      USE_DOCKER_SANDBOX: "false"
+      LLM_PROVIDER: mock
+      OPENAI_API_KEY: ci-test-key
+      OPENAI_BASE_URL: http://127.0.0.1:9/v1
       DATABASE_URL: sqlite:///./test_ci.db
       PYTHONUNBUFFERED: "1"
 
