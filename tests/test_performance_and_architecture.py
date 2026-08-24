@@ -246,16 +246,17 @@ def test_groq_tpm_429_retries_and_does_not_abort_as_tpd():
 
 def test_role_specific_model_configuration():
     """Verify that role-specific models are cleanly instantiated when configured."""
-    with patch.object(settings, "architect_model", "openai/gpt-oss-120b"):
-        with patch.object(settings, "coder_model", "openai/gpt-oss-120b"):
-            with patch.object(settings, "reviewer_model", "openai/gpt-oss-120b"):
-                arch_provider = get_llm_provider(role="architect")
-                coder_provider = get_llm_provider(role="coder")
-                rev_provider = get_llm_provider(role="reviewer")
+    with patch.object(settings, "llm_provider", "openai_compatible"):
+        with patch.object(settings, "architect_model", "openai/gpt-oss-120b"):
+            with patch.object(settings, "coder_model", "openai/gpt-oss-120b"):
+                with patch.object(settings, "reviewer_model", "openai/gpt-oss-120b"):
+                    arch_provider = get_llm_provider(role="architect")
+                    coder_provider = get_llm_provider(role="coder")
+                    rev_provider = get_llm_provider(role="reviewer")
 
-                assert arch_provider.model_name == "openai/gpt-oss-120b"
-                assert coder_provider.model_name == "openai/gpt-oss-120b"
-                assert rev_provider.model_name == "openai/gpt-oss-120b"
+                    assert arch_provider.model_name == "openai/gpt-oss-120b"
+                    assert coder_provider.model_name == "openai/gpt-oss-120b"
+                    assert rev_provider.model_name == "openai/gpt-oss-120b"
 
 
 # ── TEST 7: Targeted pytest validation ────────────────────────────────────────

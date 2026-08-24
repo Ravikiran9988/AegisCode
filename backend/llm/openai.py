@@ -308,6 +308,10 @@ def _parse_retry_wait(resp: requests.Response, attempt: int) -> float:
         except Exception:
             pass
 
+    if wait is not None:
+        # Respect server-provided Retry-After guidance exactly to avoid
+        # overshooting local retry budgets due to added jitter.
+        return max(0.0, wait)
+
     backoff_floor = _DEFAULT_BACKOFF_BASE * (2 ** attempt)
-    effective = max(wait or 0.0, backoff_floor)
-    return max(0.0, effective + random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS))
+    return max(0.0, backoff_floor + random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS))
