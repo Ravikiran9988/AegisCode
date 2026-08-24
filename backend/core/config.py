@@ -61,7 +61,7 @@ class Settings(BaseSettings):
         description="Base URL for OpenAI-compatible REST endpoint (Groq)",
     )
     openai_model: str = Field(
-        default="openai/gpt-oss-20b",
+        default="openai/gpt-oss-120b",
         description="Default model name for the OpenAI-compatible provider",
     )
     architect_model: str = Field(

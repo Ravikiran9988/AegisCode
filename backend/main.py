@@ -29,8 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     env_alt = os.environ.get("ENVIRONMENT", "").lower()
     production = env_name in {"production", "prod"} or env_alt in {"production", "prod"}
     strict_llm = os.environ.get("STRICT_LLM_VALIDATION") == "true"
-    non_default = not settings.debug and settings.openai_api_key != "your_openai_api_key_here"
-    if production or strict_llm or non_default:
+    if production or strict_llm:
         settings.validate_production_llm_config()
         logger.info(
             "Production Groq LLM config validated successfully (model=%s)",

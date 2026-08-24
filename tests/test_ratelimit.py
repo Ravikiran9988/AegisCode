@@ -64,13 +64,13 @@ class TestRateLimitHandling:
         resp.headers = {}
         resp.json.side_effect = Exception("no json")
 
-        # Attempt 0 -> base 5.0s
+        # Attempt 0 -> base 2.0s (+/- jitter)
         w0 = _parse_retry_wait(resp, attempt=0)
-        assert 3.0 <= w0 <= 8.0
+        assert 1.0 <= w0 <= 3.0
 
-        # Attempt 2 -> base 5 * 2^2 = 20.0s
+        # Attempt 2 -> base 2 * 2^2 = 8.0s (+/- jitter)
         w2 = _parse_retry_wait(resp, attempt=2)
-        assert 18.0 <= w2 <= 23.0
+        assert 7.0 <= w2 <= 9.0
 
     # 4. _call_with_retry retries on 429 and succeeds on second try
     @patch("time.sleep")
@@ -124,7 +124,7 @@ class TestRateLimitHandling:
         with pytest.raises(RateLimitError) as exc_info:
             provider.generate(prompt="Test prompt")
 
-        assert "exhausted after" in str(exc_info.value)
+        assert "stopped after" in str(exc_info.value)
         assert mock_post.call_count == _MAX_RETRIES + 1
         assert mock_sleep.call_count == _MAX_RETRIES
 

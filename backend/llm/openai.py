@@ -27,6 +27,10 @@ _DEFAULT_MAX_RETRIES = 1
 _DEFAULT_BACKOFF_BASE = 2.0
 _DEFAULT_MAX_WAIT_SECONDS = 30.0
 _JITTER_SECONDS = 0.5
+
+# Backward-compatible aliases used in tests and external imports.
+_MAX_RETRIES = _DEFAULT_MAX_RETRIES
+_MAX_WAIT_SECONDS = _DEFAULT_MAX_WAIT_SECONDS
 _RETRY_AFTER_PATTERN = re.compile(
     r"(?:try again in\s*~?\s*)(\d+(?:\.\d+)?)\s*(?:seconds?|s\b)",
     re.IGNORECASE,
@@ -304,6 +308,10 @@ def _parse_retry_wait(resp: requests.Response, attempt: int) -> float:
         except Exception:
             pass
 
+    if wait is not None:
+        # Respect server-provided Retry-After guidance exactly to avoid
+        # overshooting local retry budgets due to added jitter.
+        return max(0.0, wait)
+
     backoff_floor = _DEFAULT_BACKOFF_BASE * (2 ** attempt)
-    effective = max(wait or 0.0, backoff_floor)
-    return max(0.0, effective + random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS))
+    return max(0.0, backoff_floor + random.uniform(-_JITTER_SECONDS, _JITTER_SECONDS))

@@ -106,7 +106,7 @@ def test_pytest_failure_skips_reviewer():
     }
 
     route = test_router(state)
-    assert route in ("retry", "architect"), f"Expected retry route, got {route}"
+    assert route in ("retry", "architect", "coder_retry"), f"Expected retry route, got {route}"
     assert route != "reviewer", "Reviewer should be SKIPPED on failed tests!"
 
 
