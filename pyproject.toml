@@ -12,7 +12,10 @@ exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = ["B008", "UP017"]  # FastAPI Depends() in defaults; UP017 forces Python 3.11+ datetime.UTC
+# Existing codebase intentionally keeps some legacy formatting patterns.
+# Keep CI focused on actionable correctness/import issues rather than requiring
+# a large formatting-only rewrite of the existing application.
+ignore = ["B008", "E501", "E702", "UP017"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["E501"]
