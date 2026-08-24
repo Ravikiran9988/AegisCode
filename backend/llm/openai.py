@@ -79,7 +79,6 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
 
         max_retries = max(0, int(getattr(settings, "llm_rate_limit_retries", _DEFAULT_MAX_RETRIES)))
         max_wait = max(0.0, float(getattr(settings, "llm_rate_limit_max_wait_seconds", _DEFAULT_MAX_WAIT_SECONDS)))
-        backoff_base = _DEFAULT_BACKOFF_BASE
 
         for attempt in range(max_retries + 1):
             try:
