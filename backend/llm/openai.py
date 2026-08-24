@@ -27,6 +27,10 @@ _DEFAULT_MAX_RETRIES = 1
 _DEFAULT_BACKOFF_BASE = 2.0
 _DEFAULT_MAX_WAIT_SECONDS = 30.0
 _JITTER_SECONDS = 0.5
+
+# Backward-compatible aliases used in tests and external imports.
+_MAX_RETRIES = _DEFAULT_MAX_RETRIES
+_MAX_WAIT_SECONDS = _DEFAULT_MAX_WAIT_SECONDS
 _RETRY_AFTER_PATTERN = re.compile(
     r"(?:try again in\s*~?\s*)(\d+(?:\.\d+)?)\s*(?:seconds?|s\b)",
     re.IGNORECASE,
