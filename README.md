@@ -6,7 +6,7 @@ AegisCode is an autonomous software engineering platform that detects, analyzes,
 
 ## 🚀 Live Demo
 
-**Live Application:** https://aegiscode.kiranverse.tech/
+**Live Application:** https://aegiscode.axly.tech/
 
 **Demo Video:** https://www.loom.com/share/e73b17e338e84080a97be0ad2d2255ca
 
@@ -104,7 +104,7 @@ The live demonstration shows a deliberately broken Python project being uploaded
 
 | Resource | Link |
 |---|---|
-| Live App | https://aegiscode.kiranverse.tech/ |
+| Live App | https://aegiscode.axly.tech/ |
 | GitHub | https://github.com/Ravikiran9988/AegisCode |
 | Demo Video | https://www.loom.com/share/e73b17e338e84080a97be0ad2d2255ca |
 
@@ -113,3 +113,4 @@ The live demonstration shows a deliberately broken Python project being uploaded
 **Medicharla Ravi Kiran**
 
 GitHub: https://github.com/Ravikiran9988
+

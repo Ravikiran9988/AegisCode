@@ -92,7 +92,7 @@ def render_auth_tabs(
             ).strip()
             signup_email = st.text_input(
                 "Email",
-                placeholder="ada@kiranverse.tech",
+                placeholder="ada@axly.tech",
                 key="signup_email",
                 help="Unique email address for your account.",
             ).strip()
@@ -175,9 +175,10 @@ def render_auth(api_url: str, target_nav: str = "◉ Overview") -> None:
         st.markdown(
             """
             <div class="aegis-auth-footer">
-              <div>Support: <a href="mailto:admin@kiranverse.tech">admin@kiranverse.tech</a></div>
-              <div>© 2026 Kiranverse. All rights reserved.</div>
+              <div>Support: <a href="mailto:admin@axly.tech">admin@axly.tech</a></div>
+              <div>© 2026 Axly. All rights reserved.</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+

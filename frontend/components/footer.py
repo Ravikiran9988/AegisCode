@@ -21,14 +21,15 @@ def render_footer() -> None:
             </div>
             <div class="aegis-footer-meta">
               <span class="aegis-footer-support">
-                Support: <a href="mailto:admin@kiranverse.tech"
-                class="aegis-footer-link">admin@kiranverse.tech</a>
+                Support: <a href="mailto:admin@axly.tech"
+                class="aegis-footer-link">admin@axly.tech</a>
               </span>
               <span class="aegis-footer-divider">•</span>
-              <span class="aegis-footer-copy">© 2026 Kiranverse. All rights reserved.</span>
+              <span class="aegis-footer-copy">© 2026 Axly. All rights reserved.</span>
             </div>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+

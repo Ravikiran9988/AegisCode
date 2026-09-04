@@ -68,13 +68,13 @@ class TestSecurityCore:
         assert verify_password("", hashed) is False
 
     def test_jwt_token_generation_and_decoding(self):
-        payload = {"sub": "user-uuid-123", "email": "test@kiranverse.tech"}
+        payload = {"sub": "user-uuid-123", "email": "test@axly.tech"}
         token = create_access_token(payload)
         assert isinstance(token, str)
         decoded = decode_access_token(token)
         assert decoded is not None
         assert decoded["sub"] == "user-uuid-123"
-        assert decoded["email"] == "test@kiranverse.tech"
+        assert decoded["email"] == "test@axly.tech"
 
     def test_jwt_token_invalid_signature(self):
         invalid_token = "invalid.token.string"
@@ -85,7 +85,7 @@ class TestAuthAPI:
     def test_register_user_success_with_nickname(self, client: TestClient):
         payload = {
             "nickname": "adalovelace",
-            "email": "ada@kiranverse.tech",
+            "email": "ada@axly.tech",
             "password": "Password123!",
             "confirm_password": "Password123!",
         }
@@ -94,14 +94,14 @@ class TestAuthAPI:
         data = res.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
-        assert data["user"]["email"] == "ada@kiranverse.tech"
+        assert data["user"]["email"] == "ada@axly.tech"
         assert data["user"]["nickname"] == "adalovelace"
         assert data["user"]["name"] == "adalovelace"
 
     def test_register_user_success_with_auth_alias_route(self, client: TestClient):
         payload = {
             "nickname": "kjohnson",
-            "email": "kjohnson@kiranverse.tech",
+            "email": "kjohnson@axly.tech",
             "password": "Password123!",
             "confirm_password": "Password123!",
         }
@@ -109,7 +109,7 @@ class TestAuthAPI:
         assert res.status_code == 201
         data = res.json()
         assert "access_token" in data
-        assert data["user"]["email"] == "kjohnson@kiranverse.tech"
+        assert data["user"]["email"] == "kjohnson@axly.tech"
 
     def test_register_user_invalid_email_format(self, client: TestClient):
         payload = {
@@ -125,7 +125,7 @@ class TestAuthAPI:
     def test_register_user_short_nickname(self, client: TestClient):
         payload = {
             "nickname": "a",
-            "email": "a@kiranverse.tech",
+            "email": "a@axly.tech",
             "password": "Password123!",
             "confirm_password": "Password123!",
         }
@@ -135,7 +135,7 @@ class TestAuthAPI:
     def test_register_user_mismatched_passwords(self, client: TestClient):
         payload = {
             "nickname": "ada",
-            "email": "ada@kiranverse.tech",
+            "email": "ada@axly.tech",
             "password": "Password123!",
             "confirm_password": "DifferentPassword123!",
         }
@@ -146,7 +146,7 @@ class TestAuthAPI:
     def test_register_user_weak_password_no_numbers(self, client: TestClient):
         payload = {
             "nickname": "ada",
-            "email": "ada@kiranverse.tech",
+            "email": "ada@axly.tech",
             "password": "onlylettershere",
             "confirm_password": "onlylettershere",
         }
@@ -157,7 +157,7 @@ class TestAuthAPI:
     def test_register_user_short_password(self, client: TestClient):
         payload = {
             "nickname": "ada",
-            "email": "ada@kiranverse.tech",
+            "email": "ada@axly.tech",
             "password": "short",
             "confirm_password": "short",
         }
@@ -167,7 +167,7 @@ class TestAuthAPI:
     def test_register_duplicate_email_rejected_with_409(self, client: TestClient):
         payload = {
             "nickname": "ada",
-            "email": "ada@kiranverse.tech",
+            "email": "ada@axly.tech",
             "password": "Password123!",
             "confirm_password": "Password123!",
         }
@@ -184,19 +184,19 @@ class TestAuthAPI:
             "/api/auth/register",
             json={
                 "nickname": "alanturing",
-                "email": "alan@kiranverse.tech",
+                "email": "alan@axly.tech",
                 "password": "Password123!",
                 "confirm_password": "Password123!",
             },
         )
         login_res = client.post(
             "/api/auth/login",
-            json={"email": "alan@kiranverse.tech", "password": "Password123!"},
+            json={"email": "alan@axly.tech", "password": "Password123!"},
         )
         assert login_res.status_code == 200
         data = login_res.json()
         assert "access_token" in data
-        assert data["user"]["email"] == "alan@kiranverse.tech"
+        assert data["user"]["email"] == "alan@axly.tech"
         assert data["user"]["nickname"] == "alanturing"
 
     def test_login_user_via_auth_alias_route(self, client: TestClient):
@@ -204,14 +204,14 @@ class TestAuthAPI:
             "/api/auth/register",
             json={
                 "nickname": "shannon",
-                "email": "shannon@kiranverse.tech",
+                "email": "shannon@axly.tech",
                 "password": "Password123!",
                 "confirm_password": "Password123!",
             },
         )
         login_res = client.post(
             "/auth/login",
-            json={"email": "shannon@kiranverse.tech", "password": "Password123!"},
+            json={"email": "shannon@axly.tech", "password": "Password123!"},
         )
         assert login_res.status_code == 200
         assert "access_token" in login_res.json()
@@ -219,7 +219,7 @@ class TestAuthAPI:
     def test_login_nonexistent_email(self, client: TestClient):
         login_res = client.post(
             "/api/auth/login",
-            json={"email": "nonexistent@kiranverse.tech", "password": "Password123!"},
+            json={"email": "nonexistent@axly.tech", "password": "Password123!"},
         )
         assert login_res.status_code == 401
         assert "Invalid email or password" in login_res.json()["detail"]
@@ -229,14 +229,14 @@ class TestAuthAPI:
             "/api/auth/register",
             json={
                 "name": "Alan Turing",
-                "email": "alan@kiranverse.tech",
+                "email": "alan@axly.tech",
                 "password": "Password123!",
                 "confirm_password": "Password123!",
             },
         )
         login_res = client.post(
             "/api/auth/login",
-            json={"email": "alan@kiranverse.tech", "password": "WrongPassword123!"},
+            json={"email": "alan@axly.tech", "password": "WrongPassword123!"},
         )
         assert login_res.status_code == 401
         assert "Invalid email or password" in login_res.json()["detail"]
@@ -246,7 +246,7 @@ class TestAuthAPI:
             "/api/auth/register",
             json={
                 "name": "Grace Hopper",
-                "email": "grace@kiranverse.tech",
+                "email": "grace@axly.tech",
                 "password": "Password123!",
                 "confirm_password": "Password123!",
             },
@@ -260,7 +260,7 @@ class TestAuthAPI:
         assert me_res.status_code == 200
         me_data = me_res.json()
         assert me_data["name"] == "Grace Hopper"
-        assert me_data["email"] == "grace@kiranverse.tech"
+        assert me_data["email"] == "grace@axly.tech"
 
     def test_get_current_user_unauthorized_without_token(self, client: TestClient):
         res = client.get("/api/auth/me")
@@ -280,7 +280,7 @@ class TestUserDataIsolation:
             "/api/auth/register",
             json={
                 "name": "User Alpha",
-                "email": "alpha@kiranverse.tech",
+                "email": "alpha@axly.tech",
                 "password": "Password123!",
                 "confirm_password": "Password123!",
             },
@@ -292,7 +292,7 @@ class TestUserDataIsolation:
             "/api/auth/register",
             json={
                 "name": "User Beta",
-                "email": "beta@kiranverse.tech",
+                "email": "beta@axly.tech",
                 "password": "Password123!",
                 "confirm_password": "Password123!",
             },
@@ -339,3 +339,4 @@ class TestUserDataIsolation:
             headers={"Authorization": f"Bearer {token_b}"},
         )
         assert res_b_direct.status_code == 403
+
