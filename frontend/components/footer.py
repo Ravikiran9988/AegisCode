@@ -21,8 +21,8 @@ def render_footer() -> None:
             </div>
             <div class="aegis-footer-meta">
               <span class="aegis-footer-support">
-                Support: <a href="mailto:admin@axly.tech"
-                class="aegis-footer-link">admin@axly.tech</a>
+                Support: <a href="mailto:support@axly.in"
+                class="aegis-footer-link">support@axly.in</a>
               </span>
               <span class="aegis-footer-divider">•</span>
               <span class="aegis-footer-copy">© 2026 Axly. All rights reserved.</span>

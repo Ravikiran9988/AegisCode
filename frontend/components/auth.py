@@ -175,7 +175,7 @@ def render_auth(api_url: str, target_nav: str = "◉ Overview") -> None:
         st.markdown(
             """
             <div class="aegis-auth-footer">
-              <div>Support: <a href="mailto:admin@axly.tech">admin@axly.tech</a></div>
+              <div>Support: <a href="mailto:support@axly.in">support@axly.in</a></div>
               <div>© 2026 Axly. All rights reserved.</div>
             </div>
             """,
