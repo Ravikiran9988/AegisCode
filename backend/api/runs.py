@@ -12,8 +12,10 @@ LangGraph agents are wired in Phase 4.
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import io
+import json
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,7 +30,7 @@ from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event, Iteration, Project, Run, User
 from backend.database.persistence import upsert_iteration
-from backend.database.session import get_db
+from backend.database.session import SessionLocal, get_db
 from backend.execution import get_execution_backend
 from backend.execution.workspace import WorkspaceError, WorkspaceManager
 from backend.graph.graph import run_repair_workflow
@@ -682,6 +684,63 @@ def get_run_status(
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
         "elapsed_seconds": elapsed_sec,
     }
+
+
+@router.get(
+    "/{run_id}/stream",
+    summary="Stream live run status, agent transitions, and events via Server-Sent Events",
+)
+async def stream_run_status(
+    run_id: str,
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """
+    Server-Sent Events endpoint streaming real-time status and telemetry
+    to the Fixsembly React client.
+    """
+    async def event_generator():
+        consecutive_terminal = 0
+        last_snapshot_str = None
+
+        while True:
+            db = SessionLocal()
+            try:
+                run = resolve_run(db, run_id)
+                if not run:
+                    yield f"event: error\ndata: {json.dumps({'error': f'Run {run_id} not found'})}\n\n"
+                    break
+
+                _check_run_access(run, current_user)
+                status_data = get_run_status(run_id, db, current_user)
+                snapshot_str = json.dumps(status_data)
+
+                # Only emit if status changed or every 2 iterations to reduce network noise
+                if snapshot_str != last_snapshot_str:
+                    last_snapshot_str = snapshot_str
+                    yield f"event: status\ndata: {snapshot_str}\n\n"
+
+                if status_data.get("status") in ("passed", "already_passing", "failed", "stalled", "error", "cancelled"):
+                    consecutive_terminal += 1
+                    if consecutive_terminal >= 2:
+                        yield f"event: complete\ndata: {json.dumps({'status': status_data.get('status')})}\n\n"
+                        break
+            except Exception as exc:
+                yield f"event: error\ndata: {json.dumps({'error': str(exc)})}\n\n"
+                break
+            finally:
+                db.close()
+
+            await asyncio.sleep(1.0)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 def _format_run_summary(r: Run) -> dict:

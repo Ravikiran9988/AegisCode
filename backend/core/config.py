@@ -23,8 +23,11 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "AegisCode"
-    app_version: str = "0.1.0"
+    app_name: str = "Fixsembly"
+    app_version: str = "2.0.0"
+    tagline: str = "Three Agents. One Verified Fix."
+    product_descriptor: str = "Self-Healing Multi-Agent Software Engineering System."
+    feature_message: str = "Red to green, automatically."
     debug: bool = False
     log_level: str = "INFO"
 
@@ -85,7 +88,7 @@ class Settings(BaseSettings):
 
     # Security & network
     cors_origins: str = Field(
-        default="http://localhost:8501,http://localhost:3000,http://127.0.0.1:8501",
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:8501,http://127.0.0.1:8501",
         description="Comma-separated list of allowed CORS origin URLs",
     )
 
