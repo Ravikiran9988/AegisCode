@@ -16,6 +16,12 @@ export async function startRepair(runId) {
   });
 }
 
+export async function cancelRun(runId) {
+  return apiRequest(`/api/runs/${runId}/cancel`, {
+    method: 'POST',
+  });
+}
+
 export async function getRunStatus(runId) {
   return apiRequest(`/api/runs/${runId}/status`);
 }

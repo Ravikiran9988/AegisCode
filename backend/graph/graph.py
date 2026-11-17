@@ -49,7 +49,12 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
         run_id, current_iteration, status,
     )
 
-    if status in ("error", "stalled", "passed", "already_passing"):
+    _TERMINAL_STATUSES = (
+        "error", "stalled", "passed", "already_passing",
+        "cancelled", "test_error", "reviewer_rejected",
+        "timeout", "partially_repaired", "failed",
+    )
+    if status in _TERMINAL_STATUSES:
         logger.info("[DECISION ROUTER] run_id=%s Early exit on status=%r", run_id, status)
         return "end"
 
@@ -100,7 +105,12 @@ def decision_router(state: RepairState) -> Literal["retry", "end"]:
 def test_router(state: RepairState) -> Literal["reviewer", "coder_retry", "end"]:
     """Route after Pytest: review on success, reuse the existing plan on failure."""
     status = state.get("status", "running")
-    if status in ("error", "stalled", "failed", "passed", "already_passing"):
+    _TERMINAL_STATUSES = (
+        "error", "stalled", "failed", "passed", "already_passing",
+        "cancelled", "test_error", "reviewer_rejected",
+        "timeout", "partially_repaired",
+    )
+    if status in _TERMINAL_STATUSES:
         logger.info("[TEST ROUTER] Terminal status=%r -> ending graph", status)
         return "end"
 
@@ -149,7 +159,11 @@ def initial_entry_router(state: RepairState) -> Literal["run_initial_test", "arc
 def coder_router(state: RepairState) -> Literal["test", "coder_retry", "architect_retry", "end"]:
     """Route patch failures directly back to repair instead of validating unchanged code."""
     status = state.get("status", "running")
-    if status in ("error", "failed", "stalled"):
+    _TERMINAL_STATUSES = (
+        "error", "failed", "stalled", "cancelled",
+        "timeout", "test_error", "partially_repaired",
+    )
+    if status in _TERMINAL_STATUSES:
         return "end"
 
     patch_status = state.get("patch_status")
@@ -328,6 +342,15 @@ def run_repair_workflow(
         final_state["status"] = "error"
         final_state["termination_reason"] = f"llm_error: {exc}"
 
+    if db and run_id:
+        try:
+            r_rec = db.get(Run, run_id)
+            if r_rec and r_rec.status == "cancelled":
+                final_state["status"] = "cancelled"
+                final_state["termination_reason"] = "cancelled_by_user"
+        except Exception:
+            pass
+
     if final_state.get("status") in ("running", "passed"):
         test_data = final_state.get("test_result")
         review_data = final_state.get("review_result")
@@ -339,22 +362,26 @@ def run_repair_workflow(
             final_state["termination_reason"] = "all_tests_passed"
         elif final_state.get("status") == "already_passing":
             pass
+        elif review_res and not review_res.approved:
+            final_state["status"] = "reviewer_rejected"
+            final_state["termination_reason"] = "reviewer_rejected"
         elif final_state.get("iteration", 1) >= eff_max:
-            final_state["status"] = "failed"
-            final_state["termination_reason"] = (
-                "reviewer_rejected"
-                if (review_res and not review_res.approved)
-                else "max_iterations_reached"
-            )
+            init_failed = final_state.get("initial_failed_count", 0)
+            final_failed = final_state.get("final_failed_count", 0)
+            if 0 < final_failed < init_failed:
+                final_state["status"] = "partially_repaired"
+                final_state["termination_reason"] = "partial_repair_max_iterations"
+            else:
+                final_state["status"] = "failed"
+                final_state["termination_reason"] = "max_iterations_reached"
         else:
             final_state["status"] = "failed"
-            final_state["termination_reason"] = (
-                "reviewer_rejected"
-                if (review_res and not review_res.approved)
-                else "stopped"
-            )
+            final_state["termination_reason"] = "stopped"
 
     elapsed = time.monotonic() - start_time
+    if elapsed > settings.execution_timeout_seconds and final_state.get("status") not in ("passed", "already_passing"):
+        final_state["status"] = "timeout"
+        final_state["termination_reason"] = "execution_timeout"
     final_state["total_duration"] = elapsed
 
     if db and run_id:

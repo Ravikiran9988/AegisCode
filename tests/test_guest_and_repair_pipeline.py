@@ -28,7 +28,7 @@ from backend.graph.loop_detector import compute_failure_fingerprint
 from backend.graph.state import RepairState
 from backend.main import create_app
 from backend.tools.pytest_runner import TestResult
-from frontend.utils.api_client import _get_auth_headers
+from frontend_legacy.utils.api_client import _get_auth_headers
 
 
 @pytest.fixture

@@ -116,14 +116,22 @@ export default function AgentStepper({ statusData }) {
             className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
               status === 'passed' || status === 'already_passing'
                 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                : status === 'failed' || status === 'error'
-                ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                : status === 'partially_repaired'
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                : status === 'reviewer_rejected'
+                ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
                 : status === 'stalled'
                 ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                : status === 'timeout'
+                ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+                : status === 'cancelled'
+                ? 'bg-slate-700/30 text-slate-400 border-slate-700'
+                : status === 'failed' || status === 'error' || status === 'test_error'
+                ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                 : 'bg-brand-500/15 text-brand-300 border-brand-500/30 animate-pulse'
             }`}
           >
-            {status}
+            {status?.replace('_', ' ')}
           </span>
         </div>
       </div>

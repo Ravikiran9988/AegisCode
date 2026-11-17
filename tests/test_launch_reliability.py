@@ -8,7 +8,7 @@ from backend.agents.schemas import ArchitecturePlan, CodeChange, ReviewResult
 from backend.core.config import settings
 from backend.graph.graph import initial_entry_router
 from backend.llm.openai_strict import StrictGroqLLMProvider
-from frontend.utils.api_client import _request_error_message
+from frontend_legacy.utils.api_client import _request_error_message
 
 
 def _test_result(*, success: bool) -> dict:

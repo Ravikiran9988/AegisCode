@@ -408,6 +408,57 @@ def start_repair_loop(
     }
 
 
+@router.post(
+    "/{run_id}/cancel",
+    summary="Cancel an in-progress repair run",
+)
+def cancel_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+) -> dict[str, str]:
+    """
+    Cancel an active repair run.
+    """
+    run = _get_run_or_404(run_id, db)
+    _check_run_access(run, current_user)
+
+    terminal_statuses = {
+        "passed", "already_passing", "failed", "stalled",
+        "error", "cancelled", "test_error", "reviewer_rejected",
+        "timeout", "partially_repaired",
+    }
+    if run.status in terminal_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Run {run_id!r} is already in terminal state {run.status!r}.",
+        )
+
+    run.status = "cancelled"
+    run.finished_at = datetime.now(timezone.utc)
+    run.final_summary = "Repair run cancelled by user."
+    _emit_event(
+        db,
+        run.id,
+        "system",
+        "REPAIR_CANCELLED",
+        {
+            "node": "system",
+            "agent": "System",
+            "phase": "Repair Cancelled",
+            "description": "User requested run cancellation.",
+        },
+        iteration=run.current_iteration,
+    )
+    db.commit()
+
+    return {
+        "run_id": run_id,
+        "status": "cancelled",
+        "message": "Repair run cancelled successfully.",
+    }
+
+
 @router.get(
     "/{run_id}/status",
     summary="Get live status and progress metrics of a repair run",
@@ -472,6 +523,18 @@ def get_run_status(
     if run.status in ("passed", "already_passing"):
         cur_phase = "Repair Complete & Verified"
         cur_action_desc = "All pytest assertions passed and reviewer approved patch."
+    elif run.status == "partially_repaired":
+        cur_phase = "Partially Repaired"
+        cur_action_desc = "Some failing assertions fixed, but remaining failures exceeded iteration limit."
+    elif run.status == "reviewer_rejected":
+        cur_phase = "Reviewer Rejected"
+        cur_action_desc = "Tests passed, but Reviewer Agent rejected patch for safety or regression risk."
+    elif run.status == "test_error":
+        cur_phase = "Test Execution Error"
+        cur_action_desc = "Pytest execution encountered a collection error or syntax crash."
+    elif run.status == "timeout":
+        cur_phase = "Execution Timeout"
+        cur_action_desc = "Run exceeded configured timeout limit."
     elif run.status in ("failed", "stalled"):
         cur_phase = "Repair Terminated"
         cur_action_desc = run.final_summary or "Repair concluded without passing patch."
@@ -489,17 +552,22 @@ def get_run_status(
         if (ev.iteration_number == cur_iter_num or (ev.iteration_number == 0 and cur_iter_num == 1))
     }
 
+    _FAIL_STATUSES = (
+        "failed", "stalled", "error", "cancelled",
+        "test_error", "timeout", "reviewer_rejected", "partially_repaired",
+    )
+
     def _get_node_status(node_name: str, start_tag: str, complete_tag: str) -> str:
         if complete_tag in ev_types_cur_iter:
             return "completed"
         if start_tag in ev_types_cur_iter:
-            if run.status in ("failed", "stalled", "error") and cur_node == node_name:
+            if run.status in _FAIL_STATUSES and cur_node == node_name:
                 return "failed"
             return "running"
         if run.status in ("passed", "already_passing"):
             return "completed"
         if (
-            run.status in ("failed", "stalled", "error")
+            run.status in _FAIL_STATUSES
             and "TEST_COMPLETED" in ev_types_cur_iter
             and node_name == "reviewer"
         ):
@@ -600,7 +668,7 @@ def get_run_status(
     completed_nodes_in_cur = sum(1 for n in pipeline_nodes if n["status"] == "completed")
     if run.status in ("passed", "already_passing"):
         prog_pct = 100
-    elif run.status in ("failed", "stalled", "error", "cancelled"):
+    elif run.status in ("failed", "stalled", "error", "cancelled", "test_error", "timeout", "reviewer_rejected", "partially_repaired"):
         total_steps = max_its * 4
         done_steps = (max(run.current_iteration, 1) - 1) * 4 + completed_nodes_in_cur
         prog_pct = min(90, max(5, int((done_steps / total_steps) * 100)))
@@ -719,7 +787,12 @@ async def stream_run_status(
                     last_snapshot_str = snapshot_str
                     yield f"event: status\ndata: {snapshot_str}\n\n"
 
-                if status_data.get("status") in ("passed", "already_passing", "failed", "stalled", "error", "cancelled"):
+                _TERMINAL_STREAM_STATUSES = (
+                    "passed", "already_passing", "failed", "stalled",
+                    "error", "cancelled", "test_error", "reviewer_rejected",
+                    "timeout", "partially_repaired",
+                )
+                if status_data.get("status") in _TERMINAL_STREAM_STATUSES:
                     consecutive_terminal += 1
                     if consecutive_terminal >= 2:
                         yield f"event: complete\ndata: {json.dumps({'status': status_data.get('status')})}\n\n"
@@ -967,6 +1040,16 @@ def get_run_results(
     if not term_reason:
         if run.status in ("passed", "already_passing"):
             term_reason = "all_tests_passed"
+        elif run.status == "partially_repaired":
+            term_reason = "partial_repair_max_iterations"
+        elif run.status == "reviewer_rejected":
+            term_reason = "reviewer_rejected"
+        elif run.status == "test_error":
+            term_reason = "pytest_execution_error"
+        elif run.status == "timeout":
+            term_reason = "execution_timeout"
+        elif run.status == "cancelled":
+            term_reason = "cancelled_by_user"
         elif run.status == "stalled":
             term_reason = "repeated_failure"
         elif run.status == "failed":
