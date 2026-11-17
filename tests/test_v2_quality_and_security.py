@@ -21,18 +21,17 @@ import io
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from backend.agents.policies import PolicyViolationError, check_file_modification_policy
-from backend.core.config import settings
 from backend.database.models import Project, Run
 from backend.database.session import SessionLocal, get_db
-from backend.execution.workspace import WorkspaceError, WorkspaceManager, ZipValidationError
-from backend.graph.graph import decision_router, test_router
+from backend.execution.workspace import WorkspaceManager, ZipValidationError
+from backend.graph.graph import decision_router
 from backend.graph.nodes import test_node
 from backend.main import app
 from backend.tools.pytest_runner import TestResult

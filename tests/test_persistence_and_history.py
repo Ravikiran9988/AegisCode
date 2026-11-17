@@ -28,7 +28,11 @@ from backend.database.models import Base, Project, Run
 from backend.database.persistence import upsert_iteration
 from backend.database.session import get_db
 from backend.main import app
-from frontend_legacy.utils.api_client import fetch_active_runs, fetch_history_runs, fetch_recent_runs
+from frontend_legacy.utils.api_client import (
+    fetch_active_runs,
+    fetch_history_runs,
+    fetch_recent_runs,
+)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "projects"
 PASSING_PROJECT = FIXTURES_DIR / "passing_project"
