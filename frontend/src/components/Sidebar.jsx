@@ -9,6 +9,7 @@ import {
   Cpu,
   Flame,
 } from 'lucide-react';
+import { FixsemblyIcon } from '../assets/logo';
 
 const navigation = [
   { name: 'Control Center', to: '/overview', icon: LayoutDashboard },
@@ -51,8 +52,8 @@ export default function Sidebar() {
         {/* Multi-Agent Architecture Card */}
         <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3 text-xs">
           <div className="flex items-center gap-2 text-slate-300 font-semibold mb-2">
-            <Cpu className="h-4 w-4 text-brand-400" />
-            <span>Agent Squad</span>
+            <FixsemblyIcon size={16} />
+            <span>Agent Assembly</span>
           </div>
           <div className="space-y-2 text-[11px] text-slate-400">
             <div className="flex items-center justify-between">

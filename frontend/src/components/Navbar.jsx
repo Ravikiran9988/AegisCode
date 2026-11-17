@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShieldCheck, Moon, Sun, User as UserIcon, LogOut, Terminal, Activity } from 'lucide-react';
+import { Moon, Sun, User as UserIcon, LogOut, Terminal, Activity, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getSystemHealth } from '../api/auth';
+import { FixsemblyWordmark } from '../assets/logo';
 
 export default function Navbar({ onOpenAuthModal }) {
   const { user, isGuest, guestName, logout, clearGuest } = useAuth();
@@ -30,23 +31,8 @@ export default function Navbar({ onOpenAuthModal }) {
       <div className="flex h-14 items-center justify-between px-4 sm:px-6">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-500 shadow-lg shadow-brand-500/25 group-hover:shadow-brand-500/40 transition">
-              <ShieldCheck className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-                  Fixsembly
-                </span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">
-                  v2.0
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block -mt-0.5">
-                Three Agents. One Verified Fix.
-              </p>
-            </div>
+          <Link to="/" className="group">
+            <FixsemblyWordmark showTagline={true} />
           </Link>
         </div>
 

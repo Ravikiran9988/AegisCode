@@ -3,9 +3,6 @@ Tests for Fixsembly V2 Server-Sent Events (SSE) streaming endpoint.
 """
 from __future__ import annotations
 
-import json
-from unittest.mock import patch
-
 import pytest
 from fastapi.testclient import TestClient
 

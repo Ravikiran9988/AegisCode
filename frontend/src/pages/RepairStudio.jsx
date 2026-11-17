@@ -21,9 +21,11 @@ import Terminal from '../components/Terminal';
 import ReviewAudit from '../components/ReviewAudit';
 import { useRunStream } from '../api/sse';
 import { getRunResults, downloadRunZip } from '../api/runs';
+import { useToast } from '../context/ToastContext';
 
 export default function RepairStudio() {
   const { runId } = useParams();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('diff'); // 'diff', 'terminal', 'review', 'timeline'
   const [resultsData, setResultsData] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -44,6 +46,7 @@ export default function RepairStudio() {
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
+      toast.info('Packaging verified fix archive...');
       const blob = await downloadRunZip(runId);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -53,8 +56,9 @@ export default function RepairStudio() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      toast.success('Download started! Repaired project saved.');
     } catch (err) {
-      alert(`Download failed: ${err.message}`);
+      toast.error(`Download failed: ${err.message}`);
     } finally {
       setIsDownloading(false);
     }

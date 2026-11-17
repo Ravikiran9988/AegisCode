@@ -12,6 +12,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { FixsemblyIcon } from '../assets/logo';
 
 export default function Landing({ onOpenAuthModal }) {
   const { user, isGuest, enterAsGuest } = useAuth();
@@ -32,10 +33,16 @@ export default function Landing({ onOpenAuthModal }) {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-brand-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+        {/* Brand Icon Convergence */}
+        <div className="flex justify-center mb-5">
+          <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl shadow-brand-500/10">
+            <FixsemblyIcon size={44} />
+          </div>
+        </div>
+
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-mono font-medium mb-6 animate-in fade-in">
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Self-Healing Multi-Agent Software Engineering</span>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-mono font-medium mb-6 animate-in fade-in">
+          <span>Self-Healing Multi-Agent Software Engineering System</span>
         </div>
 
         {/* Hero Title */}

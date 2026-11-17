@@ -39,7 +39,7 @@ with patch.dict(
         mock_init_get.return_value = MagicMock(
             status_code=200, json=lambda: {"status": "ok"}
         )
-        from frontend.app import (
+        from frontend_legacy.app import (
             _check_backend_once,
             _detect_rate_limit_error,
             _normalize_backend_url,
@@ -50,7 +50,7 @@ with patch.dict(
 class TestFrontendHealthConnectivity:
 
     def test_get_default_backend_url_configured(self):
-        from frontend.utils.helpers import get_default_backend_url
+        from frontend_legacy.utils.helpers import get_default_backend_url
         with patch.dict("os.environ", {"BACKEND_URL": "http://127.0.0.1:8000"}):
             assert get_default_backend_url() == "http://127.0.0.1:8000"
 
@@ -230,7 +230,7 @@ class TestSidebarNavigation:
 
     def test_sidebar_initial_default_navigation(self):
         session = {}
-        with patch("frontend.components.sidebar.st") as mock_st:
+        with patch("frontend_legacy.components.sidebar.st") as mock_st:
             mock_st.session_state = session
             mock_st.toggle.return_value = False
             mock_st.radio.side_effect = (

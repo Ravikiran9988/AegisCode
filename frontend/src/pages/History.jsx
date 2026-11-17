@@ -11,8 +11,10 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { listHistoryRuns, downloadRunZip } from '../api/runs';
+import { useToast } from '../context/ToastContext';
 
 export default function History() {
+  const toast = useToast();
   const [runs, setRuns] = useState([]);
   const [filterStatus, setFilterStatus] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +37,7 @@ export default function History() {
 
   const handleDownload = async (runId) => {
     try {
+      toast.info('Packaging verified fix archive...');
       const blob = await downloadRunZip(runId);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -44,8 +47,9 @@ export default function History() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      toast.success('Download started! Repaired project saved.');
     } catch (err) {
-      alert(`Download failed: ${err.message}`);
+      toast.error(`Download failed: ${err.message}`);
     }
   };
 

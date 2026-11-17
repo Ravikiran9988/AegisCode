@@ -1,0 +1,22 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fx-arch" x1="24" y1="4" x2="10" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8" />
+      <stop offset="1" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="fx-coder" x1="10" y1="28" x2="38" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#818cf8" />
+      <stop offset="1" stop-color="#4f46e5" />
+    </linearGradient>
+    <linearGradient id="fx-rev" x1="38" y1="28" x2="24" y2="4" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34d399" />
+      <stop offset="1" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+  <path d="M24 4L41.32 14V34L24 44L6.68 34V14L24 4Z" stroke="#334155" stroke-width="2" stroke-dasharray="2 3" opacity="0.6"/>
+  <path d="M24 6L38 14.5L30 20L24 16L18 20L10 14.5L24 6Z" fill="url(#fx-arch)"/>
+  <path d="M9 16.5L16.5 21L16.5 29L10 33L4 23.5L9 16.5Z" fill="url(#fx-coder)"/>
+  <path d="M39 16.5L44 23.5L38 33L31.5 29L31.5 21L39 16.5Z" fill="url(#fx-rev)"/>
+  <circle cx="24" cy="24" r="5" fill="#0f172a" stroke="#6366f1" stroke-width="2"/>
+  <circle cx="24" cy="24" r="2.5" fill="#34d399"/>
+</svg>

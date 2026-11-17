@@ -9,3 +9,10 @@ export async function uploadProject(file) {
     body: formData,
   });
 }
+
+export async function loadDemoProject() {
+  return apiRequest('/api/projects/demo', {
+    method: 'POST',
+  });
+}
+

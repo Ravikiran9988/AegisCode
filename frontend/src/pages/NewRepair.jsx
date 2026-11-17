@@ -10,9 +10,11 @@ import {
   Loader2,
   Sparkles,
   Info,
+  Flame,
 } from 'lucide-react';
-import { uploadProject } from '../api/projects';
+import { uploadProject, loadDemoProject } from '../api/projects';
 import { createRun, startRepair } from '../api/runs';
+import { useToast } from '../context/ToastContext';
 
 export default function NewRepair() {
   const navigate = useNavigate();
@@ -47,24 +49,30 @@ export default function NewRepair() {
     }
   };
 
+  const toast = useToast();
+
   const handleLaunchDemo = async () => {
-    // Generate a demo zip in memory or fetch demo project
     setIsUploading(true);
-    setStepState('Preparing demo project...');
+    setStepState('1/3 Loading Buggy Calculator benchmark project...');
     setError('');
 
     try {
-      // Create a minimal synthetic demo zip in browser if needed, or prompt user
-      const response = await fetch('/api/health');
-      if (!response.ok) throw new Error('Backend is currently unreachable');
+      toast.info('Loading demo benchmark project...');
+      const uploadRes = await loadDemoProject();
+      const projectId = uploadRes.project_id;
 
-      // We can upload a demo calculator archive
-      // Let's create a JS Zip or trigger demo upload
-      setStepState('Uploading Buggy Calculator benchmark...');
-      // Using an actual sample zip:
-      const dummyContent = 'dummy'; // We can trigger sample via standard file or alert
+      setStepState('2/3 Executing baseline Pytest assessment...');
+      const runRes = await createRun(projectId, maxIterations);
+      const runId = runRes.run_id;
+
+      setStepState('3/3 Deploying multi-agent repair loop...');
+      await startRepair(runId);
+
+      toast.success('Demo repair launched! Redirecting to studio...');
+      navigate(`/repair/${runId}`);
     } catch (err) {
       setError(err.message || 'Failed to initialize demo');
+      toast.error(err.message || 'Demo launch failed');
       setIsUploading(false);
     }
   };
@@ -127,6 +135,33 @@ export default function NewRepair() {
           <span>{error}</span>
         </div>
       )}
+
+      {/* Quick Benchmark Card */}
+      <div className="rounded-2xl border border-indigo-500/25 bg-gradient-to-r from-indigo-950/40 via-slate-900/60 to-slate-900/40 p-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center flex-shrink-0">
+            <Flame className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold text-slate-100">
+              Want to see Fixsembly in action right now?
+            </h4>
+            <p className="text-[11px] text-slate-400">
+              Load the built-in Buggy Calculator project and watch all three agents execute.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleLaunchDemo}
+          disabled={isUploading}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-500/20 transition disabled:opacity-50"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Launch Demo Fix</span>
+        </button>
+      </div>
 
       {/* Main Upload Card */}
       <form onSubmit={handleSubmit} className="space-y-6">
