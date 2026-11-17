@@ -3,17 +3,17 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: aegis_postgres
+    container_name: fixsembly_postgres
     environment:
-      POSTGRES_USER: aegis_user
-      POSTGRES_PASSWORD: aegis_password
-      POSTGRES_DB: aegiscode_db
+      POSTGRES_USER: fixsembly_user
+      POSTGRES_PASSWORD: fixsembly_password
+      POSTGRES_DB: fixsembly_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aegis_user -d aegiscode_db"]
+      test: ["CMD-SHELL", "pg_isready -U fixsembly_user -d fixsembly_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,14 +22,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: aegis_backend
+    container_name: fixsembly_backend
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+psycopg://aegis_user:aegis_password@postgres:5432/aegiscode_db
+      - DATABASE_URL=postgresql+psycopg://fixsembly_user:fixsembly_password@postgres:5432/fixsembly_db
       - LLM_PROVIDER=mock
       - EXECUTION_BACKEND=local
-      - CORS_ORIGINS=http://localhost:8501,http://127.0.0.1:8501
+      - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:8501
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,11 +40,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: aegis_frontend
+    container_name: fixsembly_frontend
     ports:
-      - "8501:8501"
-    environment:
-      - BACKEND_URL=http://backend:8000/api
+      - "3000:80"
+      - "5173:80"
     depends_on:
       - backend
 

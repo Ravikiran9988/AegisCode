@@ -1,116 +1,139 @@
-# AegisCode
+# Fixsembly (v2.0)
 
-**Self-Healing Multi-Agent Software Engineering System**
+> **Three Agents. One Verified Fix.**  
+> *Self-Healing Multi-Agent Software Engineering System.*  
+> **Red to green, automatically.**
 
-AegisCode is an autonomous software engineering platform that detects, analyzes, and repairs failing Python projects using a LangGraph-based multi-agent workflow. It combines an Architect, Coder, and Reviewer agent with authoritative Pytest execution, code-diff inspection, observability, and security controls.
+Fixsembly is an autonomous software engineering platform that detects, analyzes, and repairs failing Python projects using a LangGraph-coordinated multi-agent workflow. It combines an **Architect**, **Coder**, and **Reviewer** agent with authoritative Pytest execution, Monaco-powered side-by-side diff inspection, real-time Server-Sent Events (SSE) telemetry, and strict anti-tampering security policies.
 
-## 🚀 Live Demo
+---
 
-**Live Application:** https://aegiscode.axly.tech/
+## 🎯 What Fixsembly Does
 
-**Demo Video:** https://www.loom.com/share/e73b17e338e84080a97be0ad2d2255ca
-
-## 📦 Repository
-
-**GitHub:** https://github.com/Ravikiran9988/AegisCode
-
-## 🎯 What AegisCode Does
-
-AegisCode accepts a Python project with failing Pytest tests and autonomously works through a repair loop:
+Fixsembly accepts a Python project with failing Pytest tests and autonomously works through a verification-gated repair loop:
 
 ```text
-Upload Project
-     ↓
-Initial Pytest Run
-     ↓
-Architect — Analyze Failure & Plan Repair
-     ↓
-Coder — Apply Targeted Code Repair
-     ↓
-Pytest — Execute & Verify
-     ↓
-Reviewer — Audit Changes & Regression Risk
-     ↓
-Pass → Complete  |  Fail → Next Iteration
+Upload Project ZIP
+       ↓
+Initial Pytest Assessment
+       ↓
+Architect Agent — Root Cause Analysis & Plan Formulation
+       ↓
+Coder Agent — Targeted Patch Synthesis (Strict Policy Guarded)
+       ↓
+Pytest Execution Sandbox — Verification Truth (Exit Code Gate)
+       ↓
+Reviewer Agent — Independent Audit & Regression Risk Gate
+       ↓
+Pass → Verified Fix Ready (.ZIP)  |  Fail → Next Repair Iteration
 ```
 
-The system uses actual Pytest execution results as the source of truth instead of relying on the LLM to claim that a repair works.
+The system uses **actual Pytest exit codes** as the sole source of truth instead of relying on the LLM to hallucinate or claim that a fix works.
+
+---
 
 ## 🤖 Multi-Agent Architecture
 
-- **Architect Agent** — analyzes failures, tracebacks, and project context and produces a repair plan.
-- **Coder Agent** — applies targeted changes based on the repair plan.
-- **Reviewer Agent** — independently reviews generated changes and checks for regression risks.
-- **LangGraph Orchestration** — coordinates the agents and controls iterative repair decisions.
+- **Architect Agent**: Read-only analysis agent that parses pytest failure diagnostics, error tracebacks, and directory structure to formulate a structured `ArchitecturePlan`.
+- **Coder Agent**: Synthesizes minimal unified diff patches or surgical file writes. Includes an automated recovery fallback if diff headers are malformed.
+- **Reviewer Agent**: Independent quality gate that audits Git diffs and before/after test results to guarantee zero regression risk.
+- **Pytest Runner**: Sandboxed subprocess execution providing the authoritative pass/fail signal.
+- **LangGraph StateGraph**: Orchestrates agents, handles patch retries, and invokes loop detection to prevent infinite failing cycles.
 
-## 🖥️ Platform Features
+---
 
-- Control Center / Overview dashboard
-- New Repair project upload workflow
-- Active Repair live telemetry
-- Repair History
-- Agent observability
-- Synthesized code diffs
-- Pytest execution logs
-- System health and telemetry
-- Configuration and settings
-- Architecture and documentation views
+## 🖥️ Modernized V2 Tech Stack
 
-## 🔐 Security
+### Frontend
+- **Framework**: React 18+ (Pure JavaScript)
+- **Bundler & Dev Server**: Vite
+- **Styling**: Tailwind CSS (Cyber-engineering dark/light palette)
+- **Routing**: React Router v6
+- **Iconography**: Lucide React
+- **Code & Diff Inspection**: Monaco Editor (`@monaco-editor/react`)
+- **Real-Time Telemetry**: Server-Sent Events (SSE) via `useRunStream` hook with REST polling fallback
 
-AegisCode includes security-focused controls such as:
+### Backend
+- **API Framework**: FastAPI & Starlette
+- **State Machine**: LangGraph (v1.2+) & LangChain Core
+- **Database**: SQLAlchemy 2.0 ORM (SQLite for local dev, PostgreSQL for production)
+- **Authentication**: JWT Bearer tokens + bcrypt password hashing & guest sessions
+- **Testing Engine**: Subprocess Pytest runner with hard timeouts
+- **Diff Tracking**: Ephemeral Git repository tracking
 
-- Protected test/system files
-- Path traversal prevention
-- Prompt injection defenses
-- Failure-loop detection
-- Isolated execution
-- Safe repair boundaries
+---
 
-## 🛠️ Tech Stack
-
-- **Frontend:** Streamlit
-- **Backend:** FastAPI
-- **Agent Orchestration:** LangGraph
-- **LLM:** Groq-compatible LLM integration
-- **Testing:** Pytest
-- **Execution:** Docker / sandboxed execution
-- **Language:** Python
-
-## 📁 Project Structure
+## 📁 Repository Structure
 
 ```text
-AegisCode/
-├── backend/          # FastAPI backend and repair workflow
-├── frontend/         # Streamlit developer dashboard
-├── demo_projects/    # Demonstration projects
-├── evaluation/       # Evaluation and benchmarking
-├── docs/             # Architecture and project documentation
-├── Dockerfile
-├── Dockerfile.frontend
-├── docker-compose.yml
-├── render.yaml
-├── pyproject.toml
-└── README.md
+Fixsembly/
+├── backend/
+│   ├── agents/          # Architect, Coder, Reviewer agents, schemas, policies, prompts
+│   ├── api/             # FastAPI routers (runs, projects, auth, guests, health) & SSE stream
+│   ├── context/         # Bounded context builder with prompt injection defenses
+│   ├── core/            # Configuration settings, logging, and security
+│   ├── database/        # SQLAlchemy models (Run, Project, Iteration, Event) & persistence
+│   ├── execution/       # Workspace manager & sandboxed execution backends
+│   ├── graph/           # LangGraph state machine, nodes, conditional routers, loop detector
+│   ├── llm/             # LLM provider abstractions (Groq, Ollama, Mock)
+│   ├── tools/           # Pytest runner, Git diff tools, and filesystem operations
+│   └── main.py          # FastAPI application factory
+├── frontend/            # React + Vite + Tailwind CSS SPA
+│   ├── src/
+│   │   ├── api/         # API client, run endpoints, auth, and SSE hook
+│   │   ├── components/  # Navbar, Sidebar, AgentStepper, MonacoDiff, Terminal, ReviewAudit
+│   │   ├── context/     # AuthContext (Guest + User) and ThemeContext
+│   │   └── pages/       # Landing, Overview, NewRepair, RepairStudio, History, Health, Docs
+│   ├── nginx.conf       # Production Nginx reverse-proxy configuration
+│   └── package.json     # Frontend dependencies
+├── frontend-legacy/     # Preserved Streamlit frontend (100% intact)
+├── demo_projects/       # Buggy calculator sample project & packaged ZIP
+├── evaluation/          # Benchmark evaluation suite
+├── tests/               # 22 test suites covering all backend phases & SSE streaming
+├── Dockerfile           # Backend container
+├── Dockerfile.frontend  # Multi-stage React + Nginx container
+├── docker-compose.yml   # Multi-service stack (Postgres, FastAPI backend, React frontend)
+└── pyproject.toml       # Ruff and Pytest configuration
 ```
 
-## 🎥 Demo
+---
 
-The live demonstration shows a deliberately broken Python project being uploaded, analyzed, repaired, tested, reviewed, and verified through the AegisCode workflow.
+## 🚀 Quick Start
 
-**Watch the 2-minute demo:** https://www.loom.com/share/e73b17e338e84080a97be0ad2d2255ca
+### 1. Run via Docker Compose (Recommended)
 
-## 🌐 Links
+```bash
+docker compose up --build
+```
+- React Frontend: http://localhost:3000
+- FastAPI Backend & Swagger Docs: http://localhost:8000/docs
 
-| Resource | Link |
-|---|---|
-| Live App | https://aegiscode.axly.tech/ |
-| GitHub | https://github.com/Ravikiran9988/AegisCode |
-| Demo Video | https://www.loom.com/share/e73b17e338e84080a97be0ad2d2255ca |
+### 2. Run Locally
 
-## 👨‍💻 Author
+**Start Backend:**
+```bash
+pip install -r requirements.txt
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-**Medicharla Ravi Kiran**
+**Start Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open http://localhost:5173 in your browser.
 
-GitHub: https://github.com/Ravikiran9988
+---
 
+## 🧪 Testing
+
+Run backend test suites:
+```bash
+pytest -q
+```
+
+Build and verify frontend:
+```bash
+cd frontend && npm run build
+```

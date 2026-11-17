@@ -56,3 +56,10 @@ coverage.xml
 
 # ── Streamlit ─────────────────────────────────────────────────────────────────
 .streamlit/secrets.toml
+
+# ── Frontend (Node / Vite) ─────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/node_modules/
+.vite/
+
