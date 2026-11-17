@@ -1,5 +1,5 @@
 """
-AegisCode – centralised configuration.
+Fixsembly – centralised configuration.
 
 All settings are read from environment variables (or a .env file).
 Import the singleton `settings` object everywhere; do not use os.getenv() directly.
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./aegiscode.db",
+        default="sqlite:///./fixsembly.db",
         description="SQLAlchemy database URL (sqlite:///... or postgresql+psycopg://...)",
     )
 

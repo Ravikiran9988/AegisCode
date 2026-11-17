@@ -1,7 +1,7 @@
 """
 LangGraph State Machine Assembly — Phase 4.
 
-Assembles the AegisCode self-healing repair loop. The repair path keeps the
+Assembles the Fixsembly self-healing repair loop. The repair path keeps the
 Architect result cached across normal test failures so retries go directly to
 Coder instead of spending another LLM call re-analyzing the same failure.
 """
@@ -184,7 +184,7 @@ def build_repair_graph(
     llm_provider: BaseLLMProvider,
     db: Session | None = None,
 ) -> StateGraph:
-    """Construct and compile the AegisCode LangGraph repair graph."""
+    """Construct and compile the Fixsembly LangGraph repair graph."""
     builder = StateGraph(RepairState)
 
     builder.add_node("initial_test", partial(initial_test_node, db=db))

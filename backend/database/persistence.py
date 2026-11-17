@@ -1,5 +1,5 @@
 """
-Database Persistence Helpers for AegisCode.
+Database Persistence Helpers for Fixsembly.
 
 Provides authoritative upsert functions for Iteration and Run records,
 ensuring all agent outputs (Architect, Coder, Test, Reviewer) and test metrics

@@ -356,7 +356,7 @@ class TestEndpointsAndHistoryAPI:
         mock_list_resp.status_code = 200
         mock_list_resp.json.return_value = [{"run_id": "run-1", "status": "passed"}]
 
-        with patch("frontend.utils.api_client._safe_get", return_value=mock_list_resp):
+        with patch("frontend_legacy.utils.api_client._safe_get", return_value=mock_list_resp):
             runs = fetch_recent_runs("http://localhost:8000/api")
             assert len(runs) == 1
             assert runs[0]["run_id"] == "run-1"
@@ -365,7 +365,7 @@ class TestEndpointsAndHistoryAPI:
         mock_dict_resp.status_code = 200
         mock_dict_resp.json.return_value = {"runs": [{"run_id": "run-2", "status": "failed"}]}
 
-        with patch("frontend.utils.api_client._safe_get", return_value=mock_dict_resp):
+        with patch("frontend_legacy.utils.api_client._safe_get", return_value=mock_dict_resp):
             runs = fetch_recent_runs("http://localhost:8000/api")
             assert len(runs) == 1
             assert runs[0]["run_id"] == "run-2"

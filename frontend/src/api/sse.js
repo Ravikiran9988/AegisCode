@@ -21,15 +21,17 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
     setIsStreaming(true);
     setError(null);
 
+    // Terminal statuses — stream closes and onComplete fires when any of these is received
+    const TERMINAL_STATUSES = [
+      'passed', 'already_passing', 'failed', 'stalled', 'error', 'cancelled',
+      'partially_repaired', 'reviewer_rejected', 'test_error', 'timeout',
+    ];
+
     // Initial snapshot fetch
     getRunStatus(runId)
       .then((initialData) => {
         setData(initialData);
-        if (
-          ['passed', 'already_passing', 'failed', 'stalled', 'error', 'cancelled'].includes(
-            initialData.status
-          )
-        ) {
+        if (TERMINAL_STATUSES.includes(initialData.status)) {
           setIsStreaming(false);
           if (onComplete) onComplete(initialData);
         }
@@ -51,11 +53,7 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
           const payload = JSON.parse(e.data);
           setData(payload);
 
-          if (
-            ['passed', 'already_passing', 'failed', 'stalled', 'error', 'cancelled'].includes(
-              payload.status
-            )
-          ) {
+          if (TERMINAL_STATUSES.includes(payload.status)) {
             setIsStreaming(false);
             eventSource.close();
             if (onComplete) onComplete(payload);
@@ -92,11 +90,7 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
           const status = await getRunStatus(runId);
           setData(status);
 
-          if (
-            ['passed', 'already_passing', 'failed', 'stalled', 'error', 'cancelled'].includes(
-              status.status
-            )
-          ) {
+          if (TERMINAL_STATUSES.includes(status.status)) {
             clearInterval(pollingIntervalRef.current);
             setIsStreaming(false);
             if (onComplete) onComplete(status);

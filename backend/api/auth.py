@@ -1,5 +1,5 @@
 """
-Authentication & Authorization API Router for AegisCode.
+Authentication & Authorization API Router for Fixsembly.
 Provides user registration, login, profile queries, and token dependencies.
 """
 

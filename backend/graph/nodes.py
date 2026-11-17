@@ -1,7 +1,7 @@
 """
 LangGraph Nodes — Phase 4.
 
-Individual node implementations for the AegisCode repair state machine.
+Individual node implementations for the Fixsembly repair state machine.
 Each node takes a `RepairState`, invokes the appropriate Phase 2 tools or Phase 3 agents,
 persists DB events and iterations via authoritative upserts, and returns updated state fields.
 """

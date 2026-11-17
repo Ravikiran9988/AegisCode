@@ -181,8 +181,16 @@ export default function Overview() {
               ) : (
                 runs.map((r) => {
                   const isPass = r.status === 'passed' || r.status === 'already_passing';
-                  const isFail = r.status === 'failed' || r.status === 'error';
-                  const isStalled = r.status === 'stalled';
+                  const isFail =
+                    r.status === 'failed' ||
+                    r.status === 'error' ||
+                    r.status === 'cancelled' ||
+                    r.status === 'test_error' ||
+                    r.status === 'timeout';
+                  const isWarn =
+                    r.status === 'stalled' ||
+                    r.status === 'partially_repaired' ||
+                    r.status === 'reviewer_rejected';
 
                   return (
                     <tr key={r.run_id} className="hover:bg-slate-800/30 transition">
@@ -199,7 +207,7 @@ export default function Overview() {
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                               : isFail
                               ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                              : isStalled
+                              : isWarn
                               ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                               : 'bg-brand-500/10 text-brand-400 border-brand-500/20 animate-pulse'
                           }`}

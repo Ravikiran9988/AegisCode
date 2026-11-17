@@ -1206,15 +1206,15 @@ def download_repaired_project(
     )
 
     buf.seek(0)
-    filename = f"aegiscode-repaired-{run_id}.zip"
+    filename = f"fixsembly-repaired-{run_id}.zip"
 
     return StreamingResponse(
         content=buf,
         media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
-            "X-AegisCode-Run-Id": run_id,
-            "X-AegisCode-File-Count": str(file_count),
+            "X-Fixsembly-Run-Id": run_id,
+            "X-Fixsembly-File-Count": str(file_count),
         },
     )
 

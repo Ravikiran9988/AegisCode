@@ -68,18 +68,28 @@ export default function History() {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-2">
-          {['', 'passed', 'failed', 'stalled'].map((status) => (
+        <div className="flex items-center gap-2 flex-wrap">
+          {[
+            { value: '', label: 'All Records' },
+            { value: 'passed', label: 'PASSED' },
+            { value: 'already_passing', label: 'ALREADY PASSING' },
+            { value: 'failed', label: 'FAILED' },
+            { value: 'partially_repaired', label: 'PARTIAL' },
+            { value: 'reviewer_rejected', label: 'REJECTED' },
+            { value: 'stalled', label: 'STALLED' },
+            { value: 'test_error', label: 'TEST ERROR' },
+            { value: 'cancelled', label: 'CANCELLED' },
+          ].map(({ value, label }) => (
             <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
+              key={value}
+              onClick={() => setFilterStatus(value)}
               className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition border ${
-                filterStatus === status
+                filterStatus === value
                   ? 'bg-brand-600 text-white border-brand-500 shadow-sm'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              {status === '' ? 'All Records' : status.toUpperCase()}
+              {label}
             </button>
           ))}
         </div>
@@ -110,8 +120,16 @@ export default function History() {
               ) : (
                 runs.map((r) => {
                   const isPass = r.status === 'passed' || r.status === 'already_passing';
-                  const isFail = r.status === 'failed' || r.status === 'error';
-                  const isStalled = r.status === 'stalled';
+                  const isFail =
+                    r.status === 'failed' ||
+                    r.status === 'error' ||
+                    r.status === 'cancelled' ||
+                    r.status === 'test_error' ||
+                    r.status === 'timeout';
+                  const isWarn =
+                    r.status === 'stalled' ||
+                    r.status === 'partially_repaired' ||
+                    r.status === 'reviewer_rejected';
 
                   return (
                     <tr key={r.run_id} className="hover:bg-slate-800/30 transition">
@@ -128,7 +146,7 @@ export default function History() {
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                               : isFail
                               ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                              : isStalled
+                              : isWarn
                               ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                               : 'bg-brand-500/10 text-brand-400 border-brand-500/20'
                           }`}

@@ -1,5 +1,5 @@
 """
-Security & Authentication Core for AegisCode.
+Security & Authentication Core for Fixsembly.
 Provides password hashing, verification, and JWT access token management.
 """
 
@@ -13,7 +13,7 @@ from jose import JWTError, jwt
 
 # A predictable fallback secret is unsafe for a deployed authentication service.
 # Keep local development convenient, but fail closed when production is enabled.
-_DEFAULT_DEV_SECRET = "aegiscode-development-only-secret"
+_DEFAULT_DEV_SECRET = "fixsembly-development-only-secret"
 _SECRET_ENV = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
 
