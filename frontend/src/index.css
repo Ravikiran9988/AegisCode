@@ -5,6 +5,8 @@
 :root,
 html.dark {
   color-scheme: dark;
+  background-color: #090d16;
+  color: #f1f5f9;
   --color-slate-50: 248 250 252;
   --color-slate-100: 241 245 249;
   --color-slate-200: 226 232 240;
@@ -22,6 +24,8 @@ html.dark {
 html.light,
 html:not(.dark) {
   color-scheme: light;
+  background-color: #f8fafc;
+  color: #0f172a;
   --color-slate-50: 15 23 42;
   --color-slate-100: 15 23 42;
   --color-slate-200: 30 41 59;
@@ -38,9 +42,35 @@ html:not(.dark) {
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased;
+    @apply bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased;
     transition: background-color 0.15s ease, color 0.15s ease;
   }
+}
+
+/* Light mode definitive utility guarantees */
+html.light .bg-slate-950,
+html:not(.dark) .bg-slate-950 {
+  background-color: #f8fafc;
+}
+
+html.light .bg-slate-900,
+html:not(.dark) .bg-slate-900 {
+  background-color: #ffffff;
+}
+
+html.light .border-slate-800,
+html:not(.dark) .border-slate-800 {
+  border-color: #e2e8f0;
+}
+
+html.light .border-slate-800\/80,
+html:not(.dark) .border-slate-800\/80 {
+  border-color: rgba(226, 232, 240, 0.8);
+}
+
+html.light .text-slate-100,
+html:not(.dark) .text-slate-100 {
+  color: #0f172a;
 }
 
 /* Light mode overrides for headings with text-white */
@@ -52,13 +82,13 @@ html:not(.dark) h1.text-white,
 html:not(.dark) h2.text-white,
 html:not(.dark) h3.text-white,
 html:not(.dark) h4.text-white {
-  color: rgb(15 23 42) !important;
+  color: #0f172a !important;
 }
 
 /* Light mode override for general text-white when not in a colored button/badge */
 html.light div.text-white:not(button *):not(a.bg-brand-600 *):not(.bg-brand-600 *):not(.bg-indigo-600 *):not(.bg-emerald-500 *):not(.bg-emerald-600 *):not(.bg-rose-500 *),
 html:not(.dark) div.text-white:not(button *):not(a.bg-brand-600 *):not(.bg-brand-600 *):not(.bg-indigo-600 *):not(.bg-emerald-500 *):not(.bg-emerald-600 *):not(.bg-rose-500 *) {
-  color: rgb(15 23 42) !important;
+  color: #0f172a !important;
 }
 
 /* Custom scrollbar for developer tools look */

@@ -22,7 +22,7 @@ const navigation = [
 
 export default function Sidebar() {
   return (
-    <aside className="w-60 flex-shrink-0 border-r border-slate-800/80 bg-slate-950/60 p-3 hidden md:flex flex-col justify-between">
+    <aside className="w-60 flex-shrink-0 border-r border-slate-200 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-950/60 p-3 hidden md:flex flex-col justify-between transition-colors">
       <div className="space-y-6">
         {/* Navigation Group */}
         <div>
@@ -38,7 +38,7 @@ export default function Sidebar() {
                   `flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-lg transition ${
                     isActive
                       ? 'bg-brand-600/15 text-brand-600 dark:text-brand-300 border border-brand-500/25 shadow-sm font-semibold'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-900/60'
                   }`
                 }
               >
@@ -50,36 +50,36 @@ export default function Sidebar() {
         </div>
 
         {/* Multi-Agent Architecture Card */}
-        <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-300 font-semibold mb-2">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/40 p-3 text-xs shadow-sm dark:shadow-none">
+          <div className="flex items-center gap-2 text-slate-800 dark:text-slate-300 font-semibold mb-2">
             <FixsemblyIcon size={16} />
             <span>Agent Assembly</span>
           </div>
-          <div className="space-y-2 text-[11px] text-slate-400">
+          <div className="space-y-2 text-[11px] text-slate-600 dark:text-slate-400">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                 Architect
               </span>
               <span className="text-slate-500 font-mono">Plan</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
                 Coder
               </span>
               <span className="text-slate-500 font-mono">Patch</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                 Pytest
               </span>
               <span className="text-slate-500 font-mono">Verify</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                 Reviewer
               </span>
               <span className="text-slate-500 font-mono">Audit</span>
@@ -89,7 +89,7 @@ export default function Sidebar() {
       </div>
 
       {/* Footer Info */}
-      <div className="pt-4 border-t border-slate-900 text-[11px] text-slate-500 font-mono flex items-center justify-between px-2">
+      <div className="pt-4 border-t border-slate-200 dark:border-slate-900 text-[11px] text-slate-500 font-mono flex items-center justify-between px-2">
         <span>LangGraph Orchestrated</span>
         <span className="text-emerald-500 flex items-center gap-1">
           <Flame className="h-3 w-3" /> Auto
