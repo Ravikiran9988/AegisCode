@@ -57,7 +57,7 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description=(
-            "Fixsembly — Self-Healing Multi-Agent Software Engineering System. "
+            "Fixsembly: Self-Healing Multi-Agent Software Engineering System. "
             "Three Agents. One Verified Fix. Red to green, automatically."
         ),
         lifespan=lifespan,

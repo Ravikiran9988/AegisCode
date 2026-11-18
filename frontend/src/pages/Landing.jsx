@@ -60,7 +60,7 @@ export default function Landing({ onOpenAuthModal }) {
           {/* Top Pill Announcement */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-mono mb-4 shadow-sm backdrop-blur-md">
             <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-            <span className="font-medium text-slate-800 dark:text-slate-200">Fixsembly V2</span>
+            <span className="font-medium text-slate-800 dark:text-slate-200">Fixsembly</span>
             <span className="text-slate-400 dark:text-slate-600">•</span>
             <span className="text-slate-600 dark:text-slate-400 hidden sm:inline">Self-Healing Multi-Agent Engineering</span>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 font-semibold">
@@ -79,7 +79,7 @@ export default function Landing({ onOpenAuthModal }) {
           {/* Subtitle Value Proposition */}
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mb-6 leading-relaxed max-w-2xl mx-auto font-normal">
             Autonomous software engineering system that analyzes failing Python repositories,
-            synthesizes targeted unified patches, runs real Pytest assertions, and verifies zero regressions —{' '}
+            synthesizes targeted unified patches, runs real Pytest assertions, and verifies zero regressions, taking code{' '}
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold underline decoration-emerald-500/40 underline-offset-2">
               red to green, automatically
             </span>
@@ -424,8 +424,8 @@ export default function Landing({ onOpenAuthModal }) {
         <div className="border-t border-slate-800/80 pt-6 pb-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-mono">
           <div className="flex items-center gap-2">
             <FixsemblyIcon size={18} />
-            <span className="text-slate-400 font-medium font-sans">Fixsembly V2.0</span>
-            <span>— Three Agents. One Verified Fix.</span>
+            <span className="text-slate-400 font-medium font-sans">Fixsembly</span>
+            <span>• Three Agents. One Verified Fix.</span>
           </div>
 
           <div className="flex items-center gap-4">

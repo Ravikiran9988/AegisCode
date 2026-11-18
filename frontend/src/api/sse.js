@@ -21,7 +21,7 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
     setIsStreaming(true);
     setError(null);
 
-    // Terminal statuses — stream closes and onComplete fires when any of these is received
+    // Terminal statuses: stream closes and onComplete fires when any of these is received
     const TERMINAL_STATUSES = [
       'passed', 'already_passing', 'failed', 'stalled', 'error', 'cancelled',
       'partially_repaired', 'reviewer_rejected', 'test_error', 'timeout',
