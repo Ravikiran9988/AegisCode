@@ -122,7 +122,7 @@ export default function NewRepair() {
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="pb-4 border-b border-slate-800">
-        <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+        <h2 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
           <PlayCircle className="h-5 w-5 text-brand-400" />
           <span>Launch Autonomous Repair</span>
         </h2>

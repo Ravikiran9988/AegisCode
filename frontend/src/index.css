@@ -2,10 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+:root,
+html.dark {
+  color-scheme: dark;
+  --color-slate-50: 248 250 252;
+  --color-slate-100: 241 245 249;
+  --color-slate-200: 226 232 240;
+  --color-slate-300: 203 213 225;
+  --color-slate-400: 148 163 184;
+  --color-slate-500: 100 116 139;
+  --color-slate-600: 71 85 105;
+  --color-slate-700: 51 65 85;
+  --color-slate-800: 30 41 59;
+  --color-slate-850: 21 31 50;
+  --color-slate-900: 15 23 42;
+  --color-slate-950: 9 13 22;
+}
+
+html.light,
+html:not(.dark) {
+  color-scheme: light;
+  --color-slate-50: 15 23 42;
+  --color-slate-100: 15 23 42;
+  --color-slate-200: 30 41 59;
+  --color-slate-300: 51 65 85;
+  --color-slate-400: 71 85 105;
+  --color-slate-500: 100 116 139;
+  --color-slate-600: 148 163 184;
+  --color-slate-700: 203 213 225;
+  --color-slate-800: 226 232 240;
+  --color-slate-850: 241 245 249;
+  --color-slate-900: 255 255 255;
+  --color-slate-950: 248 250 252;
+}
+
 @layer base {
   body {
     @apply bg-slate-950 text-slate-100 font-sans antialiased;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
+}
+
+/* Light mode overrides for headings with text-white */
+html.light h1.text-white,
+html.light h2.text-white,
+html.light h3.text-white,
+html.light h4.text-white,
+html:not(.dark) h1.text-white,
+html:not(.dark) h2.text-white,
+html:not(.dark) h3.text-white,
+html:not(.dark) h4.text-white {
+  color: rgb(15 23 42) !important;
+}
+
+/* Light mode override for general text-white when not in a colored button/badge */
+html.light div.text-white:not(button *):not(a.bg-brand-600 *):not(.bg-brand-600 *):not(.bg-indigo-600 *):not(.bg-emerald-500 *):not(.bg-emerald-600 *):not(.bg-rose-500 *),
+html:not(.dark) div.text-white:not(button *):not(a.bg-brand-600 *):not(.bg-brand-600 *):not(.bg-indigo-600 *):not(.bg-emerald-500 *):not(.bg-emerald-600 *):not(.bg-rose-500 *) {
+  color: rgb(15 23 42) !important;
 }
 
 /* Custom scrollbar for developer tools look */
@@ -13,13 +66,21 @@
   width: 6px;
   height: 6px;
 }
+
+html.dark ::-webkit-scrollbar-track,
 ::-webkit-scrollbar-track {
   background: rgba(15, 23, 42, 0.6);
 }
+
+html.light ::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.8);
+}
+
 ::-webkit-scrollbar-thumb {
   background: rgba(99, 102, 241, 0.3);
   border-radius: 3px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 102, 241, 0.6);
 }
@@ -27,6 +88,7 @@
 .terminal-scroll::-webkit-scrollbar-track {
   background: #020617;
 }
+
 .terminal-scroll::-webkit-scrollbar-thumb {
   background: #334155;
 }

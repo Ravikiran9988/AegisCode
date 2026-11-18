@@ -49,7 +49,7 @@ export default function Landing({ onOpenAuthModal }) {
   return (
     <div className="relative pt-1 sm:pt-3 pb-16 overflow-hidden">
       {/* Background Engineering Canvas & Radial Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-35 pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 dark:opacity-35 pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[720px] h-[280px] bg-gradient-to-b from-brand-500/15 via-indigo-500/5 to-transparent blur-[90px] rounded-full pointer-events-none -z-10" />
 
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
@@ -69,7 +69,7 @@ export default function Landing({ onOpenAuthModal }) {
           </div>
 
           {/* Primary Display Title */}
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white mb-3.5 leading-[1.1]">
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-100 mb-3.5 leading-[1.1]">
             Three Agents.{' '}
             <span className="bg-gradient-to-r from-brand-400 via-indigo-300 to-emerald-400 bg-clip-text text-transparent">
               One Verified Fix.
@@ -200,12 +200,12 @@ export default function Landing({ onOpenAuthModal }) {
               <div className="space-y-1">
                 <div className="text-slate-500">@@ -11,7 +11,7 @@ def calculate_discounted_total(price, quantity, discount):</div>
                 <div className="text-slate-400">     subtotal = price * quantity</div>
-                <div className="bg-rose-500/15 text-rose-300 px-2 py-0.5 rounded border border-rose-500/20 flex items-center gap-2">
-                  <span className="select-none font-bold text-rose-400">-</span>
+                <div className="bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded border border-rose-500/20 flex items-center gap-2">
+                  <span className="select-none font-bold text-rose-500 dark:text-rose-400">-</span>
                   <span>    return subtotal - discount * 1.05  # Bug: incorrect tax operator precedence</span>
                 </div>
-                <div className="bg-emerald-500/15 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-2">
-                  <span className="select-none font-bold text-emerald-400">+</span>
+                <div className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-2">
+                  <span className="select-none font-bold text-emerald-500 dark:text-emerald-400">+</span>
                   <span>    return (subtotal - discount) * 1.05  # Fix: strictly grouped operands</span>
                 </div>
                 <div className="text-slate-400">     # Preserved invariant: total cannot be negative</div>
@@ -216,16 +216,16 @@ export default function Landing({ onOpenAuthModal }) {
               <div className="space-y-1 text-slate-300">
                 <div className="text-slate-500">$ pytest tests/ -v --tb=short</div>
                 <div>collected 8 items</div>
-                <div className="text-emerald-400 flex items-center gap-2">
+                <div className="text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                   <Check className="h-3 w-3" /> tests/test_calculator.py::test_basic_addition PASSED
                 </div>
-                <div className="text-emerald-400 flex items-center gap-2">
+                <div className="text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                   <Check className="h-3 w-3" /> tests/test_calculator.py::test_discount_precedence PASSED
                 </div>
-                <div className="text-emerald-400 flex items-center gap-2">
+                <div className="text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                   <Check className="h-3 w-3" /> tests/test_calculator.py::test_edge_cases PASSED
                 </div>
-                <div className="pt-2 text-emerald-300 font-bold border-t border-slate-800/80">
+                <div className="pt-2 text-emerald-600 dark:text-emerald-300 font-bold border-t border-slate-800/80">
                   ================ 8 passed, 0 failed in 0.42s (Exit Code: 0) ================
                 </div>
               </div>
@@ -233,19 +233,19 @@ export default function Landing({ onOpenAuthModal }) {
 
             {activeTab === 'flow' && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-blue-400">
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                   <span className="px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-500/20 text-[10px]">
                     ARCHITECT
                   </span>
                   <span>Identified AssertionError in math_ops.py:14 (Operator grouping)</span>
                 </div>
-                <div className="flex items-center gap-2 text-indigo-400">
+                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                   <span className="px-1.5 py-0.5 rounded bg-indigo-500/15 border border-indigo-500/20 text-[10px]">
                     CODER
                   </span>
                   <span>Synthesized 1-line surgical patch; test suite strictly immutable</span>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-400">
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                   <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/20 text-[10px]">
                     REVIEWER
                   </span>
@@ -270,7 +270,7 @@ export default function Landing({ onOpenAuthModal }) {
            ========================================================= */}
         <div className="mb-14">
           <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-2">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tracking-tight mb-2">
               Three Specialized Agents. Single Ground Truth.
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
@@ -343,7 +343,7 @@ export default function Landing({ onOpenAuthModal }) {
            ========================================================= */}
         <div className="mb-14 p-6 sm:p-8 rounded-3xl border border-slate-800/80 bg-slate-900/30">
           <div className="text-center mb-8">
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight mb-2">
               Autonomous Repair Lifecycle
             </h2>
             <p className="text-xs text-slate-400">
@@ -391,7 +391,7 @@ export default function Landing({ onOpenAuthModal }) {
            ========================================================= */}
         <div className="rounded-3xl border border-brand-500/30 bg-gradient-to-b from-brand-500/10 via-slate-900/60 to-slate-950 p-8 sm:p-10 text-center relative overflow-hidden shadow-2xl mb-8">
           <div className="max-w-xl mx-auto space-y-4">
-            <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
               Ready to Turn Red Tests Green?
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">

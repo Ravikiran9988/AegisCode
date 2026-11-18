@@ -31,7 +31,7 @@ export default function Health() {
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
             <HeartPulse className="h-5 w-5 text-brand-400" />
             <span>System Health & Telemetry</span>
           </h2>
@@ -75,7 +75,7 @@ export default function Health() {
               className={`h-2.5 w-2.5 rounded-full ${isHealthy ? 'bg-emerald-400 shadow-lg shadow-emerald-500/50' : 'bg-rose-500'}`}
             ></span>
           </div>
-          <div className="text-2xl font-bold text-white capitalize mb-1">
+          <div className="text-2xl font-bold text-slate-100 capitalize mb-1">
             {health?.status || 'Offline'}
           </div>
           <p className="text-xs text-slate-400 font-mono">
@@ -98,7 +98,7 @@ export default function Health() {
               }`}
             ></span>
           </div>
-          <div className="text-2xl font-bold text-white capitalize mb-1">
+          <div className="text-2xl font-bold text-slate-100 capitalize mb-1">
             {health?.database || 'Disconnected'}
           </div>
           <p className="text-xs text-slate-400 font-mono">

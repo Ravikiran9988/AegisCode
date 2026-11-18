@@ -110,7 +110,7 @@ export default function RepairStudio() {
         <div className="flex items-center gap-3">
           <Link
             to="/overview"
-            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:text-white hover:border-slate-700 transition"
+            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-100 hover:border-slate-700 transition"
             title="Back to Overview"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -118,7 +118,7 @@ export default function RepairStudio() {
 
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-slate-100 tracking-tight">
                 Repair Studio
               </h2>
               <span className="font-mono text-xs text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded-lg">
@@ -180,7 +180,7 @@ export default function RepairStudio() {
           </div>
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-semibold hover:bg-emerald-400 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition shadow-sm"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Download ZIP</span>

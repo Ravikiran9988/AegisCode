@@ -47,7 +47,8 @@ export function FixsemblyIcon({ className = "h-8 w-8", size = 32 }) {
       {/* Hexagonal Outer Track */}
       <path
         d="M24 4L41.32 14V34L24 44L6.68 34V14L24 4Z"
-        stroke="#334155"
+        stroke="currentColor"
+        className="text-slate-400 dark:text-slate-600"
         strokeWidth="1.5"
         strokeLinejoin="round"
         strokeDasharray="2 3"
@@ -78,13 +79,12 @@ export function FixsemblyIcon({ className = "h-8 w-8", size = 32 }) {
       {/* Interlocking Convergence Bridge Base */}
       <path
         d="M16.5 30.5L24 35L31.5 30.5L31.5 38.5L24 43L16.5 38.5V30.5Z"
-        fill="#1e293b"
-        stroke="#475569"
+        className="fill-slate-300 dark:fill-slate-800 stroke-slate-400 dark:stroke-slate-600"
         strokeWidth="1.5"
       />
 
       {/* Central Verified Core Node */}
-      <circle cx="24" cy="24" r="5" fill="#0f172a" stroke="#6366f1" strokeWidth="2" />
+      <circle cx="24" cy="24" r="5" className="fill-slate-100 dark:fill-slate-900" stroke="#6366f1" strokeWidth="2" />
       <circle cx="24" cy="24" r="2.5" fill="#34d399" />
       <circle cx="24" cy="24" r="7" fill="url(#fx-core-glow)" pointerEvents="none" />
     </svg>
@@ -97,15 +97,15 @@ export function FixsemblyWordmark({ className = "h-7", showTagline = false }) {
       <FixsemblyIcon size={30} className="flex-shrink-0" />
       <div className="flex flex-col">
         <div className="flex items-center gap-2">
-          <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent font-sans">
+          <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:bg-gradient-to-r dark:from-white dark:via-slate-100 dark:to-slate-300 dark:bg-clip-text dark:text-transparent font-sans">
             Fixsembly
           </span>
-          <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-brand-500/15 text-brand-400 border border-brand-500/30">
+          <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-brand-500/15 text-brand-500 dark:text-brand-400 border border-brand-500/30">
             v2.0
           </span>
         </div>
         {showTagline && (
-          <span className="hidden sm:inline text-[10px] text-slate-400 tracking-tight font-medium font-sans -mt-0.5">
+          <span className="hidden sm:inline text-[10px] text-slate-500 dark:text-slate-400 tracking-tight font-medium font-sans -mt-0.5">
             Three Agents. One Verified Fix.
           </span>
         )}

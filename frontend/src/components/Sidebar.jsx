@@ -37,8 +37,8 @@ export default function Sidebar() {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-lg transition ${
                     isActive
-                      ? 'bg-brand-600/15 text-brand-300 border border-brand-500/25 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                      ? 'bg-brand-600/15 text-brand-600 dark:text-brand-300 border border-brand-500/25 shadow-sm font-semibold'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'
                   }`
                 }
               >

@@ -58,7 +58,7 @@ export default function History() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
             <HistoryIcon className="h-5 w-5 text-brand-400" />
             <span>Repair Run History</span>
           </h2>

@@ -55,7 +55,7 @@ export default function Overview() {
       {/* Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
             <span>Fixsembly Control Center</span>
             <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
               Live Hub

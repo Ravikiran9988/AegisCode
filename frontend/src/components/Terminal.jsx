@@ -101,11 +101,11 @@ export default function Terminal({ output = '', title = 'Pytest Execution Output
       {/* Terminal Content */}
       <div
         ref={terminalRef}
-        className="flex-1 p-4 font-mono text-[11.5px] leading-relaxed overflow-y-auto terminal-scroll bg-slate-950/90 selection:bg-brand-500/40"
+        className="flex-1 p-4 font-mono text-[11.5px] leading-relaxed overflow-y-auto terminal-scroll bg-[#090d16] text-slate-300 selection:bg-brand-500/40"
       >
         {filteredLines.map((line, idx) => (
-          <div key={idx} className="flex hover:bg-slate-900/40 px-1 rounded transition-colors">
-            <span className="text-slate-600 select-none w-10 flex-shrink-0 text-right pr-3 font-mono text-[10px]">
+          <div key={idx} className="flex hover:bg-slate-800/40 px-1 rounded transition-colors">
+            <span className="text-slate-500 select-none w-10 flex-shrink-0 text-right pr-3 font-mono text-[10px]">
               {idx + 1}
             </span>
             <span className={`whitespace-pre-wrap break-all ${formatLine(line)}`}>
