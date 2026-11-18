@@ -54,81 +54,81 @@ export default function AgentStepper({ statusData }) {
     switch (state) {
       case 'completed':
         return {
-          badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+          badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
           indicator: 'bg-emerald-500 text-white',
           line: 'bg-emerald-500',
           icon: CheckCircle2,
         };
       case 'running':
         return {
-          badge: 'bg-brand-500/15 text-brand-300 border-brand-500/40 ring-2 ring-brand-500/20 shadow-lg shadow-brand-500/10',
-          indicator: 'bg-brand-500 text-white animate-pulse',
-          line: 'bg-slate-700',
+          badge: 'bg-brand-500/10 text-brand-600 dark:text-brand-300 border-brand-500/40 ring-2 ring-brand-500/20 shadow-md shadow-brand-500/10',
+          indicator: 'bg-brand-600 dark:bg-brand-500 text-white animate-pulse',
+          line: 'bg-slate-300 dark:bg-slate-700',
           icon: Loader2,
         };
       case 'failed':
         return {
-          badge: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+          badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
           indicator: 'bg-rose-500 text-white',
-          line: 'bg-slate-700',
+          line: 'bg-slate-300 dark:bg-slate-700',
           icon: XCircle,
         };
       case 'skipped':
         return {
-          badge: 'bg-slate-800/40 text-slate-500 border-slate-800',
-          indicator: 'bg-slate-700 text-slate-400',
-          line: 'bg-slate-800',
+          badge: 'bg-slate-100 dark:bg-slate-800/40 text-slate-500 border-slate-200 dark:border-slate-800',
+          indicator: 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400',
+          line: 'bg-slate-200 dark:bg-slate-800',
           icon: Clock,
         };
       default:
         return {
-          badge: 'bg-slate-900/60 text-slate-400 border-slate-800/80',
-          indicator: 'bg-slate-800 text-slate-400',
-          line: 'bg-slate-800',
+          badge: 'bg-white dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800/80',
+          indicator: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
+          line: 'bg-slate-200 dark:bg-slate-800',
           icon: Clock,
         };
     }
   }
 
   return (
-    <div className="w-full bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm">
+    <div className="w-full bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm backdrop-blur-sm">
       {/* Header with Iteration Badge */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800/80">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+          <div className="h-8 w-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-600 dark:text-brand-400">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-100 tracking-tight">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
               Self-Healing Multi-Agent Pipeline
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               Coordinated autonomous execution with authoritative Pytest gate
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-            Iteration <span className="text-brand-400 font-semibold">{current_iteration}</span> of {max_iterations}
+          <span className="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+            Iteration <span className="text-brand-600 dark:text-brand-400 font-semibold">{current_iteration}</span> of {max_iterations}
           </span>
           <span
             className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
               status === 'passed' || status === 'already_passing'
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                 : status === 'partially_repaired'
-                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30'
                 : status === 'reviewer_rejected'
-                ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
                 : status === 'stalled'
-                ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
                 : status === 'timeout'
-                ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+                ? 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30'
                 : status === 'cancelled'
-                ? 'bg-slate-700/30 text-slate-400 border-slate-700'
+                ? 'bg-slate-100 dark:bg-slate-700/30 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
                 : status === 'failed' || status === 'error' || status === 'test_error'
-                ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
-                : 'bg-brand-500/15 text-brand-300 border-brand-500/30 animate-pulse'
+                ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                : 'bg-brand-500/15 text-brand-600 dark:text-brand-300 border-brand-500/30 animate-pulse'
             }`}
           >
             {status?.replace('_', ' ')}
@@ -152,22 +152,22 @@ export default function AgentStepper({ statusData }) {
                 <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${style.indicator}`}>
                   <step.icon className="h-3.5 w-3.5" />
                 </div>
-                <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Step 0{idx + 1}
                 </span>
               </div>
 
               <div className="mt-1">
-                <p className="text-xs font-semibold text-slate-100 flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                   {step.name}
-                  {isCurrent && <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-ping" />}
+                  {isCurrent && <span className="h-1.5 w-1.5 rounded-full bg-brand-500 animate-ping" />}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{step.role}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5 leading-snug">{step.role}</p>
               </div>
 
-              <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] font-mono">
+              <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-800/60 flex items-center justify-between text-[10px] font-mono">
                 <span className="text-slate-500">Status:</span>
-                <span className="font-semibold capitalize">{step.state}</span>
+                <span className="font-semibold capitalize text-slate-700 dark:text-slate-300">{step.state}</span>
               </div>
             </div>
           );

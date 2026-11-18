@@ -2,93 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-:root,
-html.dark {
-  color-scheme: dark;
-  background-color: #090d16;
-  color: #f1f5f9;
-  --color-slate-50: 248 250 252;
-  --color-slate-100: 241 245 249;
-  --color-slate-200: 226 232 240;
-  --color-slate-300: 203 213 225;
-  --color-slate-400: 148 163 184;
-  --color-slate-500: 100 116 139;
-  --color-slate-600: 71 85 105;
-  --color-slate-700: 51 65 85;
-  --color-slate-800: 30 41 59;
-  --color-slate-850: 21 31 50;
-  --color-slate-900: 15 23 42;
-  --color-slate-950: 9 13 22;
+:root {
+  color-scheme: light;
 }
 
-html.light,
-html:not(.dark) {
-  color-scheme: light;
-  background-color: #f8fafc;
-  color: #0f172a;
-  --color-slate-50: 15 23 42;
-  --color-slate-100: 15 23 42;
-  --color-slate-200: 30 41 59;
-  --color-slate-300: 51 65 85;
-  --color-slate-400: 71 85 105;
-  --color-slate-500: 100 116 139;
-  --color-slate-600: 148 163 184;
-  --color-slate-700: 203 213 225;
-  --color-slate-800: 226 232 240;
-  --color-slate-850: 241 245 249;
-  --color-slate-900: 255 255 255;
-  --color-slate-950: 248 250 252;
+html.dark {
+  color-scheme: dark;
 }
 
 @layer base {
   body {
-    @apply bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased;
-    transition: background-color 0.15s ease, color 0.15s ease;
+    @apply bg-slate-50 text-slate-900 font-sans antialiased transition-colors duration-150;
   }
-}
 
-/* Light mode definitive utility guarantees */
-html.light .bg-slate-950,
-html:not(.dark) .bg-slate-950 {
-  background-color: #f8fafc;
-}
-
-html.light .bg-slate-900,
-html:not(.dark) .bg-slate-900 {
-  background-color: #ffffff;
-}
-
-html.light .border-slate-800,
-html:not(.dark) .border-slate-800 {
-  border-color: #e2e8f0;
-}
-
-html.light .border-slate-800\/80,
-html:not(.dark) .border-slate-800\/80 {
-  border-color: rgba(226, 232, 240, 0.8);
-}
-
-html.light .text-slate-100,
-html:not(.dark) .text-slate-100 {
-  color: #0f172a;
-}
-
-/* Light mode overrides for headings with text-white */
-html.light h1.text-white,
-html.light h2.text-white,
-html.light h3.text-white,
-html.light h4.text-white,
-html:not(.dark) h1.text-white,
-html:not(.dark) h2.text-white,
-html:not(.dark) h3.text-white,
-html:not(.dark) h4.text-white {
-  color: #0f172a !important;
-}
-
-/* Light mode override for general text-white when not in a colored button/badge */
-html.light div.text-white:not(button *):not(a.bg-brand-600 *):not(.bg-brand-600 *):not(.bg-indigo-600 *):not(.bg-emerald-500 *):not(.bg-emerald-600 *):not(.bg-rose-500 *),
-html:not(.dark) div.text-white:not(button *):not(a.bg-brand-600 *):not(.bg-brand-600 *):not(.bg-indigo-600 *):not(.bg-emerald-500 *):not(.bg-emerald-600 *):not(.bg-rose-500 *) {
-  color: #0f172a !important;
+  html.dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
 }
 
 /* Custom scrollbar for developer tools look */
@@ -116,7 +45,7 @@ html.light ::-webkit-scrollbar-track {
 }
 
 .terminal-scroll::-webkit-scrollbar-track {
-  background: #020617;
+  background: #090d16;
 }
 
 .terminal-scroll::-webkit-scrollbar-thumb {

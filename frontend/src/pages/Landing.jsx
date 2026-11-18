@@ -421,28 +421,28 @@ export default function Landing({ onOpenAuthModal }) {
         {/* =========================================================
             CLEAN DEVELOPER FOOTER
            ========================================================= */}
-        <div className="border-t border-slate-800/80 pt-6 pb-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-mono">
+        <div className="border-t border-slate-200 dark:border-slate-800/80 pt-6 pb-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400 font-mono">
           <div className="flex items-center gap-2">
             <FixsemblyIcon size={18} />
-            <span className="text-slate-400 font-medium font-sans">Fixsembly</span>
+            <span className="text-slate-900 dark:text-slate-300 font-medium font-sans">Fixsembly</span>
             <span>• Three Agents. One Verified Fix.</span>
           </div>
 
           <div className="flex items-center gap-4">
-            <Link to="/docs" className="hover:text-slate-300 transition">
+            <Link to="/docs" className="hover:text-slate-900 dark:hover:text-slate-200 transition">
               Docs
             </Link>
-            <Link to="/history" className="hover:text-slate-300 transition">
+            <Link to="/history" className="hover:text-slate-900 dark:hover:text-slate-200 transition">
               History
             </Link>
-            <Link to="/health" className="hover:text-slate-300 transition">
+            <Link to="/health" className="hover:text-slate-900 dark:hover:text-slate-200 transition">
               Health
             </Link>
             <a
               href="https://github.com/Ravikiran9988/AegisCode"
               target="_blank"
               rel="noreferrer"
-              className="hover:text-slate-300 transition flex items-center gap-1"
+              className="hover:text-slate-900 dark:hover:text-slate-200 transition flex items-center gap-1"
             >
               <span>GitHub</span>
               <ExternalLink className="h-3 w-3" />
