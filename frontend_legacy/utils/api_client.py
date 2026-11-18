@@ -9,9 +9,12 @@ import requests
 import streamlit as st
 
 try:
-    from frontend.utils.helpers import _normalize_backend_url
+    from frontend_legacy.utils.helpers import _normalize_backend_url
 except ImportError:
-    from utils.helpers import _normalize_backend_url
+    try:
+        from frontend.utils.helpers import _normalize_backend_url
+    except ImportError:
+        from utils.helpers import _normalize_backend_url
 
 _COLD_START_RETRY_DELAYS = [0, 2, 4, 8, 12]
 
