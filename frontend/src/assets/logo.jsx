@@ -2,7 +2,7 @@ import React from 'react';
 
 /**
  * Fixsembly Brand Identity Assets
- * Concept: Tripartite Engineering Convergence — Three specialized agent nodes
+ * Concept: Tripartite Engineering Convergence: Three specialized agent nodes
  * (Architect, Coder, Reviewer) interlocking into a single verified assembly core.
  */
 
@@ -99,9 +99,6 @@ export function FixsemblyWordmark({ className = "h-7", showTagline = false }) {
         <div className="flex items-center gap-2">
           <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:bg-gradient-to-r dark:from-white dark:via-slate-100 dark:to-slate-300 dark:bg-clip-text dark:text-transparent font-sans">
             Fixsembly
-          </span>
-          <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-brand-500/15 text-brand-500 dark:text-brand-400 border border-brand-500/30">
-            v2.0
           </span>
         </div>
         {showTagline && (
