@@ -105,7 +105,7 @@ export function FixsemblyWordmark({ className = "h-7", showTagline = false }) {
           </span>
         </div>
         {showTagline && (
-          <span className="text-[10px] text-slate-400 tracking-tight font-medium font-sans -mt-0.5">
+          <span className="hidden sm:inline text-[10px] text-slate-400 tracking-tight font-medium font-sans -mt-0.5">
             Three Agents. One Verified Fix.
           </span>
         )}
