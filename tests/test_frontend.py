@@ -86,7 +86,7 @@ class TestFrontendHealthConnectivity:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
             "status": "ok",
-            "app_name": "AegisCode",
+            "app_name": "Fixsembly",
             "version": "0.1.0",
             "timestamp": "2026-08-16T22:00:00Z",
             "database": "connected",
@@ -111,7 +111,7 @@ class TestFrontendHealthConnectivity:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
             "status": "ok",
-            "app_name": "AegisCode",
+            "app_name": "Fixsembly",
             "version": "0.1.0",
             "timestamp": "2026-08-16T22:00:00Z",
             "database": "connected",

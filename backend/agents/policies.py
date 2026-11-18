@@ -1,7 +1,7 @@
 """
 Security Policy Engine — Phase 3.
 
-Enforces tool permissions and file protection rules for AegisCode agents.
+Enforces tool permissions and file protection rules for Fixsembly agents.
 
 Policy Rules
 ------------
@@ -53,7 +53,7 @@ def check_file_modification_policy(
     allow_test_modification: bool = False,
 ) -> None:
     """
-    Verify whether modifying `relative_path` is permitted under AegisCode security policy.
+    Verify whether modifying `relative_path` is permitted under Fixsembly security policy.
 
     Raises PolicyViolationError if forbidden.
     """

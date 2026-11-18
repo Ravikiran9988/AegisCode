@@ -1,7 +1,7 @@
 """
 LangGraph Repair State — Phase 4.
 
-Strongly typed state definition for the AegisCode self-healing repair graph.
+Strongly typed state definition for the Fixsembly self-healing repair graph.
 Passed between graph nodes and updated during state transitions.
 """
 

@@ -59,7 +59,7 @@ def get_llm_provider(
         )
         return StrictGroqLLMProvider(model=target_model)
     raise ValueError(
-        f"Unsupported LLM provider {name!r}. Production AegisCode requires "
+        f"Unsupported LLM provider {name!r}. Production Fixsembly requires "
         f"'openai_compatible' with Groq model 'openai/gpt-oss-120b'."
     )
 

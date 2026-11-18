@@ -6,10 +6,10 @@ Runs pytest directly in the host Python environment using subprocess.
 SECURITY WARNING
 ----------------
 This backend executes the uploaded project's test suite in the same
-OS process-group as the AegisCode server.  It should only be used:
+OS process-group as the Fixsembly server.  It should only be used:
 
   * During local development on trusted code.
-  * For the AegisCode benchmark suite (known projects).
+  * For the Fixsembly benchmark suite (known projects).
   * When USE_DOCKER_SANDBOX=false is explicitly set.
 
 For public-facing deployments, use DockerExecutionBackend instead.

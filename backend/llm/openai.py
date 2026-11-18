@@ -147,14 +147,14 @@ class OpenAICompatibleLLMProvider(BaseLLMProvider):
             if attempt >= max_retries:
                 raise RateLimitError(
                     f"Groq rate limit (HTTP 429). Retry window is about {wait:.1f}s; "
-                    f"AegisCode stopped after {max_retries} retry to avoid a long stall. "
+                    f"Fixsembly stopped after {max_retries} retry to avoid a long stall. "
                     f"Error: {err_msg}"
                 )
 
             if wait > max_wait:
                 raise RateLimitError(
                     f"Groq rate limit (HTTP 429) requires waiting about {wait:.1f}s, "
-                    f"which exceeds AegisCode's {max_wait:.0f}s retry budget. "
+                    f"which exceeds Fixsembly's {max_wait:.0f}s retry budget. "
                     f"Error: {err_msg}"
                 )
 
