@@ -27,26 +27,28 @@ export default function NewRepair() {
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
+  const MAX_FILE_SIZE_MB = 50;
+
+  const validateFile = (f) => {
+    if (!f.name.endsWith('.zip')) return 'Only .zip archives are supported.';
+    if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) return `File exceeds ${MAX_FILE_SIZE_MB}MB limit (got ${(f.size / 1024 / 1024).toFixed(1)}MB).`;
+    return null;
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
     const dropped = e.dataTransfer.files[0];
-    if (dropped && dropped.name.endsWith('.zip')) {
-      setFile(dropped);
-      setError('');
-    } else {
-      setError('Please upload a valid .zip archive of a Python project.');
-    }
+    if (!dropped) return;
+    const err = validateFile(dropped);
+    if (err) { setError(err); } else { setFile(dropped); setError(''); }
   };
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
-    if (selected && selected.name.endsWith('.zip')) {
-      setFile(selected);
-      setError('');
-    } else if (selected) {
-      setError('Only .zip archives are supported.');
-    }
+    if (!selected) return;
+    const err = validateFile(selected);
+    if (err) { setError(err); setFile(null); } else { setFile(selected); setError(''); }
   };
 
   const toast = useToast();

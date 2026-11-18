@@ -12,7 +12,7 @@ from typing import Any, TypedDict
 
 class RepairState(TypedDict, total=False):
     """
-    State dictionary for the AegisCode LangGraph repair graph.
+    State dictionary for the Fixsembly LangGraph repair graph.
     """
 
     # Identifiers & Environment

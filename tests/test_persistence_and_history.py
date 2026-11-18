@@ -1,5 +1,5 @@
 """
-Comprehensive Persistence & Run Lifecycle Tests for AegisCode.
+Comprehensive Persistence & Run Lifecycle Tests for Fixsembly.
 
 Verifies:
 - Direct SQLAlchemy database session creation, persistence, and querying

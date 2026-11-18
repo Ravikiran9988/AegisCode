@@ -1,5 +1,5 @@
 """
-Comprehensive regression test suite for AegisCode:
+Comprehensive regression test suite for Fixsembly:
 1. Guest session lifecycle & authorization persistence
 2. Cross-guest access rejection (403 Forbidden)
 3. Authenticated user ownership & cross-account isolation

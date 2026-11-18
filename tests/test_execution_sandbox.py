@@ -1,5 +1,5 @@
 """
-Regression test suite for AegisCode production execution & sandbox architecture.
+Regression test suite for Fixsembly production execution & sandbox architecture.
 
 Tests:
 1. Local execution backend runs pytest properly.
