@@ -36,7 +36,7 @@ The system uses **actual Pytest exit codes** as the source of truth for test out
 
 - **Architect Agent**: Read-only analysis agent that parses pytest failure diagnostics, error tracebacks, and directory structure to formulate a structured `ArchitecturePlan`.
 - **Coder Agent**: Synthesizes minimal unified diff patches or surgical file writes. Includes an automated recovery fallback if diff headers are malformed.
-- **Reviewer Agent**: Independent quality gate that audits Git diffs and before/after test results to guarantee zero regression risk.
+- **Reviewer Agent**: Independent quality gate that audits Git diffs and before/after test results to assess regression risk.
 - **Pytest Runner**: Bounded subprocess execution; Docker isolation is available when a Docker daemon and the configured sandbox image are provided. Production local execution is blocked.
 - **LangGraph StateGraph**: Orchestrates agents, handles patch retries, and invokes loop detection to prevent infinite failing cycles.
 
