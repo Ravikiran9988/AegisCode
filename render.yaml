@@ -7,7 +7,7 @@ services:
     plan: standard
     buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
     startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 2"
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     disk:
       name: fixsembly-workspaces
       mountPath: /app/workspaces
@@ -15,6 +15,10 @@ services:
     envVars:
       - key: APP_NAME
         value: Fixsembly
+      - key: ENV
+        value: production
+      - key: EXECUTION_BACKEND
+        value: local
       - key: DEBUG
         value: "false"
       - key: LOG_LEVEL
@@ -36,7 +40,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: CORS_ORIGINS
-        value: "https://fixsembly.com,https://*.vercel.app,http://localhost:5173"
+        value: "https://fixsembly.com,https://www.fixsembly.com,http://localhost:5173"
 
   # ── Fixsembly V2 React Frontend (Static Site) ───────────────────────────────
   - type: web
@@ -52,7 +56,7 @@ services:
         source: /*
         destination: /index.html
     envVars:
-      - key: VITE_API_URL
+      - key: VITE_BACKEND_URL
         fromService:
           type: web
           name: fixsembly-backend
