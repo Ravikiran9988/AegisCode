@@ -3,22 +3,12 @@ import { getAuthHeaders, getApiBaseUrl } from './client';
 import { getRunStatus } from './runs';
 
 const TERMINAL_STATUSES = new Set([
-  'passed',
-  'already_passing',
-  'failed',
-  'stalled',
-  'error',
-  'cancelled',
-  'partially_repaired',
-  'reviewer_rejected',
-  'test_error',
-  'timeout',
+  'passed', 'already_passing', 'failed', 'stalled', 'error', 'cancelled',
+  'partially_repaired', 'reviewer_rejected', 'test_error', 'timeout',
 ]);
 
 /**
- * Authenticated SSE stream for repair runs.
- *
- * Fetch + ReadableStream is used instead of EventSource because EventSource
+ * Authenticated SSE stream for repair runs. Fetch is used because EventSource
  * cannot attach the JWT and guest-session headers required by the API.
  * REST polling remains the fallback when streaming is unavailable.
  */
@@ -52,6 +42,7 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
         clearInterval(pollingTimer);
         pollingTimer = null;
       }
+      controller.abort();
       onCompleteRef.current?.(finalData);
     };
 
@@ -63,17 +54,17 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
     const pollOnce = async () => {
       try {
         const snapshot = await getRunStatus(runId);
-        if (!stopped) applyStatus(snapshot);
+        if (!stopped && !finished) applyStatus(snapshot);
       } catch (err) {
-        if (!stopped) setError(err.message || 'Unable to refresh repair status.');
+        if (!stopped && !finished) setError(err.message || 'Unable to refresh repair status.');
       }
     };
 
     const startPollingFallback = () => {
       if (stopped || finished || pollingTimer) return;
       setIsStreaming(true);
-      pollOnce();
       pollingTimer = setInterval(pollOnce, 2000);
+      pollOnce();
     };
 
     const processFrame = async (frame) => {
@@ -113,7 +104,7 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
     const connect = async () => {
       try {
         const response = await fetch(
-          `${getApiBaseUrl()}/api/runs/${encodeURIComponent(runId)}/stream`,
+          getApiBaseUrl() + '/api/runs/' + encodeURIComponent(runId) + '/stream',
           {
             method: 'GET',
             headers: {
@@ -126,7 +117,9 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
         );
 
         if (!response.ok) {
-          throw new Error(`Repair stream request failed (${response.status}).`);
+          const streamError = new Error('Repair stream request failed (' + response.status + ').');
+          streamError.status = response.status;
+          throw streamError;
         }
         if (!response.body) {
           throw new Error('Streaming is not supported by this browser connection.');
@@ -151,14 +144,18 @@ export function useRunStream(runId, { enabled = true, onComplete = null } = {}) 
           }
         }
 
-        if (!stopped && !finished) {
-          startPollingFallback();
-        }
+        if (!stopped && !finished) startPollingFallback();
       } catch (err) {
-        if (!stopped && err.name !== 'AbortError') {
-          setError(err.message || 'Live updates disconnected; switching to polling.');
-          startPollingFallback();
+        if (stopped || err.name === 'AbortError') return;
+
+        if ([401, 403, 404].includes(err.status)) {
+          setError(err.message);
+          setIsStreaming(false);
+          return;
         }
+
+        setError(err.message || 'Live updates disconnected; switching to polling.');
+        startPollingFallback();
       }
     };
 
