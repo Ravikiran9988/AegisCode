@@ -128,28 +128,12 @@ def get_optional_current_user(
     authorization: str | None = Header(None, alias="Authorization"),
     db: Session = Depends(get_db),
 ) -> User | None:
-    """Optional authentication dependency for backward compatibility."""
+    """Return None only when no credentials are supplied; reject invalid credentials."""
     if not authorization:
         return None
 
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-
-    token = parts[1]
-    payload = decode_access_token(token)
-    if payload is None:
-        return None
-
-    user_id = payload.get("sub")
-    if not user_id:
-        return None
-
-    user = db.get(User, user_id)
-    if not user or not user.is_active:
-        return None
-
-    return user
+    # Never downgrade an invalid or expired bearer token into an anonymous guest.
+    return get_current_user(authorization=authorization, db=db)
 
 
 # ────────────────────────────────────────────────────────────────────────────
