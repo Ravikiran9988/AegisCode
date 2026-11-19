@@ -10,7 +10,7 @@ import {
   Filter,
   RefreshCw,
 } from 'lucide-react';
-import { listRuns } from '../api/runs';
+import { listHistoryRuns, downloadRunZip } from '../api/runs';
 
 export default function History() {
   const [runs, setRuns] = useState([]);
@@ -20,7 +20,11 @@ export default function History() {
   const fetchRuns = async () => {
     setIsLoading(true);
     try {
-      const data = await listRuns(50, filterStatus === 'all' ? null : filterStatus);
+      const data = await listHistoryRuns(
+        filterStatus === 'all' ? null : filterStatus,
+        50,
+        0
+      );
       setRuns(data || []);
     } catch (err) {
       console.error('Failed to load history:', err);
@@ -33,15 +37,22 @@ export default function History() {
     fetchRuns();
   }, [filterStatus]);
 
-  const handleDownload = (e, runId) => {
+  const handleDownload = async (e, runId) => {
     e.stopPropagation();
-    const downloadUrl = `/api/runs/${runId}/download`;
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `fixsembly-repaired-${runId.slice(0, 8)}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const blob = await downloadRunZip(runId);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `fixsembly-repaired-${runId.slice(0, 8)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (err) {
+      console.error('Failed to download repaired project:', err);
+      window.alert(err.message || 'Unable to download this repair archive.');
+    }
   };
 
   return (
