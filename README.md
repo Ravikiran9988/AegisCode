@@ -4,7 +4,7 @@
 > *Self-Healing Multi-Agent Software Engineering System.*  
 > **Red to green, automatically.**
 
-Fixsembly is an autonomous software engineering platform that detects, analyzes, and repairs failing Python projects using a LangGraph-coordinated multi-agent workflow. It combines an **Architect**, **Coder**, and **Reviewer** agent with authoritative Pytest execution, Monaco-powered side-by-side diff inspection, real-time Server-Sent Events (SSE) telemetry, and strict anti-tampering security policies.
+Fixsembly is an autonomous software engineering platform that detects, analyzes, and repairs failing Python projects using a LangGraph-coordinated multi-agent workflow. It combines an **Architect**, **Coder**, and **Reviewer** agent with authoritative Pytest execution, Monaco-powered unified-patch inspection, real-time Server-Sent Events (SSE) telemetry, and strict anti-tampering security policies.
 
 ---
 
@@ -21,7 +21,7 @@ Architect Agent — Root Cause Analysis & Plan Formulation
        ↓
 Coder Agent — Targeted Patch Synthesis (Strict Policy Guarded)
        ↓
-Pytest Execution Sandbox — Verification Truth (Exit Code Gate)
+Pytest Execution Backend — Verification Truth (Exit Code Gate)
        ↓
 Reviewer Agent — Independent Audit & Regression Risk Gate
        ↓
@@ -37,7 +37,7 @@ The system uses **actual Pytest exit codes** as the source of truth for test out
 - **Architect Agent**: Read-only analysis agent that parses pytest failure diagnostics, error tracebacks, and directory structure to formulate a structured `ArchitecturePlan`.
 - **Coder Agent**: Synthesizes minimal unified diff patches or surgical file writes. Includes an automated recovery fallback if diff headers are malformed.
 - **Reviewer Agent**: Independent quality gate that audits Git diffs and before/after test results to guarantee zero regression risk.
-- **Pytest Runner**: Sandboxed subprocess execution providing the authoritative pass/fail signal.
+- **Pytest Runner**: Bounded subprocess execution; Docker isolation is available when a Docker daemon and the configured sandbox image are provided. Production local execution is blocked.
 - **LangGraph StateGraph**: Orchestrates agents, handles patch retries, and invokes loop detection to prevent infinite failing cycles.
 
 ---
@@ -139,7 +139,20 @@ Run backend test suites:
 pytest -q
 ```
 
-Build and verify frontend:
+Test frontend utilities and build the React app:
 ```bash
-cd frontend && npm run build
+cd frontend
+npm ci
+npm test
+npm run build
 ```
+
+### Docker sandbox image
+
+Build the runner image before selecting `EXECUTION_BACKEND=docker`:
+```bash
+docker build -f Dockerfile.sandbox -t fixsembly-pytest-sandbox:latest .
+```
+The sandbox has Pytest preinstalled, runs without network access and mounts the uploaded project read-only. Project-specific third-party dependencies must already be available in the sandbox image; dependency installation from untrusted project archives is not performed automatically.
+
+The Render blueprint deliberately keeps `EXECUTION_BACKEND=local` with `ENV=production`, so repair creation returns HTTP 503 until a separate isolated execution service is available. Do not remove this guard to make the UI appear functional.
