@@ -3,7 +3,21 @@
  * Centralized fetch wrapper handling JWT authentication, Guest headers, and unified error handling.
  */
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || '';
+const configuredBackendUrl = (
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.VITE_API_URL ||
+  ''
+).trim().replace(/\\/+$/, '');
+
+const BASE_URL = configuredBackendUrl
+  ? (/^https?:\\/\\//i.test(configuredBackendUrl)
+      ? configuredBackendUrl
+      : `https://${configuredBackendUrl}`)
+  : '';
+
+export function getApiBaseUrl() {
+  return BASE_URL;
+}
 
 export function getAuthHeaders() {
   const headers = {};
