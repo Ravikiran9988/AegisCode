@@ -1,5 +1,5 @@
 # =============================================================================
-# AegisCode – Runtime Dependencies
+# Fixsembly – Runtime Dependencies
 # =============================================================================
 # Uses >= pins so pip can resolve the current compatible set.
 # Install:  pip install -r requirements.txt
