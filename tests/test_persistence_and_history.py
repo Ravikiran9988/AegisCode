@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from backend.database.guest import Guest
 from backend.database.models import Base, Project, Run
 from backend.database.persistence import upsert_iteration
 from backend.database.session import get_db
@@ -318,15 +319,32 @@ class TestDatabasePersistenceLifecycle:
 
 
 class TestEndpointsAndHistoryAPI:
-    def test_history_returns_runs(self, api_client):
-        """GET /api/runs and GET /api/runs/history return historical runs list."""
-        resp = api_client.get("/api/runs")
+    def test_history_returns_runs(self, api_client, session_factory):
+        """Guest history returns only runs owned by the supplied session."""
+        guest_session_id = "persistence-history-guest"
+        session = session_factory()
+        guest = Guest(session_id=guest_session_id, name="History Guest")
+        session.add(guest)
+        session.flush()
+        project = Project(
+            name="History Project",
+            original_filename="history.zip",
+            workspace_path="/tmp/history",
+            guest_id=guest.id,
+        )
+        session.add(project)
+        session.flush()
+        session.add(Run(project_id=project.id, guest_id=guest.id, status="passed"))
+        session.commit()
+        session.close()
+        headers = {"X-Guest-Session-ID": guest_session_id}
+        resp = api_client.get("/api/runs", headers=headers)
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
         assert len(data) > 0
 
-        hist_resp = api_client.get("/api/runs/history")
+        hist_resp = api_client.get("/api/runs/history", headers=headers)
         assert hist_resp.status_code == 200
         h_data = hist_resp.json()
         assert isinstance(h_data, list)
@@ -335,16 +353,20 @@ class TestEndpointsAndHistoryAPI:
     def test_active_runs_returns_running_runs(self, api_client, session_factory):
         """GET /api/runs/active returns only active runs."""
         session = session_factory()
-        proj = Project(name="Active App", original_filename="a.zip", workspace_path="/tmp/ws_a")
+        guest_session_id = "persistence-active-guest"
+        guest = Guest(session_id=guest_session_id, name="Active Guest")
+        session.add(guest)
+        session.flush()
+        proj = Project(name="Active App", original_filename="a.zip", workspace_path="/tmp/ws_a", guest_id=guest.id)
         session.add(proj)
-        session.commit()
+        session.flush()
 
-        active_run = Run(project_id=proj.id, status="running")
+        active_run = Run(project_id=proj.id, guest_id=guest.id, status="running")
         session.add(active_run)
         session.commit()
         session.close()
 
-        resp = api_client.get("/api/runs/active")
+        resp = api_client.get("/api/runs/active", headers={"X-Guest-Session-ID": guest_session_id})
         assert resp.status_code == 200
         active_list = resp.json()
         assert isinstance(active_list, list)
