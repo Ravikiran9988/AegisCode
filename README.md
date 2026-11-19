@@ -1,4 +1,4 @@
-# Fixsembly (v2.0)
+# Fixsembly
 
 > **Three Agents. One Verified Fix.**  
 > *Self-Healing Multi-Agent Software Engineering System.*  
@@ -28,7 +28,7 @@ Reviewer Agent — Independent Audit & Regression Risk Gate
 Pass → Verified Fix Ready (.ZIP)  |  Fail → Next Repair Iteration
 ```
 
-The system uses **actual Pytest exit codes** as the sole source of truth instead of relying on the LLM to hallucinate or claim that a fix works.
+The system uses **actual Pytest exit codes** as the source of truth for test outcomes instead of trusting an LLM's claim that a fix works.
 
 ---
 
@@ -42,7 +42,7 @@ The system uses **actual Pytest exit codes** as the sole source of truth instead
 
 ---
 
-## 🖥️ Modernized V2 Tech Stack
+## 🖥️ Technology Stack
 
 ### Frontend
 - **Framework**: React 18+ (Pure JavaScript)
@@ -86,7 +86,7 @@ Fixsembly/
 │   │   └── pages/       # Landing, Overview, NewRepair, RepairStudio, History, Health, Docs
 │   ├── nginx.conf       # Production Nginx reverse-proxy configuration
 │   └── package.json     # Frontend dependencies
-├── frontend-legacy/     # Preserved Streamlit frontend (100% intact)
+├── frontend_legacy/     # Preserved legacy Streamlit frontend
 ├── demo_projects/       # Buggy calculator sample project & packaged ZIP
 ├── evaluation/          # Benchmark evaluation suite
 ├── tests/               # 22 test suites covering all backend phases & SSE streaming
@@ -100,7 +100,7 @@ Fixsembly/
 
 ## 🚀 Quick Start
 
-### 1. Run via Docker Compose (Recommended)
+### 1. Run via Docker Compose (local development)
 
 ```bash
 docker compose up --build
@@ -108,7 +108,7 @@ docker compose up --build
 - React Frontend: http://localhost:3000
 - FastAPI Backend & Swagger Docs: http://localhost:8000/docs
 
-### 2. Run Locally
+### 2. Run Locally (trusted projects only)
 
 **Start Backend:**
 ```bash
@@ -123,6 +123,12 @@ npm install
 npm run dev
 ```
 Open http://localhost:5173 in your browser.
+
+> **Execution safety:** the local runner executes uploaded Python tests inside the API service environment and is for trusted local projects only. Production deployments intentionally reject local execution. Enable public repairs only after connecting a separately isolated Docker or remote sandbox worker. The Render blueprint keeps the API and UI available but repair execution returns HTTP 503 until that worker is configured.
+
+### Frontend deployment configuration
+
+Set `VITE_BACKEND_URL` to the backend origin (for example, the HTTPS Render service URL) in the frontend hosting provider before building. The frontend accepts either a full URL or a host name.
 
 ---
 
