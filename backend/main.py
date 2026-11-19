@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging()
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
-    env_name = os.environ.get("ENV", "").lower()
-    env_alt = os.environ.get("ENVIRONMENT", "").lower()
-    production = env_name in {"production", "prod"} or env_alt in {"production", "prod"}
+    production = settings.is_production
     strict_llm = os.environ.get("STRICT_LLM_VALIDATION") == "true"
     if production or strict_llm:
         settings.validate_production_llm_config()
