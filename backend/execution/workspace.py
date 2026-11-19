@@ -226,9 +226,12 @@ class WorkspaceManager:
         project_root = self.get_project_path().resolve()
         clean = relative.lstrip("/\\").replace("\\", "/")
         target = (project_root / clean).resolve()
-        if not _is_within(target, self._workspace_root):
+        # Agent file operations must remain inside the extracted project,
+        # not merely inside the enclosing run workspace (which also contains
+        # metadata such as the project-root marker).
+        if not _is_within(target, project_root):
             raise PathTraversalError(
-                f"Path {relative!r} would escape the workspace"
+                f"Path {relative!r} would escape the project directory"
             )
         return target
 
