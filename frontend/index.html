@@ -28,24 +28,34 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Apply the saved theme immediately; new visitors start in light mode. -->
+    <!-- Apply the saved theme before React renders to prevent a flash.
+         Existing browsers are migrated from the old dark default to light once. -->
     <script>
       (function() {
+        function applyTheme(theme) {
+          var root = document.documentElement;
+          root.classList.toggle('dark', theme === 'dark');
+          root.classList.toggle('light', theme !== 'dark');
+          root.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+        }
+
         try {
-          var t = localStorage.getItem('fixsembly_theme') || 'light';
-          if (t === 'dark') {
-            document.documentElement.classList.add('dark');
-            document.documentElement.classList.remove('light');
-            document.documentElement.style.colorScheme = 'dark';
+          var versionKey = 'fixsembly_theme_version';
+          var themeKey = 'fixsembly_theme';
+          var version = localStorage.getItem(versionKey);
+          var theme;
+
+          if (version !== '2') {
+            theme = 'light';
+            localStorage.setItem(themeKey, theme);
+            localStorage.setItem(versionKey, '2');
           } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.classList.add('light');
-            document.documentElement.style.colorScheme = 'light';
+            theme = localStorage.getItem(themeKey) || 'light';
           }
+
+          applyTheme(theme);
         } catch (e) {
-          document.documentElement.classList.remove('dark');
-          document.documentElement.classList.add('light');
-          document.documentElement.style.colorScheme = 'light';
+          applyTheme('light');
         }
       })();
     </script>
