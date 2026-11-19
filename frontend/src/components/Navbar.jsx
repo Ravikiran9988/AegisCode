@@ -55,7 +55,7 @@ export default function Navbar({ onOpenAuthModal }) {
             <span
               className={`h-1.5 w-1.5 rounded-full ${backendOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}
             ></span>
-            <span className="hidden sm:inline">{backendOnline ? 'Engine Online' : 'Connecting...'}</span>
+            <span className="hidden sm:inline">{backendOnline ? 'API Online' : 'Connecting...'}</span>
           </div>
 
           {/* Theme Toggle */}
