@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -9,7 +9,7 @@
     <title>Fixsembly | Three Agents. One Verified Fix.</title>
     <meta name="title" content="Fixsembly: Three Agents. One Verified Fix." />
     <meta name="description" content="Self-Healing Multi-Agent Software Engineering System. Fixsembly analyzes failing Python projects, repairs code, executes Pytest and verifies fixes. Red to green, automatically." />
-    <meta name="theme-color" content="#090d16" />
+    <meta name="theme-color" content="#f8fafc" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -28,21 +28,35 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Immediate theme initializer to prevent flash -->
+    <!-- Apply the saved theme before React renders to prevent a flash.
+         Existing browsers are migrated from the old dark default to light once. -->
     <script>
       (function() {
+        function applyTheme(theme) {
+          var root = document.documentElement;
+          root.classList.toggle('dark', theme === 'dark');
+          root.classList.toggle('light', theme !== 'dark');
+          root.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+        }
+
         try {
-          var t = localStorage.getItem('fixsembly_theme');
-          if (t === 'light') {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.classList.add('light');
-            document.documentElement.style.colorScheme = 'light';
+          var versionKey = 'fixsembly_theme_version';
+          var themeKey = 'fixsembly_theme';
+          var version = localStorage.getItem(versionKey);
+          var theme;
+
+          if (version !== '2') {
+            theme = 'light';
+            localStorage.setItem(themeKey, theme);
+            localStorage.setItem(versionKey, '2');
           } else {
-            document.documentElement.classList.add('dark');
-            document.documentElement.classList.remove('light');
-            document.documentElement.style.colorScheme = 'dark';
+            theme = localStorage.getItem(themeKey) || 'light';
           }
-        } catch (e) {}
+
+          applyTheme(theme);
+        } catch (e) {
+          applyTheme('light');
+        }
       })();
     </script>
   </head>

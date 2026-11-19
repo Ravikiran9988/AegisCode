@@ -1,11 +1,30 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext(null);
+const THEME_STORAGE_KEY = 'fixsembly_theme';
+const THEME_VERSION_STORAGE_KEY = 'fixsembly_theme_version';
+const THEME_VERSION = '2';
+
+function getInitialTheme() {
+  try {
+    const storedVersion = localStorage.getItem(THEME_VERSION_STORAGE_KEY);
+
+    // Previous releases persisted the original dark default. Migrate those
+    // browsers to light once, then respect any theme choice made afterwards.
+    if (storedVersion !== THEME_VERSION) {
+      localStorage.setItem(THEME_STORAGE_KEY, 'light');
+      localStorage.setItem(THEME_VERSION_STORAGE_KEY, THEME_VERSION);
+      return 'light';
+    }
+
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('fixsembly_theme') || 'dark';
-  });
+  const [theme, setTheme] = useState(getInitialTheme);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -18,7 +37,13 @@ export function ThemeProvider({ children }) {
       root.classList.add('light');
       root.style.colorScheme = 'light';
     }
-    localStorage.setItem('fixsembly_theme', theme);
+
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      localStorage.setItem(THEME_VERSION_STORAGE_KEY, THEME_VERSION);
+    } catch {
+      // Theme still works for the current session when storage is unavailable.
+    }
   }, [theme]);
 
   const toggleTheme = () => {
