@@ -74,6 +74,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
+        # Allow unique Vercel/Render preview hostnames without treating a
+        # literal wildcard in allow_origins as a valid origin.
+        allow_origin_regex=r"https://[a-zA-Z0-9-]+\\.(?:vercel\\.app|onrender\\.com)",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
