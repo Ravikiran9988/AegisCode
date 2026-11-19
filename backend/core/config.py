@@ -7,6 +7,7 @@ Import the singleton `settings` object everywhere; do not use os.getenv() direct
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -130,6 +131,13 @@ class Settings(BaseSettings):
     @property
     def is_debug(self) -> bool:
         return self.debug
+
+    @property
+    def is_production(self) -> bool:
+        """Detect production mode consistently across common hosting platforms."""
+        env_name = os.environ.get("ENV", "").lower()
+        env_alt = os.environ.get("ENVIRONMENT", "").lower()
+        return env_name in {"production", "prod"} or env_alt in {"production", "prod"}
 
     def validate_production_llm_config(self) -> None:
         """Validate production hosted-provider configuration without pinning a model."""
