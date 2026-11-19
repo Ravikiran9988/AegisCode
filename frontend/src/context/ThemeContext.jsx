@@ -4,7 +4,7 @@ const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('fixsembly_theme') || 'dark';
+    return localStorage.getItem('fixsembly_theme') || 'light';
   });
 
   useEffect(() => {
