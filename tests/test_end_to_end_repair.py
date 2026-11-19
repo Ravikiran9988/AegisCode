@@ -21,11 +21,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.agents.schemas import ArchitecturePlan, CodeChange, ReviewResult
+from backend.database.guest import Guest
 from backend.database.models import Base, Iteration, Project, Run
 from backend.database.persistence import upsert_iteration
 from backend.database.session import get_db
@@ -47,7 +48,23 @@ def e2e_db():
     Base.metadata.create_all(bind=engine)
     session_cls = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = session_cls()
+    default_guest = Guest(
+        session_id="e2e-api-test-guest",
+        name="E2E API Test Guest",
+    )
+    session.add(default_guest)
+    session.flush()
+
+    # Directly-created ORM fixtures represent data owned by this test guest.
+    # This keeps test setup concise while exercising the real ownership guard.
+    def assign_test_guest(_session, _flush_context, instances):
+        for obj in list(_session.new):
+            if isinstance(obj, (Project, Run)) and obj.user_id is None and obj.guest_id is None:
+                obj.guest_id = default_guest.id
+
+    event.listen(session, "before_flush", assign_test_guest)
     yield session
+    event.remove(session, "before_flush", assign_test_guest)
     session.close()
     Base.metadata.drop_all(bind=engine)
 
@@ -63,7 +80,7 @@ def e2e_client(e2e_db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-Guest-Session-ID": "e2e-api-test-guest"}) as client:
         yield client
     app.dependency_overrides.clear()
 
