@@ -18,7 +18,7 @@ export function calculateDashboardMetrics(runs = []) {
     (run) => run.status === 'passed' || run.status === 'already_passing'
   ).length;
 
-  const durations = records
+  const durations = terminalRuns
     .map((run) => run?.duration)
     .filter((duration) => typeof duration === 'number' && Number.isFinite(duration) && duration >= 0);
 
