@@ -34,7 +34,9 @@ async def upload_project(
 ) -> ProjectUploadResponse:
     guest = None
     if current_user is None:
-        eff_session_id = guest_session_id or "default-guest-session"
+        if not guest_session_id or not guest_session_id.strip():
+            raise HTTPException(status_code=401, detail="A guest session ID is required.")
+        eff_session_id = guest_session_id.strip()
         eff_name = (guest_name.strip() if (guest_name and guest_name.strip()) else "Guest User")
         guest = db.query(Guest).filter(Guest.session_id == eff_session_id).first()
         if guest is None:
@@ -101,7 +103,9 @@ async def load_demo_project(
 
     guest = None
     if current_user is None:
-        eff_session_id = guest_session_id or "default-guest-session"
+        if not guest_session_id or not guest_session_id.strip():
+            raise HTTPException(status_code=401, detail="A guest session ID is required.")
+        eff_session_id = guest_session_id.strip()
         eff_name = (guest_name.strip() if (guest_name and guest_name.strip()) else "Guest User")
         guest = db.query(Guest).filter(Guest.session_id == eff_session_id).first()
         if guest is None:
