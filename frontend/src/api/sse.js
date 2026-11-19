@@ -1,116 +1,181 @@
-import { useState, useEffect, useRef } from 'react';
-import { getAuthHeaders } from './client';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { getAuthHeaders, getApiBaseUrl } from './client';
 import { getRunStatus } from './runs';
 
+const TERMINAL_STATUSES = new Set([
+  'passed',
+  'already_passing',
+  'failed',
+  'stalled',
+  'error',
+  'cancelled',
+  'partially_repaired',
+  'reviewer_rejected',
+  'test_error',
+  'timeout',
+]);
+
 /**
- * Custom React hook connecting to Fixsembly Server-Sent Events (SSE)
- * with automatic fallback to REST polling if SSE is disconnected or unsupported.
+ * Authenticated SSE stream for repair runs.
+ *
+ * Fetch + ReadableStream is used instead of EventSource because EventSource
+ * cannot attach the JWT and guest-session headers required by the API.
+ * REST polling remains the fallback when streaming is unavailable.
  */
 export function useRunStream(runId, { enabled = true, onComplete = null } = {}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const eventSourceRef = useRef(null);
-  const pollingIntervalRef = useRef(null);
+  const onCompleteRef = useRef(onComplete);
 
   useEffect(() => {
-    if (!runId || !enabled) {
-      return;
-    }
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    if (!runId || !enabled) return undefined;
+
+    const controller = new AbortController();
+    let stopped = false;
+    let finished = false;
+    let pollingTimer = null;
 
     setIsStreaming(true);
     setError(null);
 
-    // Terminal statuses: stream closes and onComplete fires when any of these is received
-    const TERMINAL_STATUSES = [
-      'passed', 'already_passing', 'failed', 'stalled', 'error', 'cancelled',
-      'partially_repaired', 'reviewer_rejected', 'test_error', 'timeout',
-    ];
+    const finish = (finalData) => {
+      if (stopped || finished) return;
+      finished = true;
+      setData(finalData);
+      setIsStreaming(false);
+      if (pollingTimer) {
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+      }
+      onCompleteRef.current?.(finalData);
+    };
 
-    // Initial snapshot fetch
-    getRunStatus(runId)
-      .then((initialData) => {
-        setData(initialData);
-        if (TERMINAL_STATUSES.includes(initialData.status)) {
-          setIsStreaming(false);
-          if (onComplete) onComplete(initialData);
-        }
-      })
-      .catch((err) => {
-        console.warn('[SSE] Initial status check failed, falling back to stream:', err);
-      });
+    const applyStatus = (payload) => {
+      setData(payload);
+      if (TERMINAL_STATUSES.has(payload?.status)) finish(payload);
+    };
 
-    // Setup Server-Sent Events
-    const base = import.meta.env.VITE_BACKEND_URL || '';
-    const streamUrl = `${base}/api/runs/${encodeURIComponent(runId)}/stream`;
+    const pollOnce = async () => {
+      try {
+        const snapshot = await getRunStatus(runId);
+        if (!stopped) applyStatus(snapshot);
+      } catch (err) {
+        if (!stopped) setError(err.message || 'Unable to refresh repair status.');
+      }
+    };
 
-    try {
-      const eventSource = new EventSource(streamUrl);
-      eventSourceRef.current = eventSource;
+    const startPollingFallback = () => {
+      if (stopped || finished || pollingTimer) return;
+      setIsStreaming(true);
+      pollOnce();
+      pollingTimer = setInterval(pollOnce, 2000);
+    };
 
-      eventSource.addEventListener('status', (e) => {
+    const processFrame = async (frame) => {
+      let eventName = 'message';
+      const dataLines = [];
+
+      for (const line of frame.split('\n')) {
+        if (!line || line.startsWith(':')) continue;
+        if (line.startsWith('event:')) eventName = line.slice(6).trim();
+        if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart());
+      }
+
+      if (!dataLines.length) return;
+      const rawData = dataLines.join('\n');
+
+      if (eventName === 'error') {
+        let message = 'Repair stream returned an error.';
         try {
-          const payload = JSON.parse(e.data);
-          setData(payload);
-
-          if (TERMINAL_STATUSES.includes(payload.status)) {
-            setIsStreaming(false);
-            eventSource.close();
-            if (onComplete) onComplete(payload);
-          }
-        } catch (err) {
-          console.error('[SSE] Failed to parse status payload:', err);
+          message = JSON.parse(rawData).error || message;
+        } catch {
+          // Keep the safe fallback message for malformed server events.
         }
-      });
+        throw new Error(message);
+      }
 
-      eventSource.addEventListener('complete', (e) => {
-        setIsStreaming(false);
-        eventSource.close();
-        getRunStatus(runId).then((final) => {
-          setData(final);
-          if (onComplete) onComplete(final);
-        });
-      });
+      if (eventName === 'complete') {
+        const finalSnapshot = await getRunStatus(runId);
+        finish(finalSnapshot);
+        return;
+      }
 
-      eventSource.addEventListener('error', (e) => {
-        console.warn('[SSE] SSE connection error, switching to polling fallback');
-        eventSource.close();
-        startPollingFallback();
-      });
-    } catch (err) {
-      console.warn('[SSE] Failed to instantiate EventSource, using polling:', err);
-      startPollingFallback();
-    }
+      if (eventName === 'status' || eventName === 'message') {
+        applyStatus(JSON.parse(rawData));
+      }
+    };
 
-    function startPollingFallback() {
-      if (pollingIntervalRef.current) return;
-
-      pollingIntervalRef.current = setInterval(async () => {
-        try {
-          const status = await getRunStatus(runId);
-          setData(status);
-
-          if (TERMINAL_STATUSES.includes(status.status)) {
-            clearInterval(pollingIntervalRef.current);
-            setIsStreaming(false);
-            if (onComplete) onComplete(status);
+    const connect = async () => {
+      try {
+        const response = await fetch(
+          `${getApiBaseUrl()}/api/runs/${encodeURIComponent(runId)}/stream`,
+          {
+            method: 'GET',
+            headers: {
+              ...getAuthHeaders(),
+              Accept: 'text/event-stream',
+            },
+            cache: 'no-store',
+            signal: controller.signal,
           }
-        } catch (err) {
-          setError(err.message);
+        );
+
+        if (!response.ok) {
+          throw new Error(`Repair stream request failed (${response.status}).`);
         }
-      }, 1500);
-    }
+        if (!response.body) {
+          throw new Error('Streaming is not supported by this browser connection.');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (!stopped && !finished) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+          let boundary = buffer.indexOf('\n\n');
+
+          while (boundary !== -1 && !stopped && !finished) {
+            const frame = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            await processFrame(frame);
+            boundary = buffer.indexOf('\n\n');
+          }
+        }
+
+        if (!stopped && !finished) {
+          startPollingFallback();
+        }
+      } catch (err) {
+        if (!stopped && err.name !== 'AbortError') {
+          setError(err.message || 'Live updates disconnected; switching to polling.');
+          startPollingFallback();
+        }
+      }
+    };
+
+    connect();
 
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-      setIsStreaming(false);
+      stopped = true;
+      controller.abort();
+      if (pollingTimer) clearInterval(pollingTimer);
     };
   }, [runId, enabled]);
 
-  return { data, error, isStreaming, refresh: () => getRunStatus(runId).then(setData) };
+  const refresh = useCallback(async () => {
+    const snapshot = await getRunStatus(runId);
+    setData(snapshot);
+    return snapshot;
+  }, [runId]);
+
+  return { data, error, isStreaming, refresh };
 }
