@@ -10,7 +10,15 @@ export function AuthProvider({ children }) {
   const [guestSessionId, setGuestSessionId] = useState(() => {
     let sid = localStorage.getItem('fixsembly_guest_session_id');
     if (!sid) {
-      sid = 'guest-' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+      // Use an unpredictable browser-generated UUID for guest ownership.
+      // The timestamp/random fallback is only for older browsers without Web Crypto.
+      sid = typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : 'guest-' + Date.now().toString(36) + '-' +
+          Array.from(
+            (globalThis.crypto?.getRandomValues?.(new Uint8Array(16))) || new Uint8Array(16).map(() => Math.floor(Math.random() * 256)),
+            (byte) => byte.toString(16).padStart(2, '0')
+          ).join('');
       localStorage.setItem('fixsembly_guest_session_id', sid);
     }
     return sid;
