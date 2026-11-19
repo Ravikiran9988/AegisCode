@@ -79,7 +79,7 @@ export default function Landing({ onOpenAuthModal }) {
           {/* Subtitle Value Proposition */}
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mb-6 leading-relaxed max-w-2xl mx-auto font-normal">
             Autonomous software engineering system that analyzes failing Python repositories,
-            synthesizes targeted unified patches, runs real Pytest assertions, and verifies zero regressions, taking code{' '}
+            synthesizes targeted unified patches, runs real Pytest assertions, and reviews changes for regression risk, taking code{' '}
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold underline decoration-emerald-500/40 underline-offset-2">
               red to green, automatically
             </span>
