@@ -59,7 +59,7 @@ def e2e_db():
     # This keeps test setup concise while exercising the real ownership guard.
     def assign_test_guest(_session, _flush_context, instances):
         for obj in list(_session.new):
-            if isinstance(obj, (Project, Run)) and obj.user_id is None and obj.guest_id is None:
+            if isinstance(obj, Project | Run) and obj.user_id is None and obj.guest_id is None:
                 obj.guest_id = default_guest.id
 
     event.listen(session, "before_flush", assign_test_guest)
