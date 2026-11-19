@@ -59,7 +59,14 @@ export async function apiRequest(endpoint, options = {}) {
       return response.blob();
     }
 
-    const data = await response.json().catch(() => ({}));
+    const isJson = contentType.includes('application/json') || contentType.includes('+json');
+    if (!isJson) {
+      throw new Error(
+        'The API returned a non-JSON response. Check that VITE_BACKEND_URL points to the Fixsembly API service.'
+      );
+    }
+
+    const data = await response.json();
     if (!response.ok) {
       const errorMessage = data.detail || data.message || ('Request failed with status ' + response.status);
       const error = new Error(
