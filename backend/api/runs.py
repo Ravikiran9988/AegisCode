@@ -208,9 +208,9 @@ def _get_run_or_404(run_id: str, db: Session) -> Run:
 
 
 def _check_run_access(run: Run, current_user: User | None) -> None:
-    """Ensure that the authenticated user owns this run, or is superuser."""
+    """Enforce ownership for authenticated users; guests are checked by middleware."""
     if current_user is not None and not current_user.is_superuser:
-        if run.user_id is not None and run.user_id != current_user.id:
+        if run.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to access this repair run",
@@ -262,6 +262,12 @@ def create_run(
             status_code=404,
             detail=f"Project {body.project_id!r} not found. Upload it first.",
         )
+    if current_user is not None and not current_user.is_superuser:
+        if project.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to start a repair for this project.",
+            )
 
     # ── Create Run record ─────────────────────────────────────────────────────
     now = datetime.now(timezone.utc)
@@ -300,7 +306,15 @@ def create_run(
     # ── Execute initial pytest ────────────────────────────────────────────────
     _emit_event(db, run.id, "tester", "tool_call", {"tool": "run_pytest"}, iteration=1)
 
-    backend = get_execution_backend()
+    try:
+        backend = get_execution_backend()
+    except Exception as exc:
+        # Missing Docker daemon/image and production local-runner blocks are
+        # unavailable execution backends, not successful test failures.
+        raise HTTPException(
+            status_code=503,
+            detail="Execution backend unavailable: " + str(exc),
+        ) from exc
     result: TestResult = backend.run_pytest(project_path)
 
     # ── Persist iteration ─────────────────────────────────────────────────────

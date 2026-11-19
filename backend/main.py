@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging()
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
-    env_name = os.environ.get("ENV", "").lower()
-    env_alt = os.environ.get("ENVIRONMENT", "").lower()
-    production = env_name in {"production", "prod"} or env_alt in {"production", "prod"}
+    production = settings.is_production
     strict_llm = os.environ.get("STRICT_LLM_VALIDATION") == "true"
     if production or strict_llm:
         settings.validate_production_llm_config()
@@ -42,8 +40,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             DockerExecutionBackend()
             logger.info("Production Docker sandbox validated successfully")
         else:
-            logger.info(
-                "Production execution backend configured as 'local' (running in container sandbox)"
+            # Keep health/auth services available, but the execution factory
+            # rejects repair requests until an isolated worker is configured.
+            logger.error(
+                "Unsafe local code execution is disabled in production. "
+                "Project repair requests will return HTTP 503 until a sandbox worker is configured."
             )
 
     init_db()
@@ -71,6 +72,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
+        # Permit unique Vercel/Render preview hosts without a literal wildcard
+        # (which Starlette does not interpret as an origin pattern).
+        allow_origin_regex=r"https://[a-zA-Z0-9-]+[.](?:vercel[.]app|onrender[.]com)",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

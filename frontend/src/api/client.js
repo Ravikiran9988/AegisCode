@@ -1,67 +1,77 @@
 /**
  * Fixsembly API Client
- * Centralized fetch wrapper handling JWT authentication, Guest headers, and unified error handling.
+ * Centralized fetch wrapper handling JWT authentication, guest identity and errors.
  */
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || '';
+const configuredBackendUrl = (
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.VITE_API_URL ||
+  ''
+).trim().replace(/\/+$/, '');
+
+const BASE_URL = configuredBackendUrl
+  ? (/^https?:\/\//i.test(configuredBackendUrl)
+      ? configuredBackendUrl
+      : 'https://' + configuredBackendUrl)
+  : '';
+
+export function getApiBaseUrl() {
+  return BASE_URL;
+}
 
 export function getAuthHeaders() {
   const headers = {};
   const token = localStorage.getItem('fixsembly_auth_token');
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  if (token) headers.Authorization = 'Bearer ' + token;
 
   const guestSessionId = localStorage.getItem('fixsembly_guest_session_id');
   const guestName = localStorage.getItem('fixsembly_guest_name');
-  if (guestSessionId) {
-    headers['X-Guest-Session-ID'] = guestSessionId;
-  }
-  if (guestName) {
-    headers['X-Guest-Name'] = guestName;
-  }
+  if (guestSessionId) headers['X-Guest-Session-ID'] = guestSessionId;
+  if (guestName) headers['X-Guest-Name'] = guestName;
 
   return headers;
 }
 
 export async function apiRequest(endpoint, options = {}) {
-  const url = `${BASE_URL}${endpoint}`;
+  const url = BASE_URL + endpoint;
   const headers = {
     ...getAuthHeaders(),
     ...(options.headers || {}),
   };
 
-  // Don't set Content-Type for FormData (browser sets boundary)
+  // Let the browser set the multipart boundary for FormData uploads.
   if (!(options.body instanceof FormData) && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const config = {
-    ...options,
-    headers,
-  };
-
   try {
-    const response = await fetch(url, config);
+    const response = await fetch(url, { ...options, headers });
 
-    if (response.status === 204) {
-      return null;
-    }
+    if (response.status === 204) return null;
 
-    // For file downloads (ZIP)
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/zip') || contentType.includes('application/octet-stream')) {
       if (!response.ok) {
-        throw new Error(`Download failed with status ${response.status}`);
+        const error = new Error('Download failed with status ' + response.status);
+        error.status = response.status;
+        throw error;
       }
       return response.blob();
     }
 
-    const data = await response.json().catch(() => ({}));
+    const isJson = contentType.includes('application/json') || contentType.includes('+json');
+    if (!isJson) {
+      throw new Error(
+        'The API returned a non-JSON response. Check that VITE_BACKEND_URL points to the Fixsembly API service.'
+      );
+    }
 
+    const data = await response.json();
     if (!response.ok) {
-      const errorMsg = data.detail || data.message || `Request failed with status ${response.status}`;
-      const error = new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      const errorMessage = data.detail || data.message || ('Request failed with status ' + response.status);
+      const error = new Error(
+        typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
+      );
       error.status = response.status;
       error.data = data;
       throw error;
@@ -69,7 +79,7 @@ export async function apiRequest(endpoint, options = {}) {
 
     return data;
   } catch (err) {
-    console.error(`[API Error] ${options.method || 'GET'} ${endpoint}:`, err);
+    console.error('[API Error] ' + (options.method || 'GET') + ' ' + endpoint + ':', err);
     throw err;
   }
 }

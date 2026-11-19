@@ -13,22 +13,26 @@ import {
 } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import { listRuns, listActiveRuns } from '../api/runs';
+import { calculateDashboardMetrics } from '../utils/dashboardMetrics';
 
 export default function Overview() {
   const [runs, setRuns] = useState([]);
   const [activeRuns, setActiveRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const [allRunsData, activeRunsData] = await Promise.all([
-        listRuns(15),
+        listRuns(100),
         listActiveRuns(),
       ]);
+      setLoadError('');
       setRuns(allRunsData || []);
       setActiveRuns(activeRunsData || []);
     } catch (err) {
+      setLoadError(err.message || 'Could not load repair metrics.');
       console.error('Failed to load overview data:', err);
     } finally {
       setIsLoading(false);
@@ -41,18 +45,13 @@ export default function Overview() {
     return () => clearInterval(interval);
   }, []);
 
-  // Compute stats
-  const totalRuns = runs.length;
-  const passedRuns = runs.filter(
-    (r) => r.status === 'passed' || r.status === 'already_passing'
-  ).length;
-  const passRate = totalRuns > 0 ? `${Math.round((passedRuns / totalRuns) * 100)}%` : '100%';
+  // Metrics are calculated only from real API records. Empty histories stay empty.
+  const metrics = calculateDashboardMetrics(runs);
+  const totalRuns = metrics.totalRuns;
+  const passRate = metrics.passRate === null ? '—' : `${metrics.passRate}%`;
   const avgDuration =
-    totalRuns > 0
-      ? `${Math.round(
-          runs.reduce((acc, r) => acc + (r.duration || 0), 0) / totalRuns
-        )}s`
-      : '32s';
+    metrics.averageDuration === null ? '—' : `${metrics.averageDuration}s`;
+
 
   return (
     <div className="space-y-6">
@@ -89,6 +88,12 @@ export default function Overview() {
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-700 dark:text-rose-300">
+          Unable to refresh dashboard data: {loadError}
+        </div>
+      )}
+
       {/* Active Runs Banner */}
       {activeRuns.length > 0 && (
         <div className="rounded-2xl border border-brand-500/30 bg-brand-500/10 p-4 flex flex-wrap items-center justify-between gap-4 animate-pulse">
@@ -116,19 +121,19 @@ export default function Overview() {
       {/* Telemetry Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Repairs"
+          title="Recent Repairs"
           value={totalRuns}
-          subtext="Executed repair pipelines"
+          subtext="Latest repair executions"
           icon={Activity}
           color="brand"
         />
         <StatCard
-          title="Verified Pass Rate"
+          title="Recent Verified Pass Rate"
           value={passRate}
           subtext="Green pytest verification"
           icon={CheckCircle2}
           color="emerald"
-          trend="+12% vs v1"
+          
         />
         <StatCard
           title="Active Repairs"
@@ -138,9 +143,9 @@ export default function Overview() {
           color="blue"
         />
         <StatCard
-          title="Mean Duration"
+          title="Average Duration"
           value={avgDuration}
-          subtext="Fast targeted loop execution"
+          subtext="Completed runs with duration data"
           icon={Clock}
           color="amber"
         />

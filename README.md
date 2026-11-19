@@ -1,10 +1,10 @@
-# Fixsembly (v2.0)
+# Fixsembly
 
 > **Three Agents. One Verified Fix.**  
 > *Self-Healing Multi-Agent Software Engineering System.*  
 > **Red to green, automatically.**
 
-Fixsembly is an autonomous software engineering platform that detects, analyzes, and repairs failing Python projects using a LangGraph-coordinated multi-agent workflow. It combines an **Architect**, **Coder**, and **Reviewer** agent with authoritative Pytest execution, Monaco-powered side-by-side diff inspection, real-time Server-Sent Events (SSE) telemetry, and strict anti-tampering security policies.
+Fixsembly is an autonomous software engineering platform that detects, analyzes, and repairs failing Python projects using a LangGraph-coordinated multi-agent workflow. It combines an **Architect**, **Coder**, and **Reviewer** agent with authoritative Pytest execution, Monaco-powered unified-patch inspection, real-time Server-Sent Events (SSE) telemetry, and strict anti-tampering security policies.
 
 ---
 
@@ -21,14 +21,14 @@ Architect Agent — Root Cause Analysis & Plan Formulation
        ↓
 Coder Agent — Targeted Patch Synthesis (Strict Policy Guarded)
        ↓
-Pytest Execution Sandbox — Verification Truth (Exit Code Gate)
+Pytest Execution Backend — Verification Truth (Exit Code Gate)
        ↓
 Reviewer Agent — Independent Audit & Regression Risk Gate
        ↓
 Pass → Verified Fix Ready (.ZIP)  |  Fail → Next Repair Iteration
 ```
 
-The system uses **actual Pytest exit codes** as the sole source of truth instead of relying on the LLM to hallucinate or claim that a fix works.
+The system uses **actual Pytest exit codes** as the source of truth for test outcomes instead of trusting an LLM's claim that a fix works.
 
 ---
 
@@ -36,13 +36,13 @@ The system uses **actual Pytest exit codes** as the sole source of truth instead
 
 - **Architect Agent**: Read-only analysis agent that parses pytest failure diagnostics, error tracebacks, and directory structure to formulate a structured `ArchitecturePlan`.
 - **Coder Agent**: Synthesizes minimal unified diff patches or surgical file writes. Includes an automated recovery fallback if diff headers are malformed.
-- **Reviewer Agent**: Independent quality gate that audits Git diffs and before/after test results to guarantee zero regression risk.
-- **Pytest Runner**: Sandboxed subprocess execution providing the authoritative pass/fail signal.
+- **Reviewer Agent**: Independent quality gate that audits Git diffs and before/after test results to assess regression risk.
+- **Pytest Runner**: Bounded subprocess execution; Docker isolation is available when a Docker daemon and the configured sandbox image are provided. Production local execution is blocked.
 - **LangGraph StateGraph**: Orchestrates agents, handles patch retries, and invokes loop detection to prevent infinite failing cycles.
 
 ---
 
-## 🖥️ Modernized V2 Tech Stack
+## 🖥️ Technology Stack
 
 ### Frontend
 - **Framework**: React 18+ (Pure JavaScript)
@@ -86,7 +86,7 @@ Fixsembly/
 │   │   └── pages/       # Landing, Overview, NewRepair, RepairStudio, History, Health, Docs
 │   ├── nginx.conf       # Production Nginx reverse-proxy configuration
 │   └── package.json     # Frontend dependencies
-├── frontend-legacy/     # Preserved Streamlit frontend (100% intact)
+├── frontend_legacy/     # Preserved legacy Streamlit frontend
 ├── demo_projects/       # Buggy calculator sample project & packaged ZIP
 ├── evaluation/          # Benchmark evaluation suite
 ├── tests/               # 22 test suites covering all backend phases & SSE streaming
@@ -100,7 +100,7 @@ Fixsembly/
 
 ## 🚀 Quick Start
 
-### 1. Run via Docker Compose (Recommended)
+### 1. Run via Docker Compose (local development)
 
 ```bash
 docker compose up --build
@@ -108,7 +108,7 @@ docker compose up --build
 - React Frontend: http://localhost:3000
 - FastAPI Backend & Swagger Docs: http://localhost:8000/docs
 
-### 2. Run Locally
+### 2. Run Locally (trusted projects only)
 
 **Start Backend:**
 ```bash
@@ -124,6 +124,12 @@ npm run dev
 ```
 Open http://localhost:5173 in your browser.
 
+> **Execution safety:** the local runner executes uploaded Python tests inside the API service environment and is for trusted local projects only. Production deployments intentionally reject local execution. Enable public repairs only after connecting a separately isolated Docker or remote sandbox worker. The Render blueprint keeps the API and UI available but repair execution returns HTTP 503 until that worker is configured.
+
+### Frontend deployment configuration
+
+Set `VITE_BACKEND_URL` to the backend origin (for example, the HTTPS Render service URL) in the frontend hosting provider before building. The frontend accepts either a full URL or a host name.
+
 ---
 
 ## 🧪 Testing
@@ -133,7 +139,20 @@ Run backend test suites:
 pytest -q
 ```
 
-Build and verify frontend:
+Test frontend utilities and build the React app:
 ```bash
-cd frontend && npm run build
+cd frontend
+npm ci
+npm test
+npm run build
 ```
+
+### Docker sandbox image
+
+Build the runner image before selecting `EXECUTION_BACKEND=docker`:
+```bash
+docker build -f Dockerfile.sandbox -t fixsembly-pytest-sandbox:latest .
+```
+The sandbox has Pytest preinstalled, runs without network access and mounts the uploaded project read-only. Project-specific third-party dependencies must already be available in the sandbox image; dependency installation from untrusted project archives is not performed automatically.
+
+The Render blueprint deliberately keeps `EXECUTION_BACKEND=local` with `ENV=production`, so repair creation returns HTTP 503 until a separate isolated execution service is available. Do not remove this guard to make the UI appear functional.

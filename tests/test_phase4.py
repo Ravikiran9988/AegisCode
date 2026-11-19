@@ -83,7 +83,7 @@ def api_client(in_memory_engine, tmp_path_factory):
     settings.workspace_base_dir = str(test_workspace)
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-Guest-Session-ID": "phase4-api-test-guest"}) as client:
         yield client
     app.dependency_overrides.clear()
     settings.workspace_base_dir = original_workspace

@@ -7,6 +7,7 @@ Import the singleton `settings` object everywhere; do not use os.getenv() direct
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     )
 
     # Application
+    env: str = "development"
+    environment: str = ""
     app_name: str = "Fixsembly"
     app_version: str = "2.0.0"
     tagline: str = "Three Agents. One Verified Fix."
@@ -114,7 +117,7 @@ class Settings(BaseSettings):
     execution_timeout_seconds: int = 120
     pytest_timeout_seconds: int = 60
     use_docker_sandbox: bool = False
-    docker_image: str = "python:3.11-slim"
+    docker_image: str = "fixsembly-pytest-sandbox:latest"
     execution_backend: Literal["local", "docker"] = "local"
 
     # Upload / File limits
@@ -130,6 +133,17 @@ class Settings(BaseSettings):
     @property
     def is_debug(self) -> bool:
         return self.debug
+
+    @property
+    def is_production(self) -> bool:
+        """Detect production mode consistently across common hosting platforms."""
+        configured = (
+            self.env,
+            self.environment,
+            os.environ.get("ENV", ""),
+            os.environ.get("ENVIRONMENT", ""),
+        )
+        return any(value.lower() in {"production", "prod"} for value in configured)
 
     def validate_production_llm_config(self) -> None:
         """Validate production hosted-provider configuration without pinning a model."""

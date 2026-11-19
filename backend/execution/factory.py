@@ -14,6 +14,10 @@ from backend.execution.local import LocalExecutionBackend
 logger = get_logger(__name__)
 
 
+class UnsafeLocalExecutionError(RuntimeError):
+    """Raised when untrusted uploaded code would run without an isolation boundary."""
+
+
 def get_execution_backend() -> ExecutionBackend:
     """
     Return the configured execution backend.
@@ -40,5 +44,12 @@ def get_execution_backend() -> ExecutionBackend:
         )
         return DockerExecutionBackend()
     else:
-        logger.info("Configured for Local execution backend")
+        if settings.is_production:
+            raise UnsafeLocalExecutionError(
+                "Repair execution is disabled: production is configured with the "
+                "local runner, which executes uploaded Python code inside the API "
+                "service. Configure a separately isolated Docker or remote sandbox "
+                "worker before enabling public project repairs."
+            )
+        logger.info("Configured for Local execution backend (development/test only)")
         return LocalExecutionBackend()

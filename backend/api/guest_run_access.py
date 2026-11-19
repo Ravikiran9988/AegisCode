@@ -38,13 +38,21 @@ class GuestRunAccessMiddleware:
             for k, v in scope.get("headers", [])
         }
 
-        # JWT-authenticated requests are authorized by the existing runs API.
+        # A supplied bearer token is validated by the FastAPI dependency. Invalid
+        # tokens must never fall back to the guest authorization path.
         if headers.get("authorization"):
             await self.app(scope, receive, send)
             return
 
-        guest_session_id = headers.get("x-guest-session-id") or "default-guest-session"
+        guest_session_id = headers.get("x-guest-session-id")
         guest_name = headers.get("x-guest-name") or "Guest User"
+        if not guest_session_id:
+            await JSONResponse(
+                {"detail": "A guest session ID is required."},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )(scope, receive, send)
+            return
 
         app_obj = scope.get("app")
         from backend.database.session import get_db
@@ -98,7 +106,7 @@ class GuestRunAccessMiddleware:
                     # Let downstream router return 404
                     await self.app(scope, replay_receive, send)
                     return
-                if project.guest_id is not None and project.guest_id != guest.id:
+                if project.user_id is not None or project.guest_id != guest.id:
                     await JSONResponse(
                         {"detail": "You do not have permission to start a repair for this project."},
                         status_code=403,
@@ -116,7 +124,7 @@ class GuestRunAccessMiddleware:
                 if run is None:
                     await self.app(scope, receive, send)
                     return
-                if run.guest_id is not None and run.guest_id != guest.id:
+                if run.user_id is not None or run.guest_id != guest.id:
                     await JSONResponse(
                         {"detail": "You do not have permission to access this repair run."},
                         status_code=403,
@@ -139,10 +147,11 @@ class GuestRunAccessMiddleware:
                 except ValueError:
                     limit, offset = 50, 0
 
-                if guest_session_id == "default-guest-session":
-                    query = db.query(Run).filter((Run.guest_id == guest.id) | (Run.guest_id.is_(None)))
-                else:
-                    query = db.query(Run).filter(Run.guest_id == guest.id)
+                # Guest sessions must never see unowned or authenticated-user runs.
+                query = db.query(Run).filter(
+                    Run.guest_id == guest.id,
+                    Run.user_id.is_(None),
+                )
                 if path.rstrip("/") == "/api/runs/active":
                     query = query.filter(Run.status.in_(("running", "pending")))
                 else:

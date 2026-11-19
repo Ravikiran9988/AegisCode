@@ -17,7 +17,7 @@ import AgentStepper from '../components/AgentStepper';
 import Terminal from '../components/Terminal';
 import MonacoDiff from '../components/MonacoDiff';
 import ReviewAudit from '../components/ReviewAudit';
-import { getRunStatus, getRunResults, cancelRun } from '../api/runs';
+import { getRunStatus, getRunResults, cancelRun, downloadRunZip } from '../api/runs';
 import { useRunStream } from '../api/sse';
 
 export default function RepairStudio() {
@@ -70,17 +70,24 @@ export default function RepairStudio() {
     }
   };
 
-  const handleDownload = () => {
-    if (!runId || !statusData) return;
+  const handleDownload = async () => {
+    if (!runId || !statusData || isDownloading) return;
     setIsDownloading(true);
-    const downloadUrl = `/api/runs/${runId}/download`;
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `fixsembly-repaired-${runId.slice(0, 8)}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => setIsDownloading(false), 1500);
+    try {
+      const blob = await downloadRunZip(runId);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `fixsembly-repaired-${runId.slice(0, 8)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (err) {
+      window.alert(err.message || 'Unable to download this repair archive.');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const isTerminal = [
@@ -105,7 +112,7 @@ export default function RepairStudio() {
     statusData?.test_stdout ||
     testResults?.stdout ||
     (statusData?.status === 'running'
-      ? 'Fixsembly test runner initializing subprocess pytest execution in isolated workspace...\nRunning test collection...'
+      ? 'Fixsembly test runner initializing subprocess pytest execution in the uploaded project...\nRunning test collection...'
       : 'No test console output available.');
 
   const currentIter = statusData?.current_iteration || 1;
@@ -188,7 +195,7 @@ export default function RepairStudio() {
                 Repair Completed & Verified: Red to Green!
               </p>
               <p className="text-emerald-700/80 dark:text-emerald-400/80">
-                All Pytest assertions passed and the Reviewer Agent verified zero regression risk.
+                All Pytest assertions passed and the Reviewer Agent approved the patch after its regression review.
               </p>
             </div>
           </div>

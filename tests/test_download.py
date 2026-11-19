@@ -30,6 +30,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.api.runs import _is_excluded
 from backend.core.config import settings
+from backend.database.guest import Guest
 from backend.database.models import Base, Project, Run
 from backend.database.session import get_db
 from backend.execution.workspace import WorkspaceManager
@@ -123,7 +124,7 @@ def dl_client(dl_engine, dl_workspace):
     settings.workspace_base_dir = str(base)
     app.dependency_overrides[get_db] = override_get_db
 
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-Guest-Session-ID": "download-tests-guest"}) as client:
         yield client, wm, base
 
     app.dependency_overrides.clear()
@@ -136,7 +137,14 @@ def _make_run(
     run_status: str = "passed",
 ) -> tuple[Project, Run]:
     """Insert a Project + Run record into the DB and return both."""
+    guest = db.query(Guest).filter(Guest.session_id == "download-tests-guest").first()
+    if guest is None:
+        guest = Guest(session_id="download-tests-guest", name="Download Test Guest")
+        db.add(guest)
+        db.flush()
+
     proj = Project(
+        guest_id=guest.id,
         name="test-project",
         original_filename="test-project.zip",
         workspace_path=workspace_path,
@@ -148,6 +156,7 @@ def _make_run(
 
     now = datetime.now(timezone.utc)
     run = Run(
+        guest_id=guest.id,
         project_id=proj.id,
         status=run_status,
         max_iterations=5,

@@ -64,7 +64,7 @@ export default function Landing({ onOpenAuthModal }) {
             <span className="text-slate-400 dark:text-slate-600">•</span>
             <span className="text-slate-600 dark:text-slate-400 hidden sm:inline">Self-Healing Multi-Agent Engineering</span>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 font-semibold">
-              LIVE
+              AUTONOMOUS
             </span>
           </div>
 
@@ -79,7 +79,7 @@ export default function Landing({ onOpenAuthModal }) {
           {/* Subtitle Value Proposition */}
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mb-6 leading-relaxed max-w-2xl mx-auto font-normal">
             Autonomous software engineering system that analyzes failing Python repositories,
-            synthesizes targeted unified patches, runs real Pytest assertions, and verifies zero regressions, taking code{' '}
+            synthesizes targeted unified patches, runs real Pytest assertions, and reviews changes for regression risk, taking code{' '}
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold underline decoration-emerald-500/40 underline-offset-2">
               red to green, automatically
             </span>
