@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     )
 
     # Application
+    env: str = "development"
+    environment: str = ""
     app_name: str = "Fixsembly"
     app_version: str = "2.0.0"
     tagline: str = "Three Agents. One Verified Fix."
@@ -135,9 +137,13 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         """Detect production mode consistently across common hosting platforms."""
-        env_name = os.environ.get("ENV", "").lower()
-        env_alt = os.environ.get("ENVIRONMENT", "").lower()
-        return env_name in {"production", "prod"} or env_alt in {"production", "prod"}
+        configured = (
+            self.env,
+            self.environment,
+            os.environ.get("ENV", ""),
+            os.environ.get("ENVIRONMENT", ""),
+        )
+        return any(value.lower() in {"production", "prod"} for value in configured)
 
     def validate_production_llm_config(self) -> None:
         """Validate production hosted-provider configuration without pinning a model."""
