@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # AegisCode targets Python 3.12 (see pyproject.toml).
+        # Fixsembly targets Python 3.12 (see pyproject.toml).
         python-version: ["3.12"]
 
     # CI must be deterministic: never depend on a hosted LLM, Ollama, Docker,
@@ -69,7 +69,8 @@ jobs:
       - name: Build React Frontend
         run: |
           cd frontend
-          npm install
+          npm ci
+          npm test
           npm run build
 
       - name: Run complete Pytest suite
