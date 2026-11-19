@@ -28,6 +28,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from backend.agents.policies import PolicyViolationError, check_file_modification_policy
+from backend.database.guest import Guest
 from backend.database.models import Project, Run
 from backend.database.session import SessionLocal, get_db
 from backend.execution.workspace import WorkspaceManager, ZipValidationError
@@ -65,18 +66,23 @@ def client(test_db):
 class TestRunCancellation:
     def test_cancel_active_run_success(self, client, test_db: Session):
         # Create a dummy project and running run
+        guest = Guest(session_id="cancel-active-guest", name="Cancellation Test Guest")
+        test_db.add(guest)
+        test_db.flush()
         project = Project(
             name="cancel_test_proj",
             original_filename="proj.zip",
             workspace_path="/tmp/test",
             file_count=2,
             size_bytes=100,
+            guest_id=guest.id,
         )
         test_db.add(project)
         test_db.flush()
 
         run = Run(
             project_id=project.id,
+            guest_id=guest.id,
             status="running",
             max_iterations=5,
             current_iteration=1,
@@ -86,7 +92,7 @@ class TestRunCancellation:
         test_db.commit()
 
         # Cancel the run
-        res = client.post(f"/api/runs/{run.id}/cancel")
+        res = client.post(f"/api/runs/{run.id}/cancel", headers={"X-Guest-Session-ID": "cancel-active-guest"})
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "cancelled"
@@ -100,18 +106,23 @@ class TestRunCancellation:
         assert "cancelled by user" in cancelled_run.final_summary.lower()
 
     def test_cancel_already_terminal_run_returns_400(self, client, test_db: Session):
+        guest = Guest(session_id="cancel-terminal-guest", name="Cancellation Test Guest")
+        test_db.add(guest)
+        test_db.flush()
         project = Project(
             name="cancel_terminal_proj",
             original_filename="proj.zip",
             workspace_path="/tmp/test",
             file_count=2,
             size_bytes=100,
+            guest_id=guest.id,
         )
         test_db.add(project)
         test_db.flush()
 
         run = Run(
             project_id=project.id,
+            guest_id=guest.id,
             status="passed",
             max_iterations=5,
             current_iteration=1,
@@ -120,7 +131,7 @@ class TestRunCancellation:
         test_db.add(run)
         test_db.commit()
 
-        res = client.post(f"/api/runs/{run.id}/cancel")
+        res = client.post(f"/api/runs/{run.id}/cancel", headers={"X-Guest-Session-ID": "cancel-terminal-guest"})
         assert res.status_code == 400
         assert "already in terminal state" in res.json()["detail"]
 
