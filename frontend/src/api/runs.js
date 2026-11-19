@@ -42,7 +42,11 @@ export async function listActiveRuns() {
   return apiRequest('/api/runs/active');
 }
 
-export async function listHistoryRuns(status = null) {
-  const query = status ? `?status=${encodeURIComponent(status)}` : '';
-  return apiRequest(`/api/runs/history${query}`);
+export async function listHistoryRuns(status = null, limit = 50, offset = 0) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (status) params.set('status', status);
+  return apiRequest(`/api/runs/history?${params.toString()}`);
 }
