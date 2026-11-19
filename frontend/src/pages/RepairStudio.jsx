@@ -112,7 +112,7 @@ export default function RepairStudio() {
     statusData?.test_stdout ||
     testResults?.stdout ||
     (statusData?.status === 'running'
-      ? 'Fixsembly test runner initializing subprocess pytest execution in isolated workspace...\nRunning test collection...'
+      ? 'Fixsembly test runner initializing subprocess pytest execution in the uploaded project...\nRunning test collection...'
       : 'No test console output available.');
 
   const currentIter = statusData?.current_iteration || 1;
