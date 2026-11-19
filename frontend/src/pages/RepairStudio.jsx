@@ -195,7 +195,7 @@ export default function RepairStudio() {
                 Repair Completed & Verified: Red to Green!
               </p>
               <p className="text-emerald-700/80 dark:text-emerald-400/80">
-                All Pytest assertions passed and the Reviewer Agent verified zero regression risk.
+                All Pytest assertions passed and the Reviewer Agent approved the patch after its regression review.
               </p>
             </div>
           </div>
