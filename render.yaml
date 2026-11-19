@@ -49,7 +49,7 @@ services:
     region: oregon
     plan: starter
     rootDir: frontend
-    buildCommand: "npm install && npm run build"
+    buildCommand: "npm ci && npm run build"
     staticPublishPath: dist
     routes:
       - type: rewrite
