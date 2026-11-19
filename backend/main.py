@@ -36,14 +36,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             settings.openai_model,
         )
     if production:
-        if settings.execution_backend == "docker":
+        if settings.execution_backend == "docker" or settings.use_docker_sandbox:
             from backend.execution.docker import DockerExecutionBackend
 
             DockerExecutionBackend()
             logger.info("Production Docker sandbox validated successfully")
         else:
-            logger.info(
-                "Production execution backend configured as 'local' (running in container sandbox)"
+            # Keep health/auth services available, but the execution factory
+            # rejects repair requests until an isolated worker is configured.
+            logger.error(
+                "Unsafe local code execution is disabled in production. "
+                "Project repair requests will return HTTP 503 until a sandbox worker is configured."
             )
 
     init_db()
