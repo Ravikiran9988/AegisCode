@@ -64,7 +64,7 @@ export default function Landing({ onOpenAuthModal }) {
             <span className="text-slate-400 dark:text-slate-600">•</span>
             <span className="text-slate-600 dark:text-slate-400 hidden sm:inline">Self-Healing Multi-Agent Engineering</span>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 font-semibold">
-              LIVE
+              AUTONOMOUS
             </span>
           </div>
 
