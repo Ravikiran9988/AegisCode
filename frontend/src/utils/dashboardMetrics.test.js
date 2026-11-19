@@ -31,6 +31,7 @@ test('missing and invalid durations are excluded', () => {
     { status: 'failed', duration: null },
     { status: 'timeout', duration: 'unknown' },
     { status: 'cancelled', duration: -4 },
+    { status: 'running', duration: 999 },
   ]);
   assert.equal(metrics.averageDuration, 12);
 });
