@@ -115,7 +115,7 @@ class Settings(BaseSettings):
     execution_timeout_seconds: int = 120
     pytest_timeout_seconds: int = 60
     use_docker_sandbox: bool = False
-    docker_image: str = "python:3.11-slim"
+    docker_image: str = "fixsembly-pytest-sandbox:latest"
     execution_backend: Literal["local", "docker"] = "local"
 
     # Upload / File limits
