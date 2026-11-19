@@ -18,10 +18,16 @@ ENV/
 env/
 .env
 
-# ── AegisCode runtime artefacts ──────────────────────────────────────────────
+# ── Database & runtime artefacts ──────────────────────────────────────────────
+fixsembly.db
+fixsembly.db-shm
+fixsembly.db-wal
 aegiscode.db
 aegiscode.db-shm
 aegiscode.db-wal
+*.db
+*.db-shm
+*.db-wal
 workspaces/
 *.log
 
@@ -56,3 +62,10 @@ coverage.xml
 
 # ── Streamlit ─────────────────────────────────────────────────────────────────
 .streamlit/secrets.toml
+
+# ── Frontend (Node / Vite) ─────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/node_modules/
+.vite/
+

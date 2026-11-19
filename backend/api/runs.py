@@ -12,8 +12,10 @@ LangGraph agents are wired in Phase 4.
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import io
+import json
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,7 +30,7 @@ from backend.core.config import settings
 from backend.core.logging import get_logger
 from backend.database.models import Event, Iteration, Project, Run, User
 from backend.database.persistence import upsert_iteration
-from backend.database.session import get_db
+from backend.database.session import SessionLocal, get_db
 from backend.execution import get_execution_backend
 from backend.execution.workspace import WorkspaceError, WorkspaceManager
 from backend.graph.graph import run_repair_workflow
@@ -406,6 +408,57 @@ def start_repair_loop(
     }
 
 
+@router.post(
+    "/{run_id}/cancel",
+    summary="Cancel an in-progress repair run",
+)
+def cancel_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+) -> dict[str, str]:
+    """
+    Cancel an active repair run.
+    """
+    run = _get_run_or_404(run_id, db)
+    _check_run_access(run, current_user)
+
+    terminal_statuses = {
+        "passed", "already_passing", "failed", "stalled",
+        "error", "cancelled", "test_error", "reviewer_rejected",
+        "timeout", "partially_repaired",
+    }
+    if run.status in terminal_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Run {run_id!r} is already in terminal state {run.status!r}.",
+        )
+
+    run.status = "cancelled"
+    run.finished_at = datetime.now(timezone.utc)
+    run.final_summary = "Repair run cancelled by user."
+    _emit_event(
+        db,
+        run.id,
+        "system",
+        "REPAIR_CANCELLED",
+        {
+            "node": "system",
+            "agent": "System",
+            "phase": "Repair Cancelled",
+            "description": "User requested run cancellation.",
+        },
+        iteration=run.current_iteration,
+    )
+    db.commit()
+
+    return {
+        "run_id": run_id,
+        "status": "cancelled",
+        "message": "Repair run cancelled successfully.",
+    }
+
+
 @router.get(
     "/{run_id}/status",
     summary="Get live status and progress metrics of a repair run",
@@ -470,6 +523,18 @@ def get_run_status(
     if run.status in ("passed", "already_passing"):
         cur_phase = "Repair Complete & Verified"
         cur_action_desc = "All pytest assertions passed and reviewer approved patch."
+    elif run.status == "partially_repaired":
+        cur_phase = "Partially Repaired"
+        cur_action_desc = "Some failing assertions fixed, but remaining failures exceeded iteration limit."
+    elif run.status == "reviewer_rejected":
+        cur_phase = "Reviewer Rejected"
+        cur_action_desc = "Tests passed, but Reviewer Agent rejected patch for safety or regression risk."
+    elif run.status == "test_error":
+        cur_phase = "Test Execution Error"
+        cur_action_desc = "Pytest execution encountered a collection error or syntax crash."
+    elif run.status == "timeout":
+        cur_phase = "Execution Timeout"
+        cur_action_desc = "Run exceeded configured timeout limit."
     elif run.status in ("failed", "stalled"):
         cur_phase = "Repair Terminated"
         cur_action_desc = run.final_summary or "Repair concluded without passing patch."
@@ -487,17 +552,22 @@ def get_run_status(
         if (ev.iteration_number == cur_iter_num or (ev.iteration_number == 0 and cur_iter_num == 1))
     }
 
+    _FAIL_STATUSES = (
+        "failed", "stalled", "error", "cancelled",
+        "test_error", "timeout", "reviewer_rejected", "partially_repaired",
+    )
+
     def _get_node_status(node_name: str, start_tag: str, complete_tag: str) -> str:
         if complete_tag in ev_types_cur_iter:
             return "completed"
         if start_tag in ev_types_cur_iter:
-            if run.status in ("failed", "stalled", "error") and cur_node == node_name:
+            if run.status in _FAIL_STATUSES and cur_node == node_name:
                 return "failed"
             return "running"
         if run.status in ("passed", "already_passing"):
             return "completed"
         if (
-            run.status in ("failed", "stalled", "error")
+            run.status in _FAIL_STATUSES
             and "TEST_COMPLETED" in ev_types_cur_iter
             and node_name == "reviewer"
         ):
@@ -598,7 +668,7 @@ def get_run_status(
     completed_nodes_in_cur = sum(1 for n in pipeline_nodes if n["status"] == "completed")
     if run.status in ("passed", "already_passing"):
         prog_pct = 100
-    elif run.status in ("failed", "stalled", "error", "cancelled"):
+    elif run.status in ("failed", "stalled", "error", "cancelled", "test_error", "timeout", "reviewer_rejected", "partially_repaired"):
         total_steps = max_its * 4
         done_steps = (max(run.current_iteration, 1) - 1) * 4 + completed_nodes_in_cur
         prog_pct = min(90, max(5, int((done_steps / total_steps) * 100)))
@@ -682,6 +752,68 @@ def get_run_status(
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
         "elapsed_seconds": elapsed_sec,
     }
+
+
+@router.get(
+    "/{run_id}/stream",
+    summary="Stream live run status, agent transitions, and events via Server-Sent Events",
+)
+async def stream_run_status(
+    run_id: str,
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """
+    Server-Sent Events endpoint streaming real-time status and telemetry
+    to the Fixsembly React client.
+    """
+    async def event_generator():
+        consecutive_terminal = 0
+        last_snapshot_str = None
+
+        while True:
+            db = SessionLocal()
+            try:
+                run = resolve_run(db, run_id)
+                if not run:
+                    yield f"event: error\ndata: {json.dumps({'error': f'Run {run_id} not found'})}\n\n"
+                    break
+
+                _check_run_access(run, current_user)
+                status_data = get_run_status(run_id, db, current_user)
+                snapshot_str = json.dumps(status_data)
+
+                # Only emit if status changed or every 2 iterations to reduce network noise
+                if snapshot_str != last_snapshot_str:
+                    last_snapshot_str = snapshot_str
+                    yield f"event: status\ndata: {snapshot_str}\n\n"
+
+                _TERMINAL_STREAM_STATUSES = (
+                    "passed", "already_passing", "failed", "stalled",
+                    "error", "cancelled", "test_error", "reviewer_rejected",
+                    "timeout", "partially_repaired",
+                )
+                if status_data.get("status") in _TERMINAL_STREAM_STATUSES:
+                    consecutive_terminal += 1
+                    if consecutive_terminal >= 2:
+                        yield f"event: complete\ndata: {json.dumps({'status': status_data.get('status')})}\n\n"
+                        break
+            except Exception as exc:
+                yield f"event: error\ndata: {json.dumps({'error': str(exc)})}\n\n"
+                break
+            finally:
+                db.close()
+
+            await asyncio.sleep(1.0)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 def _format_run_summary(r: Run) -> dict:
@@ -908,6 +1040,16 @@ def get_run_results(
     if not term_reason:
         if run.status in ("passed", "already_passing"):
             term_reason = "all_tests_passed"
+        elif run.status == "partially_repaired":
+            term_reason = "partial_repair_max_iterations"
+        elif run.status == "reviewer_rejected":
+            term_reason = "reviewer_rejected"
+        elif run.status == "test_error":
+            term_reason = "pytest_execution_error"
+        elif run.status == "timeout":
+            term_reason = "execution_timeout"
+        elif run.status == "cancelled":
+            term_reason = "cancelled_by_user"
         elif run.status == "stalled":
             term_reason = "repeated_failure"
         elif run.status == "failed":
@@ -1064,15 +1206,15 @@ def download_repaired_project(
     )
 
     buf.seek(0)
-    filename = f"aegiscode-repaired-{run_id}.zip"
+    filename = f"fixsembly-repaired-{run_id}.zip"
 
     return StreamingResponse(
         content=buf,
         media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
-            "X-AegisCode-Run-Id": run_id,
-            "X-AegisCode-File-Count": str(file_count),
+            "X-Fixsembly-Run-Id": run_id,
+            "X-Fixsembly-File-Count": str(file_count),
         },
     )
 

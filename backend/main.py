@@ -57,8 +57,8 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description=(
-            "AegisCode — Self-Healing Multi-Agent Software Engineering System. "
-            "Upload a broken Python project and watch autonomous agents repair it."
+            "Fixsembly: Self-Healing Multi-Agent Software Engineering System. "
+            "Three Agents. One Verified Fix. Red to green, automatically."
         ),
         lifespan=lifespan,
         docs_url="/docs",
@@ -66,13 +66,13 @@ def create_app() -> FastAPI:
     )
     origins = [
         o.strip() for o in settings.cors_origins.split(",") if o.strip()
-    ] or ["http://localhost:8501", "http://127.0.0.1:8501"]
+    ] or ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8501", "http://127.0.0.1:8501"]
     app.add_middleware(GuestRunAccessMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["*"],
         allow_headers=["*"],
     )
 

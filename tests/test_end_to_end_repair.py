@@ -397,7 +397,7 @@ class TestEndToEndRepair:
                 max_iterations=1,
             )
 
-            assert final_state["status"] == "failed"
+            assert final_state["status"] in ("failed", "reviewer_rejected")
             assert final_state["termination_reason"] in (
                 "reviewer_rejected", "max_iterations_reached",
             )

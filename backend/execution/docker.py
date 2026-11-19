@@ -118,7 +118,7 @@ class DockerExecutionBackend(ExecutionBackend):
         timeout: int | None = None,
     ) -> TestResult:
         effective_timeout = timeout or settings.pytest_timeout_seconds
-        container_name = f"aegiscode-{uuid.uuid4().hex[:12]}"
+        container_name = f"fixsembly-{uuid.uuid4().hex[:12]}"
 
         command = [
             "docker", "run",

@@ -1,4 +1,4 @@
-"""Live E2E Repair Verification Script for AegisCode."""
+"""Live E2E Repair Verification Script for Fixsembly."""
 
 import json
 import os
@@ -15,7 +15,7 @@ def main() -> None:
     if not BASE_URL:
         raise RuntimeError("BACKEND_URL must be set to the deployed FastAPI base URL.")
 
-    print("=== AEGISCODE LIVE E2E REPAIR TEST ===")
+    print("=== FIXSEMBLY LIVE E2E REPAIR TEST ===")
     print(f"Backend URL: {BASE_URL}")
 
     h_resp = requests.get(f"{BASE_URL}/health", timeout=15)

@@ -2,7 +2,7 @@
 import sqlite3
 import sys
 
-db_path = "aegiscode.db"
+db_path = "fixsembly.db"
 
 try:
     conn = sqlite3.connect(db_path)

@@ -1,5 +1,5 @@
 """
-SQLAlchemy ORM models for AegisCode.
+SQLAlchemy ORM models for Fixsembly.
 """
 from __future__ import annotations
 

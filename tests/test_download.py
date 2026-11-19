@@ -293,7 +293,7 @@ class TestDownloadEndpoint:
 
         cd = resp.headers.get("content-disposition", "")
         assert "attachment" in cd
-        assert f"aegiscode-repaired-{run.id}.zip" in cd
+        assert f"fixsembly-repaired-{run.id}.zip" in cd
 
     # 11. Stalled run → download rejected with 409
     def test_stalled_run_download_rejected(self, dl_client, dl_db):

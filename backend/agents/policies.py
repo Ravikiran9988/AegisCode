@@ -1,7 +1,7 @@
 """
 Security Policy Engine — Phase 3.
 
-Enforces tool permissions and file protection rules for AegisCode agents.
+Enforces tool permissions and file protection rules for Fixsembly agents.
 
 Policy Rules
 ------------
@@ -27,12 +27,20 @@ _TEST_FILE_PATTERNS = (
 
 _PROTECTED_SYSTEM_PATTERNS = (
     re.compile(r"^\.git/"),
+    re.compile(r"^\.github/"),
+    re.compile(r"^\.gitlab.*"),
+    re.compile(r"^\.circleci/"),
     re.compile(r"^\.env.*"),
     re.compile(r".*/\.env.*"),
     re.compile(r".*credentials.*"),
     re.compile(r".*secrets.*"),
+    re.compile(r".*\.pem$"),
+    re.compile(r".*\.key$"),
+    re.compile(r".*\.cert$"),
     re.compile(r"^Dockerfile.*"),
     re.compile(r"^docker-compose.*"),
+    re.compile(r"^compose\.ya?ml"),
+    re.compile(r".*\.(exe|dll|so|dylib|bat|cmd|ps1|sh)$"),
 )
 
 
@@ -45,7 +53,7 @@ def check_file_modification_policy(
     allow_test_modification: bool = False,
 ) -> None:
     """
-    Verify whether modifying `relative_path` is permitted under AegisCode security policy.
+    Verify whether modifying `relative_path` is permitted under Fixsembly security policy.
 
     Raises PolicyViolationError if forbidden.
     """

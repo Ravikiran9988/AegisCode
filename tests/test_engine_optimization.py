@@ -1,5 +1,5 @@
 """
-Tests for AegisCode Repair Engine Speed & Efficiency Optimizations.
+Tests for Fixsembly Repair Engine Speed & Efficiency Optimizations.
 
 Verifies:
 1. Pytest failure SKIPS Reviewer LLM call.

@@ -1,5 +1,5 @@
 """
-Structured logging configuration for AegisCode.
+Structured logging configuration for Fixsembly.
 
 Call `setup_logging()` once at application startup.
 Everywhere else just use `logging.getLogger(__name__)`.

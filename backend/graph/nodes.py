@@ -1,7 +1,7 @@
 """
 LangGraph Nodes — Phase 4.
 
-Individual node implementations for the AegisCode repair state machine.
+Individual node implementations for the Fixsembly repair state machine.
 Each node takes a `RepairState`, invokes the appropriate Phase 2 tools or Phase 3 agents,
 persists DB events and iterations via authoritative upserts, and returns updated state fields.
 """
@@ -47,6 +47,24 @@ def _record_timing(
     iter_t[stage_name] = round(duration, 3)
     timings[iteration] = iter_t
     updates["iteration_timings"] = timings
+
+
+def _is_run_cancelled(run_id: str, db: Session | None) -> bool:
+    """Check if the run has been cancelled asynchronously in the database."""
+    if not db or not run_id:
+        return False
+    try:
+        run_rec = db.get(Run, run_id)
+        return bool(run_rec and run_rec.status == "cancelled")
+    except Exception:
+        return False
+
+
+def _is_execution_timed_out(start_time: float) -> bool:
+    """Check if total workflow execution time has exceeded the configured timeout."""
+    if not start_time:
+        return False
+    return (time.monotonic() - start_time) > settings.execution_timeout_seconds
 
 
 
@@ -181,6 +199,13 @@ def architect_node(
     iteration = state.get("iteration", 1)
     project_path = state["project_path"]
 
+    if _is_run_cancelled(run_id, db):
+        logger.info("[CANCELLED] Run %s cancelled before Architect", run_id)
+        return {"status": "cancelled", "termination_reason": "cancelled_by_user"}
+    if _is_execution_timed_out(state.get("start_time", 0.0)):
+        logger.warning("[TIMEOUT] Run %s timed out before Architect", run_id)
+        return {"status": "timeout", "termination_reason": "execution_timeout"}
+
     _emit_event(
         db,
         run_id,
@@ -282,6 +307,13 @@ def coder_node(
     run_id = state.get("run_id", "")
     iteration = state.get("iteration", 1)
     project_path = state["project_path"]
+
+    if _is_run_cancelled(run_id, db):
+        logger.info("[CANCELLED] Run %s cancelled before Coder", run_id)
+        return {"status": "cancelled", "termination_reason": "cancelled_by_user"}
+    if _is_execution_timed_out(state.get("start_time", 0.0)):
+        logger.warning("[TIMEOUT] Run %s timed out before Coder", run_id)
+        return {"status": "timeout", "termination_reason": "execution_timeout"}
     eff_max = state.get("max_iterations", settings.max_agent_iterations)
 
     rel_file = ""
@@ -507,6 +539,13 @@ def test_node(
     iteration = state.get("iteration", 1)
     project_path = Path(state["project_path"])
 
+    if _is_run_cancelled(run_id, db):
+        logger.info("[CANCELLED] Run %s cancelled before Test", run_id)
+        return {"status": "cancelled", "termination_reason": "cancelled_by_user"}
+    if _is_execution_timed_out(state.get("start_time", 0.0)):
+        logger.warning("[TIMEOUT] Run %s timed out before Test", run_id)
+        return {"status": "timeout", "termination_reason": "execution_timeout"}
+
     _emit_event(
         db,
         run_id,
@@ -601,7 +640,14 @@ def test_node(
     }
 
 
-    if not res.success:
+    if res.exit_code in (2, 3, 4):
+        logger.warning(
+            "[TEST ERROR] run_id=%s Pytest crashed with exit code %d -> TEST_ERROR",
+            run_id, res.exit_code,
+        )
+        updates["status"] = "test_error"
+        updates["termination_reason"] = f"pytest_execution_error_exit_code_{res.exit_code}"
+    elif not res.success:
         eff_max = state.get("max_iterations", settings.max_agent_iterations)
         git_diff = state.get("git_diff") or {}
         has_changes = bool(git_diff.get("has_changes", False)) if isinstance(git_diff, dict) else False
@@ -621,12 +667,21 @@ def test_node(
             updates["status"] = "stalled"
             updates["termination_reason"] = "repeated_failure"
         elif iteration >= eff_max:
-            logger.info(
-                "[REPAIR FAILED] run_id=%s Max iterations (%d) reached -> END",
-                run_id, eff_max,
-            )
-            updates["status"] = "failed"
-            updates["termination_reason"] = "max_iterations_reached"
+            init_failed = state.get("initial_failed_count", 0)
+            if 0 < res.failed < init_failed:
+                logger.info(
+                    "[PARTIALLY REPAIRED] run_id=%s Failing tests reduced from %d to %d at max iterations (%d)",
+                    run_id, init_failed, res.failed, eff_max,
+                )
+                updates["status"] = "partially_repaired"
+                updates["termination_reason"] = "partial_repair_max_iterations"
+            else:
+                logger.info(
+                    "[REPAIR FAILED] run_id=%s Max iterations (%d) reached -> END",
+                    run_id, eff_max,
+                )
+                updates["status"] = "failed"
+                updates["termination_reason"] = "max_iterations_reached"
         else:
             updates["iteration"] = iteration + 1
             updates["previous_failures"] = prev_fps + [curr_fp]
@@ -650,6 +705,13 @@ def reviewer_node(
     run_id = state.get("run_id", "")
     iteration = state.get("iteration", 1)
     project_path = state["project_path"]
+
+    if _is_run_cancelled(run_id, db):
+        logger.info("[CANCELLED] Run %s cancelled before Reviewer", run_id)
+        return {"status": "cancelled", "termination_reason": "cancelled_by_user"}
+    if _is_execution_timed_out(state.get("start_time", 0.0)):
+        logger.warning("[TIMEOUT] Run %s timed out before Reviewer", run_id)
+        return {"status": "timeout", "termination_reason": "execution_timeout"}
 
     _emit_event(
         db,
@@ -777,10 +839,10 @@ def reviewer_node(
             updates["termination_reason"] = "repeated_failure"
         elif iteration >= eff_max:
             logger.info(
-                "[REPAIR FAILED] run_id=%s Max iterations (%d) reached -> END",
+                "[REPAIR REVIEWER REJECTED] run_id=%s Max iterations (%d) reached with reviewer rejection -> END",
                 run_id, eff_max,
             )
-            updates["status"] = "failed"
+            updates["status"] = "reviewer_rejected"
             updates["termination_reason"] = "reviewer_rejected"
         else:
             updates["iteration"] = iteration + 1

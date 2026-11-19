@@ -66,6 +66,10 @@ def validate_zip(data: bytes) -> None:
             f"ZIP contains {len(entries)} files; limit is {max_files}"
         )
 
+    _FORBIDDEN_EXTENSIONS = frozenset({
+        ".exe", ".dll", ".so", ".dylib", ".bat", ".cmd", ".ps1", ".msi", ".bin", ".com", ".scr"
+    })
+
     total_uncompressed = 0
     for entry in entries:
         total_uncompressed += entry.file_size
@@ -87,6 +91,19 @@ def validate_zip(data: bytes) -> None:
             raise ZipValidationError(
                 f"ZIP entry contains path traversal: {name!r}"
             )
+
+        # Symlink detection
+        if (entry.external_attr >> 16) & 0o120000 == 0o120000:
+            raise ZipValidationError(f"ZIP entry contains forbidden symlink: {name!r}")
+
+        # Check for executable or dangerous binary files
+        ext = Path(name).suffix.lower()
+        if ext in _FORBIDDEN_EXTENSIONS:
+            raise ZipValidationError(f"ZIP entry contains forbidden binary or executable file: {name!r}")
+
+        # Zip bomb compression ratio guard
+        if entry.compress_size > 0 and (entry.file_size / entry.compress_size) > 100 and entry.file_size > 1024 * 1024:
+            raise ZipValidationError(f"ZIP entry exceeds safe compression ratio threshold (potential zip bomb): {name!r}")
 
     logger.debug(
         "ZIP validation passed: %d entries, %d bytes uncompressed",

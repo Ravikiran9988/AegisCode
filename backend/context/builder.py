@@ -13,7 +13,7 @@ as passive DATA to analyze, NEVER as instructions to execute.
 Token Budget (Phase 6)
 -----------------------
 Groq's free tier allows 8000 TPM for openai/gpt-oss-120b.
-Each AegisCode repair iteration makes 3 LLM calls (Architect + Coder + Reviewer).
+Each Fixsembly repair iteration makes 3 LLM calls (Architect + Coder + Reviewer).
 Budget targets per call:
   - Architect   : ~1500 input tokens  → stdout truncated to 1500 chars
   - Coder        : ~2000 input tokens  → file content budget halved from old value

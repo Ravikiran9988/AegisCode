@@ -83,3 +83,68 @@ async def upload_project(
         message=f"Project uploaded successfully. {file_count} Python file(s) found.",
     )
 
+
+@router.post("/demo", response_model=ProjectUploadResponse, status_code=status.HTTP_201_CREATED)
+async def load_demo_project(
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+    guest_session_id: str | None = Header(default=None, alias="X-Guest-Session-ID"),
+    guest_name: str | None = Header(default=None, alias="X-Guest-Name"),
+) -> ProjectUploadResponse:
+    """Load the built-in Buggy Calculator benchmark project for instant demo execution."""
+    from pathlib import Path
+    demo_zip_path = Path("./demo_projects/buggy_calculator.zip")
+    if not demo_zip_path.exists():
+        raise HTTPException(status_code=404, detail="Demo project archive not found on server")
+
+    data = demo_zip_path.read_bytes()
+
+    guest = None
+    if current_user is None:
+        eff_session_id = guest_session_id or "default-guest-session"
+        eff_name = (guest_name.strip() if (guest_name and guest_name.strip()) else "Guest User")
+        guest = db.query(Guest).filter(Guest.session_id == eff_session_id).first()
+        if guest is None:
+            guest = Guest(name=eff_name, session_id=eff_session_id)
+            db.add(guest)
+            db.flush()
+        else:
+            guest.name = eff_name
+            guest.last_seen_at = datetime.now(timezone.utc)
+
+    workspace = WorkspaceManager.create(base_dir=settings.workspace_path)
+    try:
+        project_path = workspace.extract_project(data)
+        workspace.set_project_root(project_path)
+        init_repo(project_path)
+    except Exception as exc:
+        workspace.cleanup()
+        raise HTTPException(status_code=422, detail=f"Demo extraction failed: {exc}") from exc
+
+    file_count = sum(1 for _ in project_path.rglob("*.py"))
+    project_name = "buggy_calculator"
+    project = Project(
+        user_id=current_user.id if current_user else None,
+        guest_id=guest.id if guest else None,
+        name=project_name,
+        original_filename="buggy_calculator.zip",
+        workspace_path=str(workspace.get_workspace_path()),
+        file_count=file_count,
+        size_bytes=len(data),
+        archive_data=data,
+    )
+    db.add(project)
+    db.flush()
+    db.commit()
+
+    return ProjectUploadResponse(
+        project_id=project.id,
+        name=project_name,
+        file_count=file_count,
+        size_bytes=len(data),
+        workspace_id=workspace.workspace_id,
+        uploaded_at=datetime.now(timezone.utc).isoformat(),
+        message="Demo Buggy Calculator project loaded successfully.",
+    )
+
+

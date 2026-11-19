@@ -1,7 +1,7 @@
 """
 LangGraph Repair State — Phase 4.
 
-Strongly typed state definition for the AegisCode self-healing repair graph.
+Strongly typed state definition for the Fixsembly self-healing repair graph.
 Passed between graph nodes and updated during state transitions.
 """
 
@@ -12,7 +12,7 @@ from typing import Any, TypedDict
 
 class RepairState(TypedDict, total=False):
     """
-    State dictionary for the AegisCode LangGraph repair graph.
+    State dictionary for the Fixsembly LangGraph repair graph.
     """
 
     # Identifiers & Environment
@@ -51,11 +51,12 @@ class RepairState(TypedDict, total=False):
     repeated_failure_count: int
 
     # Overall Graph Status & Termination
-    status: str  # "running", "passed", "failed", "stalled", "already_passing", "error"
+    status: str  # "running", "passed", "partially_repaired", "failed", "stalled", "already_passing", "error", "cancelled", "test_error", "reviewer_rejected", "timeout"
     termination_reason: str | None
-    # Options: "all_tests_passed", "max_iterations_reached", "repeated_failure",
-    #          "policy_violation", "patch_application_failed", "quota_exhausted",
-    #          "llm_error", "workspace_error"
+    # Options: "all_tests_passed", "partial_repair_max_iterations", "max_iterations_reached",
+    #          "repeated_failure", "reviewer_rejected", "pytest_execution_error",
+    #          "execution_timeout", "cancelled_by_user", "policy_violation",
+    #          "patch_application_failed", "quota_exhausted", "llm_error", "workspace_error"
 
     # Evaluation Metrics & Telemetry
     start_time: float

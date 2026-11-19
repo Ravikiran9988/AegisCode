@@ -62,8 +62,8 @@ def init_repo(project_path: Path) -> None:
         with git.Repo.init(project_path) as repo:
             # Configure a throwaway identity so git commit doesn't fail
             with repo.config_writer() as cfg:
-                cfg.set_value("user", "name", "AegisCode")
-                cfg.set_value("user", "email", "aegiscode@local")
+                cfg.set_value("user", "name", "Fixsembly")
+                cfg.set_value("user", "email", "fixsembly@local")
 
             # Stage everything and make an initial commit
             repo.git.add(A=True)

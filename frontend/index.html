@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary Meta Tags -->
+    <title>Fixsembly | Three Agents. One Verified Fix.</title>
+    <meta name="title" content="Fixsembly: Three Agents. One Verified Fix." />
+    <meta name="description" content="Self-Healing Multi-Agent Software Engineering System. Fixsembly analyzes failing Python projects, repairs code, executes Pytest and verifies fixes. Red to green, automatically." />
+    <meta name="theme-color" content="#090d16" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Fixsembly: Three Agents. One Verified Fix." />
+    <meta property="og:description" content="Self-Healing Multi-Agent Software Engineering System. Red to green, automatically." />
+    <meta property="og:image" content="/favicon.svg" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary" />
+    <meta property="twitter:title" content="Fixsembly: Three Agents. One Verified Fix." />
+    <meta property="twitter:description" content="Self-Healing Multi-Agent Software Engineering System. Red to green, automatically." />
+    <meta property="twitter:image" content="/favicon.svg" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Immediate theme initializer to prevent flash -->
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('fixsembly_theme');
+          if (t === 'light') {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+            document.documentElement.style.colorScheme = 'light';
+          } else {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-brand-500/30 selection:text-brand-200 min-h-screen transition-colors duration-150">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
