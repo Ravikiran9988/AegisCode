@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -9,7 +9,7 @@
     <title>Fixsembly | Three Agents. One Verified Fix.</title>
     <meta name="title" content="Fixsembly: Three Agents. One Verified Fix." />
     <meta name="description" content="Self-Healing Multi-Agent Software Engineering System. Fixsembly analyzes failing Python projects, repairs code, executes Pytest and verifies fixes. Red to green, automatically." />
-    <meta name="theme-color" content="#090d16" />
+    <meta name="theme-color" content="#f8fafc" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -28,21 +28,25 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Immediate theme initializer to prevent flash -->
+    <!-- Apply the saved theme immediately; new visitors start in light mode. -->
     <script>
       (function() {
         try {
-          var t = localStorage.getItem('fixsembly_theme');
-          if (t === 'light') {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.classList.add('light');
-            document.documentElement.style.colorScheme = 'light';
-          } else {
+          var t = localStorage.getItem('fixsembly_theme') || 'light';
+          if (t === 'dark') {
             document.documentElement.classList.add('dark');
             document.documentElement.classList.remove('light');
             document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+            document.documentElement.style.colorScheme = 'light';
           }
-        } catch (e) {}
+        } catch (e) {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+          document.documentElement.style.colorScheme = 'light';
+        }
       })();
     </script>
   </head>
